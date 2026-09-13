@@ -1,0 +1,25 @@
+name: rodex
+description: "RODEX - Advanced AI Voice Assistant Android App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  speech_to_text: ^6.6.1
+  flutter_tts: ^3.8.5
+  permission_handler: ^11.3.1
+  http: ^1.2.0
+  google_fonts: ^6.1.0
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

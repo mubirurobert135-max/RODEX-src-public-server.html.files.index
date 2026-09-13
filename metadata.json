@@ -1,0 +1,10 @@
+{
+  "name": "RODEX",
+  "description": "Advanced AI voice assistant mobile prototype with a glowing reactive neural orb, tap-to-talk speech recognition, voice synthesis, real-time World Wide Web grounding, and Gemini intelligence.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
