@@ -326,7 +326,7 @@ export const CustomWakeWordTrainer: React.FC<CustomWakeWordTrainerProps> = ({
         });
         triggerHaptic('activate');
         playToneChime('wake');
-        rodexSynth.speak(`Custom wake-word verified. Subsystems ready for Mr. Robert.`);
+        rodexSynth.speak(`Custom wake-word verified. Subsystems ready for Mr. Robert.`, { rate: 1.05 });
       }, 1500);
       return;
     }

@@ -19,6 +19,7 @@ import {
   Compass,
   Sparkles,
   Radio,
+  Music2,
 } from 'lucide-react';
 import { AppMode } from '../types';
 import {
@@ -33,6 +34,7 @@ interface ModesModalProps {
   onClose: () => void;
   onSubmitPrompt: (text: string, image?: { data: string; mimeType: string }) => void;
   currentSources?: Array<{ title: string; url: string; domain?: string }>;
+  onOpenSpotify?: () => void;
 }
 
 export const ModesModal: React.FC<ModesModalProps> = ({
@@ -40,6 +42,7 @@ export const ModesModal: React.FC<ModesModalProps> = ({
   onClose,
   onSubmitPrompt,
   currentSources = [],
+  onOpenSpotify,
 }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imagePayload, setImagePayload] = useState<{ data: string; mimeType: string } | null>(null);
@@ -549,9 +552,39 @@ export const ModesModal: React.FC<ModesModalProps> = ({
             </div>
           )}
 
-          {/* MORE MODE: Android APK & Flutter Export */}
+          {/* MORE MODE: Android APK & Flutter Export + Spotify PC */}
           {mode === 'more' && (
             <div className="space-y-4">
+              {/* Spotify PC Controller Quick Launch */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-neutral-900 border border-emerald-800/70 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-900/90 border border-emerald-700/80 flex items-center justify-center text-emerald-400 shrink-0">
+                    <Music2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Spotify PC Controller</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono">
+                        DIRECT PC ACCESS
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Stream, search, volume, and voice control Spotify on Mr. Robert's PC.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenSpotify?.();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold shrink-0 transition-all active:scale-95 shadow-md shadow-emerald-500/20"
+                >
+                  Open &rarr;
+                </button>
+              </div>
+
               <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/60 flex items-start gap-3">
                 <Smartphone className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                 <p className="text-xs text-cyan-200 leading-relaxed">

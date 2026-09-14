@@ -51,7 +51,48 @@ export interface CustomWakeWordConfig {
   samples?: CustomWakeWordSample[];
 }
 
-export type AppMode = 'home' | 'chat' | 'image' | 'file' | 'code' | 'web' | 'more';
+export type AppMode = 'home' | 'chat' | 'image' | 'file' | 'code' | 'web' | 'spotify' | 'more';
+
+export interface SpotifyDevice {
+  id: string;
+  name: string;
+  type: string;
+  is_active: boolean;
+  is_private_session: boolean;
+  is_restricted: boolean;
+  volume_percent: number;
+  supports_volume: boolean;
+}
+
+export interface SpotifyTrackInfo {
+  id: string;
+  name: string;
+  artists: string[];
+  album: string;
+  albumArtUrl?: string;
+  durationMs: number;
+  progressMs: number;
+  isPlaying: boolean;
+  uri: string;
+  externalUrl?: string;
+  device?: SpotifyDevice | null;
+}
+
+export interface SpotifyStatus {
+  connected: boolean;
+  isDemo: boolean;
+  configured: boolean;
+  redirectUri: string;
+  appUrl: string;
+  playback: SpotifyTrackInfo | null;
+  device: SpotifyDevice | null;
+  devices: SpotifyDevice[];
+  user?: {
+    displayName: string;
+    email?: string;
+    product?: string;
+  };
+}
 
 export interface VoiceSettings {
   voiceURI: string;
@@ -66,7 +107,7 @@ export interface VoiceSettings {
   customWakeWord?: CustomWakeWordConfig;
 }
 
-export type ThemeAccent = 'cyan' | 'emerald' | 'purple' | 'azure';
+export type ThemeAccent = 'auto' | 'cyan' | 'gold' | 'ruby' | 'emerald' | 'purple' | 'azure';
 
 export interface QuickPrompt {
   id: string;
@@ -86,4 +127,42 @@ export interface WebVerificationResult {
   sampleHeadline?: string;
   neuralOps?: string;
   verifiedUser?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  startedAt: string;
+  lastActiveAt: string;
+  isLive: boolean;
+  messages: ChatMessage[];
+  speaker: string;
+}
+
+export interface MediaSearchResult {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  duration?: string;
+  type: 'song' | 'music_video' | 'artist' | 'playlist';
+  videoUrl?: string;
+  audioUrl?: string;
+  albumArtUrl?: string;
+  releaseDate?: string;
+  genre?: string;
+  lyricsSnippet?: string;
+  sources: WebSource[];
+  recommendedQuality: 'HD' | 'SD' | 'Audio-Only';
+}
+
+export interface NetworkQualityStats {
+  effectiveType: string;
+  latencyMs: number;
+  downlinkMbps: number;
+  connectionStable: boolean;
+  bufferingRisk: 'low' | 'medium' | 'high';
+  strategy: 'high-quality' | 'balanced' | 'low-bandwidth' | 'offline';
+  deviceCores: number;
+  deviceMemoryGb?: number;
 }

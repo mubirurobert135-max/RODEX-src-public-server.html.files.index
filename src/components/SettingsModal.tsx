@@ -13,8 +13,13 @@ import {
   Globe,
   Smartphone,
   Zap,
+  Music2,
+  Radio,
+  Image as ImageIcon,
+  Code2,
+  Cpu,
 } from 'lucide-react';
-import { VoiceSettings, ThemeAccent } from '../types';
+import { VoiceSettings, ThemeAccent, AppMode } from '../types';
 import { rodexSynth } from '../utils/speech';
 import { triggerHaptic, isHapticsSupported } from '../utils/haptics';
 
@@ -28,6 +33,9 @@ interface SettingsModalProps {
   onRequestMicPermission: () => Promise<boolean>;
   micPermissionGranted: boolean;
   onOpenVoiceProfile?: () => void;
+  onOpenSpotify?: () => void;
+  onOpenWebVerify?: () => void;
+  onSelectMode?: (mode: AppMode) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -40,6 +48,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onRequestMicPermission,
   micPermissionGranted,
   onOpenVoiceProfile,
+  onOpenSpotify,
+  onOpenWebVerify,
+  onSelectMode,
 }) => {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [testTestingVoice, setTestingVoice] = useState(false);
@@ -249,7 +260,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <div className="space-y-2">
-                {/* Mr. Robert Voice Profile Link */}
+                {/* Voice Profile Calibration Link */}
                 <button
                   onClick={() => {
                     onClose();
@@ -259,9 +270,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 >
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Voice ID: <strong>Mr. Robert</strong></span>
+                    <span>Voice Profile: <strong>Speaker Calibrated</strong></span>
                   </span>
-                  <span className="text-[11px] text-cyan-400 font-medium">Calibrated &rarr;</span>
+                  <span className="text-[11px] text-cyan-400 font-medium">Manage &rarr;</span>
                 </button>
 
                 <label className="flex items-start justify-between cursor-pointer pt-1">
@@ -334,6 +345,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>Source verification:</span>
                   <span className="text-cyan-400 font-medium">Real-time Web Grounding</span>
                 </div>
+
+                {onOpenWebVerify && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenWebVerify();
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-xs text-cyan-300 flex items-center justify-between transition-colors active:scale-98 cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Launch Web Grounding & Network Monitor</span>
+                    </span>
+                    <span className="text-cyan-400 font-bold">&rarr;</span>
+                  </button>
+                )}
+              </div>
+            </section>
+
+            {/* Specialized Operational Modes */}
+            <section className="bg-neutral-950 border border-neutral-900 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">
+                  <Cpu className="w-4 h-4" />
+                  <span>Assistant Modes & Tools</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-medium">
+                  Tool Suite
+                </span>
+              </div>
+
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Launch specialized workspaces for vision inspection, live web intelligence, or code synthesis:
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSelectMode?.('home');
+                  }}
+                  className="p-2.5 rounded-xl border border-neutral-800 bg-neutral-900/60 hover:border-cyan-500/50 text-left transition-all active:scale-98 cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-200 font-medium">
+                    <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Voice Orb</span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 mt-0.5 block">Minimal Core</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSelectMode?.('image');
+                  }}
+                  className="p-2.5 rounded-xl border border-neutral-800 bg-neutral-900/60 hover:border-purple-500/50 text-left transition-all active:scale-98 cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-200 font-medium">
+                    <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Vision</span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 mt-0.5 block">Image Analysis</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSelectMode?.('web');
+                  }}
+                  className="p-2.5 rounded-xl border border-neutral-800 bg-neutral-900/60 hover:border-emerald-500/50 text-left transition-all active:scale-98 cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-200 font-medium">
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Web Intel</span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 mt-0.5 block">Live Search</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSelectMode?.('code');
+                  }}
+                  className="p-2.5 rounded-xl border border-neutral-800 bg-neutral-900/60 hover:border-blue-500/50 text-left transition-all active:scale-98 cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-200 font-medium">
+                    <Code2 className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Code</span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 mt-0.5 block">Developer Lab</span>
+                </button>
               </div>
             </section>
 
@@ -444,15 +551,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </section>
 
+            {/* Spotify PC Access & Integration */}
+            <section className="bg-neutral-950 border border-emerald-950/80 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-400 font-medium text-sm">
+                  <Music2 className="w-4 h-4" />
+                  <span>Spotify PC Access & Playback</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-medium">
+                  PC Output Link
+                </span>
+              </div>
+
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Empower RODEX with direct control over Spotify desktop playback. Issue natural voice commands to stream songs, control playback, skip tracks, and adjust volume.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenSpotify?.();
+                }}
+                className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-800 text-xs font-semibold text-emerald-300 flex items-center justify-between transition-colors shadow-sm active:scale-98 cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Launch Spotify PC Controller & Player</span>
+                </span>
+                <span className="text-emerald-400 font-bold">&rarr;</span>
+              </button>
+            </section>
+
             {/* 5. Theme Accents */}
             <section className="bg-neutral-950 border border-neutral-900 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">
-                <Palette className="w-4 h-4" />
-                <span>Orb Glow Palette</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">
+                  <Palette className="w-4 h-4" />
+                  <span>Orb Glow Palette</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-medium">
+                  {themeAccent === 'auto' ? 'Dynamic Adaptive' : 'Fixed Tone'}
+                </span>
               </div>
+
+              <p className="text-[11px] text-neutral-400">
+                Theme-aware base glow and neural plasma colors. Shifts dynamically based on active mode (Gold for thinking, Cyan for idle, Ruby for live calls).
+              </p>
 
               <div className="grid grid-cols-2 gap-2.5">
                 {[
+                  {
+                    id: 'auto' as ThemeAccent,
+                    label: 'Theme-Aware',
+                    desc: 'Gold (think), Cyan (idle), Ruby (calls)',
+                    colors: 'from-amber-400 via-cyan-400 to-rose-500',
+                  },
                   {
                     id: 'cyan' as ThemeAccent,
                     label: 'RODEX Core',
@@ -460,21 +614,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     colors: 'from-cyan-500 to-blue-600',
                   },
                   {
+                    id: 'gold' as ThemeAccent,
+                    label: 'Neural Gold',
+                    desc: 'Amber, Solar Gold & Filament Corona',
+                    colors: 'from-amber-400 to-yellow-600',
+                  },
+                  {
+                    id: 'ruby' as ThemeAccent,
+                    label: 'Ruby Crimson',
+                    desc: 'Ruby Red & Coral Rose for calls',
+                    colors: 'from-rose-500 to-red-700',
+                  },
+                  {
                     id: 'emerald' as ThemeAccent,
                     label: 'Cyber Emerald',
-                    desc: 'Emerald & Jade Green',
+                    desc: 'Emerald & Jade Green for Spotify',
                     colors: 'from-emerald-400 to-teal-700',
                   },
                   {
                     id: 'purple' as ThemeAccent,
                     label: 'Quantum Violet',
-                    desc: 'Violet & Electric Blue',
+                    desc: 'Violet & Electric Amethyst',
                     colors: 'from-purple-500 to-blue-600',
                   },
                   {
                     id: 'azure' as ThemeAccent,
                     label: 'Deep Azure',
-                    desc: 'Pure Azure & Cobalt',
+                    desc: 'Pure Azure & Cobalt Blue',
                     colors: 'from-blue-400 to-indigo-700',
                   },
                 ].map((item) => (
@@ -483,7 +649,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onClick={() => onUpdateTheme(item.id)}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       themeAccent === item.id
-                        ? 'border-cyan-400 bg-cyan-950/30'
+                        ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
                         : 'border-neutral-800 bg-neutral-900/50 hover:bg-neutral-900'
                     }`}
                   >
@@ -512,7 +678,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     wakeWordEnabled: false,
                     audioSens: 3,
                   });
-                  onUpdateTheme('cyan');
+                  onUpdateTheme('auto');
                 }}
                 className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
               >

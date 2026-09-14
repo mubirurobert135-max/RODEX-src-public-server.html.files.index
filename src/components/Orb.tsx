@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
-import { AssistantState } from '../types';
+import { AssistantState, AppMode, ThemeAccent } from '../types';
+import { getActiveOrbTheme, OrbGlowTheme } from '../utils/orbTheme';
 
 interface OrbProps {
   state: AssistantState;
@@ -8,6 +9,9 @@ interface OrbProps {
   pitchHz?: number; // detected voice pitch frequency in Hz (e.g. 85 - 240 Hz)
   onClick?: () => void;
   size?: number;
+  activeMode?: AppMode;
+  isLive?: boolean;
+  themeAccent?: ThemeAccent;
 }
 
 interface NeuralParticle {
@@ -28,12 +32,42 @@ export const Orb: React.FC<OrbProps> = ({
   pitchHz = 124,
   onClick,
   size = 280,
+  activeMode = 'home' as AppMode,
+  isLive = false,
+  themeAccent = 'auto' as ThemeAccent,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
   const audioLevelRef = useRef(audioLevel);
   const pitchHzRef = useRef(pitchHz);
   const sizeRef = useRef(size);
+
+  // Theme-aware dynamic glow color system
+  const activeTheme: OrbGlowTheme = useMemo(() => {
+    return getActiveOrbTheme({ state, isLive, activeMode, themeAccent });
+  }, [state, isLive, activeMode, themeAccent]);
+
+  const themeRef = useRef<OrbGlowTheme>(activeTheme);
+
+  // Interactive 3D tilt and pointer-tracking physics
+  const [pointerCoord, setPointerCoord] = useState<{ x: number; y: number; isHovered: boolean }>({
+    x: 0,
+    y: 0,
+    isHovered: false,
+  });
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const normX = Math.max(-1, Math.min(1, (e.clientX - centerX) / (rect.width / 2)));
+    const normY = Math.max(-1, Math.min(1, (e.clientY - centerY) / (rect.height / 2)));
+    setPointerCoord({ x: normX, y: normY, isHovered: true });
+  };
+
+  const handlePointerLeave = () => {
+    setPointerCoord({ x: 0, y: 0, isHovered: false });
+  };
 
   useEffect(() => {
     stateRef.current = state;
@@ -51,7 +85,11 @@ export const Orb: React.FC<OrbProps> = ({
     sizeRef.current = size;
   }, [size]);
 
-  // Professional Multi-Wave Plasma, HUD Precision Optics & Neural Synapse Canvas
+  useEffect(() => {
+    themeRef.current = activeTheme;
+  }, [activeTheme]);
+
+  // Professional Multi-Wave Plasma, HUD Precision Optics & Neural Synapse Canvas with Theme-Aware Glow
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -65,6 +103,19 @@ export const Orb: React.FC<OrbProps> = ({
     let hudRotation = 0;
     const startTime = performance.now();
     const canvasMargin = 65;
+
+    // Smoothed RGB color channels for smooth organic transition between themes
+    let smoothedR = themeRef.current.primaryRGB[0];
+    let smoothedG = themeRef.current.primaryRGB[1];
+    let smoothedB = themeRef.current.primaryRGB[2];
+
+    let smoothedR2 = themeRef.current.secondaryRGB[0];
+    let smoothedG2 = themeRef.current.secondaryRGB[1];
+    let smoothedB2 = themeRef.current.secondaryRGB[2];
+
+    let smoothedR3 = themeRef.current.accentRGB[0];
+    let smoothedG3 = themeRef.current.accentRGB[1];
+    let smoothedB3 = themeRef.current.accentRGB[2];
 
     // Initialize 48 Neural Synaptic Nodes
     const numParticles = 48;
@@ -89,6 +140,7 @@ export const Orb: React.FC<OrbProps> = ({
       animId = requestAnimationFrame(render);
 
       const currentState = stateRef.current;
+      const currentTheme = themeRef.current;
       const targetLevel = audioLevelRef.current || 0;
       const targetPitch = pitchHzRef.current || 124;
       const currentSize = sizeRef.current;
@@ -113,8 +165,13 @@ export const Orb: React.FC<OrbProps> = ({
       smoothedLevel += (targetLevel - smoothedLevel) * lerpSpeed;
       smoothedPitch += (targetPitch - smoothedPitch) * 0.12;
 
-      // Dynamic rotation acceleration - hyper-accelerated during neural thinking (millions of ops/sec)
-      const rotSpeed = currentState === 'thinking' ? 0.088 : currentState === 'speaking' ? 0.018 : 0.008;
+      // Dynamic rotation acceleration - hyper-accelerated during neural thinking
+      const rotSpeed =
+        currentState === 'thinking'
+          ? 0.088
+          : currentState === 'speaking'
+          ? 0.018
+          : 0.008;
       hudRotation += rotSpeed;
 
       const normPitch = Math.max(0, Math.min(1, (smoothedPitch - 85) / 155));
@@ -137,26 +194,31 @@ export const Orb: React.FC<OrbProps> = ({
       const orbRadius = (currentSize / 2) * currentOrbScale;
       const innerRadius = orbRadius + 4;
 
-      // Dynamic chromatic palette reacting to state and voice pitch:
-      let rNode = 6, gNode = 182, bNode = 212; // Cyan default
-      if (isThinking) {
-        rNode = 16; gNode = 185; bNode = 129; // Emerald
-      } else if (normPitch < 0.4) {
-        const t = normPitch / 0.4;
-        rNode = Math.round(59 * (1 - t) + 6 * t);
-        gNode = Math.round(130 * (1 - t) + 182 * t);
-        bNode = Math.round(246 * (1 - t) + 212 * t);
-      } else if (normPitch < 0.75) {
-        const t = (normPitch - 0.4) / 0.35;
-        rNode = Math.round(6 * (1 - t) + 16 * t);
-        gNode = Math.round(182 * (1 - t) + 185 * t);
-        bNode = Math.round(212 * (1 - t) + 129 * t);
-      } else {
-        const t = (normPitch - 0.75) / 0.25;
-        rNode = Math.round(16 * (1 - t) + 167 * t);
-        gNode = Math.round(185 * (1 - t) + 243 * t);
-        bNode = Math.round(129 * (1 - t) + 208 * t);
-      }
+      // Smooth organic RGB transitions towards active theme colors (e.g. Gold, Cyan, Ruby)
+      const colorTransitionSpeed = 0.12;
+      smoothedR += (currentTheme.primaryRGB[0] - smoothedR) * colorTransitionSpeed;
+      smoothedG += (currentTheme.primaryRGB[1] - smoothedG) * colorTransitionSpeed;
+      smoothedB += (currentTheme.primaryRGB[2] - smoothedB) * colorTransitionSpeed;
+
+      smoothedR2 += (currentTheme.secondaryRGB[0] - smoothedR2) * colorTransitionSpeed;
+      smoothedG2 += (currentTheme.secondaryRGB[1] - smoothedG2) * colorTransitionSpeed;
+      smoothedB2 += (currentTheme.secondaryRGB[2] - smoothedB2) * colorTransitionSpeed;
+
+      smoothedR3 += (currentTheme.accentRGB[0] - smoothedR3) * colorTransitionSpeed;
+      smoothedG3 += (currentTheme.accentRGB[1] - smoothedG3) * colorTransitionSpeed;
+      smoothedB3 += (currentTheme.accentRGB[2] - smoothedB3) * colorTransitionSpeed;
+
+      const rNode = Math.round(smoothedR);
+      const gNode = Math.round(smoothedG);
+      const bNode = Math.round(smoothedB);
+
+      const rNode2 = Math.round(smoothedR2);
+      const gNode2 = Math.round(smoothedG2);
+      const bNode2 = Math.round(smoothedB2);
+
+      const rNode3 = Math.round(smoothedR3);
+      const gNode3 = Math.round(smoothedR3);
+      const bNode3 = Math.round(smoothedB3);
 
       // -------------------------------------------------------------
       // 1. PRECISION HOLOGRAPHIC HUD RINGS & CARDINAL TICKS
@@ -171,10 +233,10 @@ export const Orb: React.FC<OrbProps> = ({
       ctx.beginPath();
       ctx.arc(0, 0, hudRadius, 0, Math.PI * 2);
       ctx.strokeStyle = isThinking
-        ? 'rgba(52, 211, 153, 0.45)'
+        ? `rgba(${rNode2}, ${gNode2}, ${bNode2}, 0.65)`
         : isActiveVoice
-        ? `rgba(${rNode}, ${gNode}, ${bNode}, 0.5)`
-        : 'rgba(6, 182, 212, 0.22)';
+        ? `rgba(${rNode}, ${gNode}, ${bNode}, 0.6)`
+        : `rgba(${rNode}, ${gNode}, ${bNode}, 0.28)`;
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 9]);
       ctx.stroke();
@@ -192,7 +254,7 @@ export const Orb: React.FC<OrbProps> = ({
         ctx.moveTo(Math.cos(angleTick) * tickR1, Math.sin(angleTick) * tickR1);
         ctx.lineTo(Math.cos(angleTick) * tickR2, Math.sin(angleTick) * tickR2);
         ctx.strokeStyle = isCardinal
-          ? (isThinking ? 'rgba(52, 211, 153, 0.85)' : `rgba(${rNode}, ${gNode}, ${bNode}, 0.85)`)
+          ? `rgba(${rNode2}, ${gNode2}, ${bNode2}, 0.9)`
           : 'rgba(255, 255, 255, 0.28)';
         ctx.lineWidth = isCardinal ? 1.5 : 0.9;
         ctx.stroke();
@@ -207,7 +269,7 @@ export const Orb: React.FC<OrbProps> = ({
         ctx.beginPath();
         ctx.arc(0, 0, hudRadius + 9, arcStart, arcStart + arcSpan);
         ctx.strokeStyle = isThinking
-          ? 'rgba(16, 185, 129, 0.65)'
+          ? `rgba(${rNode}, ${gNode}, ${bNode}, 0.8)`
           : `rgba(${rNode}, ${gNode}, ${bNode}, ${0.35 + smoothedLevel * 0.4})`;
         ctx.lineWidth = 1.6;
         ctx.stroke();
@@ -240,15 +302,13 @@ export const Orb: React.FC<OrbProps> = ({
         }
         ctx.closePath();
 
-        // Wave color palettes
-        const waveAlpha = isActiveVoice ? 0.42 + smoothedLevel * 0.35 : 0.16;
+        // Wave color palettes derived from theme
+        const waveAlpha = isActiveVoice ? 0.45 + smoothedLevel * 0.35 : 0.2;
         let waveStroke = `rgba(${rNode}, ${gNode}, ${bNode}, ${waveAlpha})`;
         if (w === 1) {
-          waveStroke = isThinking
-            ? `rgba(52, 211, 153, ${waveAlpha})`
-            : `rgba(99, 102, 241, ${waveAlpha})`; // Indigo accent
+          waveStroke = `rgba(${rNode2}, ${gNode2}, ${bNode2}, ${waveAlpha * 0.95})`;
         } else if (w === 2) {
-          waveStroke = `rgba(34, 211, 238, ${waveAlpha * 0.9})`; // Cyan
+          waveStroke = `rgba(${rNode3}, ${gNode3}, ${bNode3}, ${waveAlpha * 0.85})`;
         }
 
         ctx.strokeStyle = waveStroke;
@@ -261,7 +321,7 @@ export const Orb: React.FC<OrbProps> = ({
 
       // -------------------------------------------------------------
       // 3. NEURAL PARTICLE SYNAPSE SYSTEM (Pitch Reactive Inside Orb)
-      // Hyper-accelerated to millions of synaptic cycles per second during thinking
+      // Hyper-accelerated during neural thinking
       // -------------------------------------------------------------
       const kineticMultiplier = isThinking ? 4.8 : 0.55 + normPitch * 1.6 + smoothedLevel * 2.5;
       const pitchVibration = isThinking
@@ -296,7 +356,9 @@ export const Orb: React.FC<OrbProps> = ({
         }
       }
 
-      const maxSynapseDist = (38 + normPitch * 28 + smoothedLevel * 28 + (isThinking ? 18 : 0)) * (currentSize / 280);
+      const maxSynapseDist =
+        (38 + normPitch * 28 + smoothedLevel * 28 + (isThinking ? 18 : 0)) *
+        (currentSize / 280);
 
       // Draw Synaptic Filaments
       for (let i = 0; i < numParticles; i++) {
@@ -313,8 +375,8 @@ export const Orb: React.FC<OrbProps> = ({
           if (dist < maxSynapseDist) {
             const proximity = 1 - dist / maxSynapseDist;
             const synapseAlpha = isThinking
-              ? proximity * 0.72
-              : proximity * (0.22 + smoothedLevel * 0.55 + normPitch * 0.25);
+              ? proximity * 0.78
+              : proximity * (0.24 + smoothedLevel * 0.55 + normPitch * 0.25);
 
             ctx.beginPath();
             ctx.moveTo(px1, py1);
@@ -323,7 +385,7 @@ export const Orb: React.FC<OrbProps> = ({
             ctx.lineWidth = isThinking ? 1.6 : isActiveVoice ? 1.35 : 0.85;
             ctx.stroke();
 
-            // Action potential sparks firing continuously during high-capacity thinking or active voice
+            // Action potential sparks firing continuously during thinking or active voice
             if ((isActiveVoice || isThinking) && dist > 12) {
               const impulseFreq = isThinking ? 6.5 : 1.6 + (smoothedPitch / 100) * 2.4;
               const sparkProgress = (elapsed * impulseFreq + (i + j) * 0.21) % 1;
@@ -333,8 +395,8 @@ export const Orb: React.FC<OrbProps> = ({
               ctx.beginPath();
               ctx.arc(sparkX, sparkY, 1.2 + normPitch * 0.9, 0, Math.PI * 2);
               ctx.fillStyle = '#ffffff';
-              ctx.shadowBlur = 5 + normPitch * 7;
-              ctx.shadowColor = `rgba(${rNode}, ${gNode}, ${bNode}, 0.95)`;
+              ctx.shadowBlur = 6 + normPitch * 7;
+              ctx.shadowColor = `rgba(${rNode2}, ${gNode2}, ${bNode2}, 0.95)`;
               ctx.fill();
               ctx.shadowBlur = 0;
             }
@@ -348,18 +410,24 @@ export const Orb: React.FC<OrbProps> = ({
         const px = center + p.x;
         const py = center + p.y;
         const pulse = Math.sin(elapsed * (3.5 + normPitch * 5.0) + p.pulsePhase) * 0.35;
-        const nodeRadius = p.baseRadius * (1 + pulse + smoothedLevel * 0.65 + normPitch * 0.4);
+        const nodeRadius =
+          p.baseRadius * (1 + pulse + smoothedLevel * 0.65 + normPitch * 0.4);
 
         ctx.beginPath();
         ctx.arc(px, py, nodeRadius * 2.2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${rNode}, ${gNode}, ${bNode}, ${0.14 + smoothedLevel * 0.25 + normPitch * 0.15})`;
+        ctx.fillStyle = `rgba(${rNode}, ${gNode}, ${bNode}, ${
+          0.14 + smoothedLevel * 0.25 + normPitch * 0.15
+        })`;
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(px, py, nodeRadius, 0, Math.PI * 2);
         ctx.fillStyle = isActiveVoice
-          ? `rgba(${Math.min(255, rNode + 60)}, ${Math.min(255, gNode + 60)}, ${Math.min(255, bNode + 60)}, 0.95)`
-          : `rgba(${rNode}, ${gNode}, ${bNode}, 0.8)`;
+          ? `rgba(${Math.min(255, rNode + 45)}, ${Math.min(255, gNode + 45)}, ${Math.min(
+              255,
+              bNode + 45
+            )}, 0.95)`
+          : `rgba(${rNode}, ${gNode}, ${bNode}, 0.85)`;
         ctx.shadowBlur = 6 + normPitch * 6 + smoothedLevel * 8;
         ctx.shadowColor = `rgba(${rNode}, ${gNode}, ${bNode}, 0.9)`;
         ctx.fill();
@@ -431,14 +499,17 @@ export const Orb: React.FC<OrbProps> = ({
         const grad = ctx.createLinearGradient(x1, y1, x2, y2);
         if (isActiveVoice) {
           grad.addColorStop(0, `rgba(${rNode}, ${gNode}, ${bNode}, 0.38)`);
-          grad.addColorStop(0.65, `rgba(${Math.min(255, rNode + 35)}, ${Math.min(255, gNode + 35)}, ${Math.min(255, bNode + 35)}, 0.88)`);
+          grad.addColorStop(
+            0.65,
+            `rgba(${rNode2}, ${gNode2}, ${bNode2}, 0.88)`
+          );
           grad.addColorStop(1, '#ffffff');
         } else if (isThinking) {
-          grad.addColorStop(0, 'rgba(5, 150, 105, 0.35)');
-          grad.addColorStop(1, 'rgba(52, 211, 153, 0.85)');
+          grad.addColorStop(0, `rgba(${rNode}, ${gNode}, ${bNode}, 0.35)`);
+          grad.addColorStop(1, `rgba(${rNode2}, ${gNode2}, ${bNode2}, 0.9)`);
         } else {
-          grad.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
-          grad.addColorStop(1, 'rgba(34, 211, 238, 0.55)');
+          grad.addColorStop(0, `rgba(${rNode}, ${gNode}, ${bNode}, 0.22)`);
+          grad.addColorStop(1, `rgba(${rNode2}, ${gNode2}, ${bNode2}, 0.6)`);
         }
 
         ctx.beginPath();
@@ -452,9 +523,9 @@ export const Orb: React.FC<OrbProps> = ({
         if (isActiveVoice && barHeight > 8) {
           ctx.beginPath();
           ctx.arc(x2, y2, 1.5, 0, Math.PI * 2);
-          ctx.fillStyle = normPitch > 0.65 ? '#a7f3d0' : '#cffafe';
+          ctx.fillStyle = '#ffffff';
           ctx.shadowBlur = 6;
-          ctx.shadowColor = `rgba(${rNode}, ${gNode}, ${bNode}, 0.9)`;
+          ctx.shadowColor = `rgba(${rNode2}, ${gNode2}, ${bNode2}, 0.95)`;
           ctx.fill();
           ctx.shadowBlur = 0;
         }
@@ -469,7 +540,7 @@ export const Orb: React.FC<OrbProps> = ({
     };
   }, []);
 
-  // Calculate dynamic scale and glow based on state and audio level
+  // Calculate dynamic scale based on state and audio level
   const dynamicScale = useMemo(() => {
     switch (state) {
       case 'listening':
@@ -487,12 +558,18 @@ export const Orb: React.FC<OrbProps> = ({
   return (
     <div
       id="rodex-orb-container"
-      className="relative flex items-center justify-center cursor-pointer select-none"
-      style={{ width: size, height: size }}
+      className="relative flex items-center justify-center cursor-pointer select-none transition-transform duration-300"
+      style={{
+        width: size,
+        height: size,
+        perspective: 900,
+      }}
       onClick={onClick}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
       role="button"
       tabIndex={0}
-      aria-label={`RODEX AI Orb - Status: ${state}`}
+      aria-label={`RODEX AI Orb - Status: ${state} - Theme: ${activeTheme.name}`}
     >
       {/* Dynamic Multi-Wave & Frequency Equalizer Canvas */}
       <canvas
@@ -507,42 +584,58 @@ export const Orb: React.FC<OrbProps> = ({
         }}
       />
 
-      {/* Atmospheric Aurora Aura Glow */}
+      {/* Atmospheric Aurora Aura Glow - Color shifts with theme & mode */}
       <div
-        className={`absolute inset-0 rounded-full transition-all duration-700 pointer-events-none ${
+        className={`absolute inset-0 rounded-full transition-all duration-700 pointer-events-none blur-3xl ${
           state === 'listening'
-            ? 'opacity-85 scale-135 blur-3xl bg-cyan-500/35'
+            ? 'opacity-90 scale-135'
             : state === 'thinking'
-            ? 'opacity-90 scale-120 blur-3xl bg-emerald-500/35 animate-pulse'
+            ? 'opacity-95 scale-125 animate-pulse'
             : state === 'speaking'
-            ? 'opacity-90 scale-130 blur-3xl bg-teal-500/35'
-            : 'opacity-55 scale-105 blur-2xl bg-cyan-600/25'
+            ? 'opacity-90 scale-130'
+            : 'opacity-55 scale-105'
         }`}
+        style={{
+          backgroundColor: activeTheme.glowHex,
+          boxShadow: `0 0 85px ${activeTheme.glowHex}`,
+        }}
       />
 
       {/* Holographic Siri Fluid Ambient Ring */}
       <div
-        className="absolute inset-[-18px] rounded-full pointer-events-none opacity-40 animate-siri-aurora"
+        className="absolute inset-[-18px] rounded-full pointer-events-none opacity-45 animate-siri-aurora transition-all duration-700"
         style={{
-          background:
-            state === 'thinking'
-              ? 'conic-gradient(from 0deg, rgba(16,185,129,0.5), rgba(6,182,212,0.4), rgba(52,211,153,0.6), rgba(16,185,129,0.5))'
-              : 'conic-gradient(from 0deg, rgba(6,182,212,0.6), rgba(99,102,241,0.5), rgba(20,184,166,0.6), rgba(6,182,212,0.6))',
-          filter: 'blur(12px)',
+          background: `conic-gradient(from 0deg, rgba(${activeTheme.primaryRGB.join(
+            ','
+          )},0.6), rgba(${activeTheme.secondaryRGB.join(
+            ','
+          )},0.5), rgba(${activeTheme.accentRGB.join(
+            ','
+          )},0.6), rgba(${activeTheme.primaryRGB.join(',')},0.6))`,
+          filter: 'blur(14px)',
         }}
       />
 
       {/* Listening State Expansion Ripples */}
       {state === 'listening' && (
         <>
-          <span className="absolute w-full h-full rounded-full border border-cyan-400/50 animate-ripple-wave pointer-events-none" />
           <span
-            className="absolute w-full h-full rounded-full border border-teal-400/40 animate-ripple-wave pointer-events-none"
-            style={{ animationDelay: '0.6s' }}
+            className="absolute w-full h-full rounded-full border animate-ripple-wave pointer-events-none transition-colors duration-500"
+            style={{ borderColor: activeTheme.ringBorderColor }}
           />
           <span
-            className="absolute w-full h-full rounded-full border border-emerald-400/30 animate-ripple-wave pointer-events-none"
-            style={{ animationDelay: '1.2s' }}
+            className="absolute w-full h-full rounded-full border animate-ripple-wave pointer-events-none transition-colors duration-500"
+            style={{
+              borderColor: activeTheme.ringBorderColor,
+              animationDelay: '0.6s',
+            }}
+          />
+          <span
+            className="absolute w-full h-full rounded-full border animate-ripple-wave pointer-events-none transition-colors duration-500"
+            style={{
+              borderColor: activeTheme.ringBorderColor,
+              animationDelay: '1.2s',
+            }}
           />
         </>
       )}
@@ -550,22 +643,36 @@ export const Orb: React.FC<OrbProps> = ({
       {/* Harmonic Acoustic Ring for Speaking State */}
       {state === 'speaking' && (
         <div
-          className="absolute inset-[-14px] rounded-full border border-cyan-400/40 animate-pulse-ring pointer-events-none"
-          style={{ animationDuration: '1.6s' }}
+          className="absolute inset-[-14px] rounded-full border animate-pulse-ring pointer-events-none transition-colors duration-500"
+          style={{
+            borderColor: activeTheme.ringBorderColor,
+            animationDuration: '1.6s',
+          }}
         />
       )}
 
       {/* Quantum Accelerator Ring for Thinking State */}
       {state === 'thinking' && (
-        <div className="absolute inset-[-12px] rounded-full border-2 border-dashed border-emerald-400/50 animate-orb-spin-slow pointer-events-none" />
+        <div
+          className="absolute inset-[-12px] rounded-full border-2 border-dashed animate-orb-spin-slow pointer-events-none transition-colors duration-500"
+          style={{ borderColor: activeTheme.ringBorderColor }}
+        />
       )}
 
-      {/* Main Animated Spherical Core */}
+      {/* Main Animated Spherical Core with 3D Tilt and Tactile Responsiveness */}
       <motion.div
-        className="relative w-full h-full rounded-full overflow-hidden shadow-2xl flex items-center justify-center"
+        className="relative w-full h-full rounded-full overflow-hidden shadow-2xl flex items-center justify-center transition-[box-shadow] duration-700"
         animate={{
           scale: dynamicScale,
           y: state === 'idle' ? [0, -5, 0] : 0,
+          rotateX: pointerCoord.isHovered ? pointerCoord.y * -14 : 0,
+          rotateY: pointerCoord.isHovered ? pointerCoord.x * 14 : 0,
+        }}
+        whileHover={{
+          scale: dynamicScale * 1.035,
+        }}
+        whileTap={{
+          scale: dynamicScale * 0.95,
         }}
         transition={{
           y: {
@@ -575,56 +682,49 @@ export const Orb: React.FC<OrbProps> = ({
           },
           scale: {
             type: 'spring',
-            stiffness: 260,
+            stiffness: 280,
             damping: 22,
           },
+          rotateX: { type: 'spring', stiffness: 300, damping: 25 },
+          rotateY: { type: 'spring', stiffness: 300, damping: 25 },
         }}
         style={{
-          boxShadow:
-            state === 'listening'
-              ? '0 0 75px rgba(6, 182, 212, 0.65), inset 0 0 45px rgba(20, 184, 166, 0.65)'
-              : state === 'thinking'
-              ? '0 0 65px rgba(16, 185, 129, 0.65), inset 0 0 40px rgba(6, 182, 212, 0.55)'
-              : state === 'speaking'
-              ? '0 0 70px rgba(20, 184, 166, 0.65), inset 0 0 50px rgba(29, 78, 216, 0.55)'
-              : '0 0 50px rgba(6, 182, 212, 0.4), inset 0 0 35px rgba(29, 78, 216, 0.45)',
+          boxShadow: activeTheme.boxShadow(state, audioLevel),
+          transformStyle: 'preserve-3d',
         }}
       >
-        {/* Layer 1: Core Iridescent Nebula (Cyan -> Turquoise -> Deep Sapphire) */}
+        {/* Layer 1: Core Iridescent Nebula - Theme aware */}
         <div
-          className="absolute inset-0 rounded-full animate-orb-spin-slow"
+          className="absolute inset-0 rounded-full animate-orb-spin-slow transition-all duration-700"
           style={{
-            background:
-              state === 'thinking'
-                ? 'radial-gradient(circle at 35% 35%, #a7f3d0 0%, #10b981 25%, #059669 50%, #047857 72%, #064e3b 90%, #020617 100%)'
-                : 'radial-gradient(circle at 35% 35%, #a5f3fc 0%, #06b6d4 22%, #14b8a6 45%, #0d9488 65%, #10b981 78%, #1d4ed8 92%, #020617 100%)',
+            background: activeTheme.coreGradient,
             filter: 'contrast(1.18) brightness(1.06)',
           }}
         />
 
-        {/* Layer 2: Swirling Apple Siri Fluid Nebula Mesh */}
+        {/* Layer 2: Swirling Siri Fluid Nebula Mesh - Theme aware */}
         <div
-          className="absolute inset-0 rounded-full mix-blend-color-dodge opacity-80 animate-orb-spin-reverse pointer-events-none"
+          className="absolute inset-0 rounded-full mix-blend-color-dodge opacity-80 animate-orb-spin-reverse pointer-events-none transition-all duration-700"
           style={{
-            background:
-              state === 'thinking'
-                ? 'conic-gradient(from 45deg, #10b981, #34d399, #059669, #06b6d4, #10b981)'
-                : 'conic-gradient(from 45deg, #06b6d4, #6366f1, #14b8a6, #10b981, #06b6d4)',
+            background: activeTheme.meshGradient,
             filter: 'blur(16px)',
           }}
         />
 
         {/* Layer 3: Internal Luminous Starburst Core */}
         <div
-          className={`absolute rounded-full pointer-events-none transition-all duration-300 ${
+          className={`absolute rounded-full pointer-events-none transition-all duration-500 ${
             state === 'thinking'
-              ? 'w-28 h-28 bg-emerald-300/70 blur-md animate-ping'
+              ? 'w-28 h-28 blur-md animate-ping opacity-85'
               : state === 'listening'
-              ? 'w-30 h-30 bg-cyan-200/60 blur-lg scale-115'
+              ? 'w-30 h-30 blur-lg scale-115 opacity-75'
               : state === 'speaking'
-              ? 'w-28 h-28 bg-teal-200/60 blur-lg'
-              : 'w-22 h-22 bg-cyan-300/45 blur-md'
+              ? 'w-28 h-28 blur-lg opacity-75'
+              : 'w-22 h-22 blur-md opacity-50'
           }`}
+          style={{
+            backgroundColor: activeTheme.glowHex,
+          }}
         />
 
         {/* Layer 4: Glass Surface Specular Reflection & Fresnel Arch */}
@@ -637,7 +737,10 @@ export const Orb: React.FC<OrbProps> = ({
         />
 
         {/* Layer 5: High-Precision Outer Rim Bezel */}
-        <div className="absolute inset-0 rounded-full border border-cyan-300/40 pointer-events-none" />
+        <div
+          className="absolute inset-0 rounded-full border pointer-events-none transition-colors duration-700"
+          style={{ borderColor: activeTheme.ringBorderColor }}
+        />
       </motion.div>
     </div>
   );

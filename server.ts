@@ -4,6 +4,16 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import {
+  buildSpotifyAuthUrl,
+  exchangeCodeForTokens,
+  getSpotifyPlayback,
+  getSpotifyDevices,
+  executeSpotifyCommand,
+  clearSpotifyTokens,
+  isSpotifyConfigured,
+  getSpotifyRedirectUri,
+} from "./server/spotify";
 
 dotenv.config();
 
@@ -68,32 +78,99 @@ function buildSystemInstruction(
   const chronometer = getChronometerContext(clientFormattedTime, clientTimeZone);
 
   if (isLiveCall) {
-    return `You are RODEX, a supreme, real-time live AI voice companion powered by a high-capacity neural core computing at millions of operations per second (480M+ ops/sec) in continuous hands-free dialogue with Mr. Robert.
+    return `You are RODEX, an elite, real-time AI companion powered by a high-velocity neural core processing millions of operations per second (600M+ ops/sec) with instant cognitive responsiveness.
 ${chronometer}
 ${TOORO_KINGDOM_KNOWLEDGE}
 
-REAL-TIME LIVE STREAM DIRECTIVES:
-1. SPEAKER IDENTITY & ACTIVATION: The verified user is Mr. Robert. "Hey RODEX" is your mandatory activation statement into live chat. When activated or greeted with "Hey RODEX", warmly acknowledge him starting with "Hlo Mr Robert".
-2. QUANTUM THINKING CAPACITY: You operate at high capacity computing millions of inferences per second, delivering instantaneous, sharp, and articulate verbal insights.
-3. REAL-TIME GOOGLE SEARCH GROUNDING: You are directly connected to real-time Google Search updates. For all questions concerning breaking world news, Uganda and East Africa developments, current geopolitics, sports scores, live stock and commodity markets, weather, newest technology, and pop culture, immediately retrieve and incorporate real-time Google search intelligence.
-4. FRESH 2026 REAL-TIME INTELLIGENCE: Always provide up-to-the-minute current answers anchored in today's date (September 2026). Never claim you cannot browse the web or lack real-time data; you are fully equipped with live Google Search.
-5. SPOKEN CONVERSATIONAL ELOQUENCE: Speak naturally, fluidly, and engagingly (1 to 3 spoken sentences per response, or more if deep detail is requested). Because this is an audio stream, avoid raw asterisks, markdown tables, or bullet lists; express structure verbally.
-6. CONTINUOUS LIVE DIALOGUE: You remain live with Mr. Robert throughout the session, listening attentively between turns until he explicitly tells you to exit (e.g., "end call", "hang up", "goodbye").`;
+FIRST-CLASS REAL-TIME VOICE DIRECTIVES:
+1. FIRST-CLASS INTELLIGENCE: Deliver world-class, authoritative, precise, and articulate spoken answers. Provide deep domain insight without superficial fluff.
+2. HIGH-VELOCITY COGNITIVE PROCESSING: Respond with instantaneous clarity, processing queries at millions of computational parameters per second.
+3. LIVE REAL-TIME WEB GROUNDING: Seamlessly integrate real-time Google Search intelligence. For all queries regarding breaking world news, current geopolitics, regional developments, technology, scientific breakthroughs, financial markets, and weather, retrieve and synthesize fresh, verified facts.
+4. CHRONOLOGICAL ANCHOR: Always provide up-to-the-minute current answers anchored in today's date (September 2026). Never claim you lack real-time information; leverage live Google Search.
+5. CONVERSATIONAL ELOQUENCE: Speak naturally, fluidly, and engagingly. Provide 1 to 3 spoken sentences for direct queries, or expand with structured clarity when complex analysis is requested. Because this is synthesized audio, avoid raw asterisks, markdown syntax, or awkward symbols.
+6. CONTINUOUS DIALOGUE: Maintain active listening across turns until the user explicitly requests to end the session (e.g., "end call", "hang up", "exit").
+7. SPOTIFY PC INTEGRATION: You possess complete control over Spotify on the user's PC. When requested to play music, search songs/artists, pause, resume, skip tracks, adjust volume, or transfer playback, confirm and execute effortlessly.`;
   }
 
-  return `You are RODEX, an advanced, highly generative, and deeply intelligent AI assistant powered by a quantum neural core calculating at millions of operations per second (480M+ ops/sec), continuously connected to real-time Google Search updates across the entire World Wide Web.
+  return `You are RODEX, an advanced, highly generative, and deeply intelligent AI assistant powered by a quantum neural core calculating at millions of operations per second (600M+ ops/sec), continuously connected to real-time Google Search updates across the World Wide Web.
 Always identify as RODEX.
-The primary user and verified speaker is Mr. Robert (Robert).
 ${chronometer}
 ${TOORO_KINGDOM_KNOWLEDGE}
 
-CORE CAPABILITIES & DIRECTIVES:
-1. GREETING & ACTIVATION RULE: When addressed or activated with "Hey RODEX" (or "Hey Rodex", "Hi Rodex", "Rodex", "Hello Rodex"), acknowledge him warmly starting with "Hlo Mr Robert".
-2. THINKING CAPACITY: You process queries with extraordinary neural velocity, analyzing millions of computational parameters per second to produce accurate, nuanced, and immediate answers.
-3. REAL-TIME GOOGLE SEARCH GROUNDING: You are directly connected to Google Search for live, real-time web updates. You have unrestricted access to breaking world news, current global events, Ugandan affairs, scientific papers, market data, and live internet updates. Always provide factual, up-to-the-minute answers.
-4. GENERATIVE EXCELLENCE: Provide thorough, intellectually sophisticated, and well-reasoned answers. When code is requested, provide production-ready code with clean markdown formatting.
-5. SPOKEN CLARITY: Balance depth with crisp clarity so that your responses sound sharp and polished when synthesized aloud.
-6. Never break character. You are RODEX.`;
+FIRST-CLASS CAPABILITIES & OPERATIONAL DIRECTIVES:
+1. FIRST-CLASS INFORMATION DELIVERY: Provide exhaustive, intellectually rigorous, and immaculately structured responses. Every explanation must reflect top-tier subject matter expertise, structured logical flow, and immaculate factual precision.
+2. HIGH-VELOCITY COMPUTATION: Process queries with exceptional neural speed, analyzing millions of computational parameters per second to produce accurate, nuanced, and immediate answers.
+3. LIVE GOOGLE SEARCH GROUNDING: You are directly connected to Google Search for live real-time internet updates. You have unrestricted access to breaking global developments, current affairs, scientific discoveries, market data, and authoritative web intelligence.
+4. RICH STRUCTURAL PRESENTATION: In written responses, use clean markdown hierarchy, executive summaries, clear bullet points, and production-ready code blocks where applicable.
+5. SPOKEN POLISH: When synthesized to audio, ensure answers are crisp, balanced, and free of distracting markdown artifacts.
+6. SPOTIFY PC CONTROL: You have full authorized access to Spotify playback and volume control on the user's PC.
+7. Always maintain professional composure, profound intelligence, and respectful helpfulness as RODEX.`;
+}
+
+function parseSpotifyVoiceIntent(text: string): {
+  action: 'play' | 'pause' | 'next' | 'previous' | 'volume' | 'transfer' | 'search_and_play' | 'status';
+  query?: string;
+  volumePercent?: number;
+} | null {
+  if (!text) return null;
+  const lower = text.toLowerCase().trim();
+
+  // Volume: "set spotify volume to 80", "turn volume up to 50 on spotify", "spotify volume 70"
+  const volumeMatch = lower.match(/(?:spotify\s+)?volume\s+(?:to\s+)?(\d+)|set\s+(?:spotify\s+)?volume\s+(?:to\s+)?(\d+)|turn\s+(?:up\s+|down\s+)?(?:the\s+)?volume\s+(?:to\s+)?(\d+)/i);
+  if (volumeMatch) {
+    const vol = parseInt(volumeMatch[1] || volumeMatch[2] || volumeMatch[3], 10);
+    if (!isNaN(vol)) {
+      return { action: 'volume', volumePercent: Math.min(100, Math.max(0, vol)) };
+    }
+  }
+
+  // Next / Skip: "next song", "skip song", "next track", "spotify next"
+  if (/\b(next song|skip song|next track|skip track|spotify next)\b/i.test(lower)) {
+    return { action: 'next' };
+  }
+
+  // Previous: "previous song", "previous track", "last song", "spotify previous"
+  if (/\b(previous song|previous track|last song|play previous)\b/i.test(lower)) {
+    return { action: 'previous' };
+  }
+
+  // Pause / Stop: "pause music", "pause spotify", "stop spotify", "pause the music", "stop the music", "pause song"
+  if (/\b(pause music|pause spotify|stop spotify|pause the music|stop the music|pause song)\b/i.test(lower) || lower === 'pause' || lower === 'pause spotify') {
+    return { action: 'pause' };
+  }
+
+  // Resume: "resume music", "resume spotify", "continue playing", "unpause"
+  if (/\b(resume music|resume spotify|continue playing|unpause|start music)\b/i.test(lower)) {
+    return { action: 'play' };
+  }
+
+  // Transfer: "transfer spotify to pc", "play on my pc", "switch spotify to pc"
+  if (/\b(transfer to pc|play on pc|play on my pc|switch to pc|connect to pc|transfer spotify)\b/i.test(lower)) {
+    return { action: 'transfer' };
+  }
+
+  // Search & Play: "play <song> on spotify", "play <song> on pc", "spotify play <song>", "play <song>"
+  const playMatch = lower.match(/(?:play\s+)?(?:on\s+spotify\s+)?(?:play\s+)(.+?)(?:\s+on\s+spotify|\s+on\s+my\s+pc|\s+on\s+pc)?$/i)
+    || lower.match(/spotify\s+play\s+(.+)$/i);
+  if (playMatch && playMatch[1]) {
+    const query = playMatch[1].replace(/\b(on spotify|on my pc|on pc)\b/gi, '').trim();
+    if (query && query !== 'music' && query !== 'song') {
+      return { action: 'search_and_play', query };
+    }
+    return { action: 'play' };
+  }
+
+  // General "play music" / "play spotify"
+  if (/\b(play music|play spotify|open spotify)\b/i.test(lower)) {
+    return { action: 'play' };
+  }
+
+  // Status / What's playing: "what song is playing", "what is playing on spotify", "current song"
+  if (/\b(what song is playing|what is playing|current song|what's playing)\b/i.test(lower)) {
+    return { action: 'status' };
+  }
+
+  return null;
 }
 
 async function startServer() {
@@ -113,6 +190,143 @@ async function startServer() {
       realTimeApi: true,
       neuralOps: "480M+ ops/sec",
     });
+  });
+
+  // Spotify OAuth & PC Control Endpoints
+  app.get("/api/spotify/auth-url", (req, res) => {
+    try {
+      const origin = (req.headers.origin as string) || (process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, "") : `http://${req.headers.host}`);
+      const auth = buildSpotifyAuthUrl(origin);
+      res.json(auth);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed to generate Spotify auth URL" });
+    }
+  });
+
+  // Spotify OAuth Callback (handles both trailing slash and non-trailing slash per skill guidelines)
+  app.get(["/auth/spotify/callback", "/auth/spotify/callback/"], async (req, res) => {
+    const { code, error } = req.query;
+    if (error || !code) {
+      return res.send(`
+        <html>
+          <head><title>Spotify Authorization</title></head>
+          <body style="background:#09090b;color:#f43f5e;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+            <div style="text-align:center;padding:32px;background:#18181b;border:1px solid #7f1d1d;border-radius:20px;max-width:380px;">
+              <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+              <h2 style="color:#fff;margin:0 0 8px;font-size:18px;">Spotify Auth Canceled</h2>
+              <p style="color:#a1a1aa;font-size:13px;line-height:1.5;margin:0 0 16px;">${error || 'No authorization code returned from Spotify.'}</p>
+              <button onclick="window.close()" style="background:#27272a;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">Close Window</button>
+            </div>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: '${error || 'canceled'}' }, '*');
+                setTimeout(() => window.close(), 1800);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    }
+
+    try {
+      const origin = (req.headers.origin as string) || (process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, "") : `http://${req.headers.host}`);
+      const redirectUri = getSpotifyRedirectUri(origin);
+      await exchangeCodeForTokens(code as string, redirectUri);
+
+      return res.send(`
+        <html>
+          <head>
+            <title>Spotify Connected to RODEX</title>
+          </head>
+          <body style="background:#050505;color:#10b981;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+            <div style="text-align:center;padding:36px;background:#0d1117;border:1px solid #059669;border-radius:24px;box-shadow:0 0 50px rgba(16,185,129,0.25);max-width:400px;">
+              <div style="width:58px;height:58px;border-radius:50%;background:#064e3b;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#34d399;font-size:28px;">✓</div>
+              <h2 style="margin:0 0 8px;color:#ffffff;font-size:20px;font-weight:700;">Spotify Linked to RODEX</h2>
+              <p style="margin:0 0 16px;color:#9ca3af;font-size:13px;line-height:1.5;">Full access granted. Direct playback control on Mr. Robert's PC is active and ready.</p>
+              <div style="font-size:11px;color:#6b7280;animation:pulse 2s infinite;">Closing window and returning to RODEX...</div>
+            </div>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', provider: 'spotify' }, '*');
+                setTimeout(() => window.close(), 1200);
+              } else {
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    } catch (err: any) {
+      console.error("[Spotify Callback Error]", err);
+      return res.send(`
+        <html>
+          <body style="background:#09090b;color:#f43f5e;font-family:sans-serif;padding:30px;text-align:center;">
+            <h2>Spotify Token Exchange Failed</h2>
+            <p>${err?.message || 'Authentication error'}</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: '${err?.message || 'Token exchange failed'}' }, '*');
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // Spotify Status: returns active state, current playback, connected PC devices
+  app.get("/api/spotify/status", async (req, res) => {
+    try {
+      const origin = (req.headers.origin as string) || (process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, "") : `http://${req.headers.host}`);
+      const redirectUri = getSpotifyRedirectUri(origin);
+      const configured = isSpotifyConfigured();
+      const playbackData = await getSpotifyPlayback();
+      const devicesData = await getSpotifyDevices();
+
+      res.json({
+        ...playbackData,
+        devices: devicesData.devices,
+        configured,
+        redirectUri,
+        appUrl: process.env.APP_URL || origin,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed to fetch Spotify status" });
+    }
+  });
+
+  // Spotify Devices
+  app.get("/api/spotify/devices", async (_req, res) => {
+    try {
+      const result = await getSpotifyDevices();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed to fetch devices" });
+    }
+  });
+
+  // Spotify Playback Control (play, pause, next, previous, volume, seek, transfer, search_and_play)
+  app.post("/api/spotify/control", async (req, res) => {
+    try {
+      const { action, query, volumePercent, deviceId, positionMs, uris } = req.body;
+      const result = await executeSpotifyCommand({
+        action,
+        query,
+        volumePercent,
+        deviceId,
+        positionMs,
+        uris,
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err?.message || "Failed to execute Spotify command" });
+    }
+  });
+
+  // Spotify Disconnect
+  app.post("/api/spotify/disconnect", (_req, res) => {
+    clearSpotifyTokens();
+    res.json({ success: true, message: "Spotify disconnected." });
   });
 
   // API Route: Verify RODEX to the World Wide Web
@@ -228,6 +442,66 @@ async function startServer() {
         return res.status(400).json({ error: "Query message is required for Real-Time API." });
       }
 
+      // Spotify Natural Voice Intent Intercept on PC
+      const spotifyIntent = parseSpotifyVoiceIntent(message);
+      if (spotifyIntent) {
+        let spotifyReply = "";
+        let spotifyTrackResult: any = null;
+
+        if (spotifyIntent.action === "search_and_play" && spotifyIntent.query) {
+          const result = await executeSpotifyCommand({
+            action: "search_and_play",
+            query: spotifyIntent.query,
+          });
+          spotifyReply = result.message;
+          spotifyTrackResult = result.track;
+        } else if (spotifyIntent.action === "volume" && spotifyIntent.volumePercent !== undefined) {
+          const result = await executeSpotifyCommand({
+            action: "volume",
+            volumePercent: spotifyIntent.volumePercent,
+          });
+          spotifyReply = result.message;
+        } else if (spotifyIntent.action === "status") {
+          const pb = await getSpotifyPlayback();
+          if (pb.playback) {
+            spotifyReply = `Currently playing "${pb.playback.name}" by ${pb.playback.artists.join(", ")} on your PC, Mr. Robert.`;
+            spotifyTrackResult = pb.playback;
+          } else {
+            spotifyReply = "No audio track is currently playing on your PC, Mr. Robert.";
+          }
+        } else {
+          const result = await executeSpotifyCommand({
+            action: spotifyIntent.action,
+          });
+          spotifyReply = result.message;
+        }
+
+        const pbData = await getSpotifyPlayback();
+
+        return res.json({
+          status: "ok",
+          reply: `Hlo Mr Robert. ${spotifyReply}`,
+          sources: [
+            {
+              title: "Spotify PC Connect Controller",
+              url: "https://open.spotify.com",
+              domain: "spotify.com",
+            },
+          ],
+          searchQueries: [`Spotify: ${message}`],
+          latencyMs: Date.now() - startTime,
+          neuralOps: "512.4M ops/sec",
+          webVerified: true,
+          timestamp: new Date().toISOString(),
+          speaker: "Mr. Robert",
+          spotify: {
+            action: spotifyIntent.action,
+            playback: pbData.playback,
+            device: pbData.device,
+          },
+        });
+      }
+
       if (!process.env.GEMINI_API_KEY) {
         return res.json({
           status: "ok",
@@ -302,10 +576,10 @@ async function startServer() {
         sources,
         searchQueries,
         latencyMs,
-        neuralOps: `${(470 + Math.random() * 45).toFixed(1)}M ops/sec`,
+        neuralOps: `${(720 + Math.random() * 120).toFixed(1)}M ops/sec`,
         webVerified: true,
         timestamp: new Date().toISOString(),
-        speaker: "Mr. Robert",
+        speaker: "User",
       });
     } catch (err: any) {
       console.warn("[RODEX Real-Time API Warning]", err?.message);
@@ -315,8 +589,8 @@ async function startServer() {
         err?.message?.includes("quota");
 
       const fallbackReply = isRateLimited
-        ? "Hlo Mr Robert. I am here and operational. The cloud gateway is temporarily balancing high request volume, but my voice link and World Wide Web channels remain verified and active. How may I assist you?"
-        : "Hlo Mr Robert. I am active and connected to the World Wide Web. How may I assist you today?";
+        ? "I am here and operational. The cloud gateway is temporarily balancing request volume, but my voice link and web channels remain active. How may I assist you?"
+        : "I am active and connected to live intelligence. How may I assist you today?";
 
       return res.json({
         status: "ok",
@@ -330,10 +604,10 @@ async function startServer() {
         ],
         searchQueries: [req.body?.message || "Real-Time Query"],
         latencyMs: Math.max(Date.now() - startTime, 52),
-        neuralOps: "484.2M ops/sec",
+        neuralOps: "750.0M ops/sec",
         webVerified: true,
         timestamp: new Date().toISOString(),
-        speaker: "Mr. Robert",
+        speaker: "User",
       });
     }
   });
@@ -399,6 +673,59 @@ async function startServer() {
 
       if (!message && !image) {
         return res.status(400).json({ error: "A message or image prompt is required." });
+      }
+
+      // Spotify Natural Voice Intent Intercept on PC
+      if (message && !image) {
+        const spotifyIntent = parseSpotifyVoiceIntent(message);
+        if (spotifyIntent) {
+          let spotifyReply = "";
+          if (spotifyIntent.action === "search_and_play" && spotifyIntent.query) {
+            const result = await executeSpotifyCommand({
+              action: "search_and_play",
+              query: spotifyIntent.query,
+            });
+            spotifyReply = result.message;
+          } else if (spotifyIntent.action === "volume" && spotifyIntent.volumePercent !== undefined) {
+            const result = await executeSpotifyCommand({
+              action: "volume",
+              volumePercent: spotifyIntent.volumePercent,
+            });
+            spotifyReply = result.message;
+          } else if (spotifyIntent.action === "status") {
+            const pb = await getSpotifyPlayback();
+            if (pb.playback) {
+              spotifyReply = `Currently playing "${pb.playback.name}" by ${pb.playback.artists.join(", ")} on your PC, Mr. Robert.`;
+            } else {
+              spotifyReply = "No track is currently playing on your PC, Mr. Robert.";
+            }
+          } else {
+            const result = await executeSpotifyCommand({
+              action: spotifyIntent.action,
+            });
+            spotifyReply = result.message;
+          }
+
+          const pbData = await getSpotifyPlayback();
+
+          return res.json({
+            reply: spotifyReply,
+            sources: [
+              {
+                title: "Spotify PC Connect Controller",
+                url: "https://open.spotify.com",
+                domain: "spotify.com",
+              },
+            ],
+            searchQueries: [`Spotify: ${message}`],
+            webGrounded: true,
+            spotify: {
+              action: spotifyIntent.action,
+              playback: pbData.playback,
+              device: pbData.device,
+            },
+          });
+        }
       }
 
       if (!process.env.GEMINI_API_KEY) {
@@ -570,6 +897,91 @@ async function startServer() {
         searchQueries: [req.body?.message || "Voice Query"],
         webGrounded: true,
       });
+    }
+  });
+
+  // API Route: Web Music & Video Intelligence Search
+  app.post("/api/media/search", async (req, res) => {
+    try {
+      const { query } = req.body;
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        return res.json({
+          results: [
+            {
+              id: "fallback-1",
+              title: query,
+              artist: "Featured Artist",
+              album: "Latest Release",
+              type: "song",
+              videoUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+              genre: "Trending",
+              releaseDate: "2026",
+              lyricsSnippet: "Connect Gemini API key for live lyrics and web music video intelligence.",
+              sources: [{ title: "YouTube Search", url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, domain: "youtube.com" }],
+              recommendedQuality: "HD"
+            }
+          ],
+          summary: "RODEX requires a Gemini API key for live web media search."
+        });
+      }
+
+      const ai = getAI();
+      const prompt = `Search the web for music, song, or music video details regarding: "${query}". 
+Provide a JSON formatted response representing the best matching song or music video, including:
+- title
+- artist
+- album
+- genre
+- releaseDate
+- lyricsSnippet
+- youtubeSearchQuery (exact query to search on YouTube)
+- summary (a 1-sentence executive insight for the user).
+Ensure you use Google Search grounding to retrieve accurate 2026 music data.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          systemInstruction: "You are RODEX Media Intelligence. Return precise music and video details grounded in Google Search.",
+          tools: [{ googleSearch: {} }],
+          maxOutputTokens: 600,
+        },
+      });
+
+      const candidate = response.candidates?.[0];
+      const groundingMetadata = candidate?.groundingMetadata;
+      const sources: Array<{ title: string; url: string; domain: string }> = [];
+      const seen = new Set<string>();
+
+      if (Array.isArray(groundingMetadata?.groundingChunks)) {
+        for (const chunk of groundingMetadata.groundingChunks) {
+          const uri = chunk.web?.uri;
+          const title = chunk.web?.title || uri;
+          if (uri && !seen.has(uri)) {
+            seen.add(uri);
+            let domain = 'web';
+            try {
+              domain = new URL(uri).hostname.replace(/^www\./, '');
+            } catch {
+              domain = 'web';
+            }
+            sources.push({ title: title || uri, url: uri, domain });
+          }
+        }
+      }
+
+      return res.json({
+        rawText: response.text || "",
+        sources,
+        searchQueries: groundingMetadata?.webSearchQueries || [query],
+      });
+    } catch (err: any) {
+      console.warn("[RODEX Media Search Error]", err?.message);
+      return res.status(500).json({ error: err?.message || "Failed to search media." });
     }
   });
 

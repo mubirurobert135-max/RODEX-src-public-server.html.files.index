@@ -35,9 +35,10 @@ export const ActionBar: React.FC<ActionBarProps> = ({
     { id: 'home', label: 'Voice Orb', icon: Radio, hasDot: isLive },
     {
       id: 'chat',
-      label: 'Chat',
+      label: isLive ? 'Live Chat' : 'Chat',
       icon: MessageSquare,
       badge: messageCount > 0 ? messageCount : undefined,
+      hasDot: isLive,
     },
     { id: 'web', label: 'Web Intel', icon: Globe, hasDot: hasWebIntel },
     { id: 'image', label: 'Vision', icon: ImageIcon },

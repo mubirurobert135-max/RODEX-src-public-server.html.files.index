@@ -15,6 +15,9 @@ import {
   Zap,
   Globe,
   ExternalLink,
+  Music2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { Orb } from './components/Orb';
 import { ActionBar } from './components/ActionBar';
@@ -23,6 +26,9 @@ import { SettingsModal } from './components/SettingsModal';
 import { ModesModal } from './components/ModesModal';
 import { VoiceProfileModal } from './components/VoiceProfileModal';
 import { WebVerificationModal } from './components/WebVerificationModal';
+import { SpotifyPlayerModal } from './components/SpotifyPlayerModal';
+import { WebMediaHubModal } from './components/WebMediaHubModal';
+import { SpotifyMiniBar } from './components/SpotifyMiniBar';
 import { AndroidFrame } from './components/AndroidFrame';
 import {
   AssistantState,
@@ -32,6 +38,9 @@ import {
   ThemeAccent,
   VoiceProfile,
   WebSource,
+  SpotifyTrackInfo,
+  SpotifyDevice,
+  ChatSession,
 } from './types';
 import {
   rodexSynth,
@@ -43,6 +52,14 @@ import {
   isConversationExit,
 } from './utils/speech';
 import { triggerHaptic, setHapticsEnabled } from './utils/haptics';
+import {
+  loadActiveSession,
+  saveActiveSession,
+  loadAllSessions,
+  createNewSession,
+  deleteSessionFromHistory,
+} from './utils/sessionStorage';
+import { getActiveOrbTheme } from './utils/orbTheme';
 
 export default function App() {
   // Core Assistant States
@@ -52,6 +69,34 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVoiceProfileOpen, setIsVoiceProfileOpen] = useState(false);
   const [isWebVerifyOpen, setIsWebVerifyOpen] = useState(false);
+  const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
+  const [isMediaHubOpen, setIsMediaHubOpen] = useState(false);
+
+  // Live Chat Sessions & Persistence
+  const [activeSession, setActiveSession] = useState<ChatSession>(() => loadActiveSession());
+  const [allSessions, setAllSessions] = useState<ChatSession[]>(() => loadAllSessions());
+
+  // Spotify Playback on PC
+  const [spotifyPlayback, setSpotifyPlayback] = useState<SpotifyTrackInfo | null>(null);
+  const [spotifyDevice, setSpotifyDevice] = useState<SpotifyDevice | null>(null);
+
+  // Poll or refresh Spotify status
+  const refreshSpotifyStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/spotify/status');
+      if (res.ok) {
+        const data = await res.json();
+        setSpotifyPlayback(data.playback || null);
+        setSpotifyDevice(data.device || null);
+      }
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    refreshSpotifyStatus();
+    const interval = setInterval(refreshSpotifyStatus, 6000);
+    return () => clearInterval(interval);
+  }, [refreshSpotifyStatus]);
 
   // Real-time Two-Way Live Conversation State
   const [isLiveConversation, setIsLiveConversation] = useState(false);
@@ -59,9 +104,9 @@ export default function App() {
   const consecutiveSilenceCountRef = useRef(0);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Voice Profile / Speaker Recognition State (Mr. Robert)
+  // Voice Profile / Speaker Recognition State
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>({
-    speakerName: 'Mr. Robert',
+    speakerName: 'User',
     isRecognized: true,
     confidence: 99.4,
     pitchHz: 124,
@@ -74,7 +119,7 @@ export default function App() {
   const [pitchHz, setPitchHz] = useState<number>(124);
   const [transcript, setTranscript] = useState('');
   const [lastResponse, setLastResponse] = useState<string>(
-    'Greetings. I am RODEX, calibrated for Mr. Robert. Say "Hey RODEX" or tap the orb to speak.'
+    'Greetings. I am RODEX. Say "Hey RODEX" or tap the orb to speak.'
   );
   const [isMuted, setIsMuted] = useState(false);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
@@ -92,30 +137,136 @@ export default function App() {
     webSearchEnabled: true,
     hapticFeedbackEnabled: true,
   });
-  const [themeAccent, setThemeAccent] = useState<ThemeAccent>('cyan');
+  const [themeAccent, setThemeAccent] = useState<ThemeAccent>(() => {
+    return (localStorage.getItem('rodex_theme_accent') as ThemeAccent) || 'auto';
+  });
+
+  const handleUpdateTheme = (theme: ThemeAccent) => {
+    setThemeAccent(theme);
+    localStorage.setItem('rodex_theme_accent', theme);
+  };
 
   // Synchronize Haptic Vibration State with User Preferences
   useEffect(() => {
     setHapticsEnabled(voiceSettings.hapticFeedbackEnabled !== false);
   }, [voiceSettings.hapticFeedbackEnabled]);
 
-  // Dynamic Thinking Capacity Tracker (operating at millions of neural operations per second)
-  const [thinkingOps, setThinkingOps] = useState('486.2M');
+  // Dynamically resolved theme-aware orb glow palette (Gold for thinking, Cyan for idle, Ruby for live calls)
+  const currentOrbTheme = React.useMemo(() => {
+    return getActiveOrbTheme({
+      state,
+      isLive: isLiveConversation,
+      activeMode,
+      themeAccent,
+    });
+  }, [state, isLiveConversation, activeMode, themeAccent]);
+
+  // Dynamic High-Velocity Neural Capacity Tracker (operating at millions of operations per second)
+  const [neuralOps, setNeuralOps] = useState('784.6M');
+  const [thinkingOps, setThinkingOps] = useState('860.2M');
 
   useEffect(() => {
-    if (state !== 'thinking') return;
     const interval = setInterval(() => {
-      // High-frequency computational variance in the 450M - 520M ops/sec range
-      const ops = (450 + Math.random() * 65).toFixed(1);
-      setThinkingOps(`${ops}M`);
-    }, 75);
+      if (state === 'thinking') {
+        const ops = (820 + Math.random() * 160).toFixed(1);
+        setThinkingOps(`${ops}M`);
+        setNeuralOps(`${ops}M`);
+      } else if (state === 'speaking' || state === 'listening') {
+        const ops = (680 + Math.random() * 120).toFixed(1);
+        setNeuralOps(`${ops}M`);
+      } else {
+        const ops = (560 + Math.random() * 80).toFixed(1);
+        setNeuralOps(`${ops}M`);
+      }
+    }, 120);
     return () => clearInterval(interval);
   }, [state]);
 
+  // Screen-Adaptive Responsive Orb Sizing for Full-Screen & Multi-Device Previews
+  const [orbSize, setOrbSize] = useState(280);
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      if (w >= 1024 && h >= 800) {
+        setOrbSize(340);
+      } else if (w >= 768 && h >= 680) {
+        setOrbSize(300);
+      } else if (h < 640) {
+        setOrbSize(220);
+      } else {
+        setOrbSize(260);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // HTML5 Fullscreen State & Toggle
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFSChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFSChange);
+    return () => document.removeEventListener('fullscreenchange', onFSChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    try {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    } catch (_) {}
+  }, []);
+
   // Messages History & Web Grounding Sources
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => activeSession.messages || []);
   const [lastSources, setLastSources] = useState<WebSource[]>([]);
   const [lastSearchQueries, setLastSearchQueries] = useState<string[]>([]);
+
+  // Synchronize Active Session with Local Storage
+  useEffect(() => {
+    setActiveSession((prev) => {
+      const updated: ChatSession = {
+        ...prev,
+        messages,
+        lastActiveAt: new Date().toISOString(),
+      };
+      saveActiveSession(updated);
+      return updated;
+    });
+    setAllSessions(loadAllSessions());
+  }, [messages]);
+
+  const handleSelectSession = (session: ChatSession) => {
+    setActiveSession(session);
+    setMessages(session.messages || []);
+    saveActiveSession(session);
+  };
+
+  const handleNewSession = () => {
+    const newSession = createNewSession();
+    setActiveSession(newSession);
+    setMessages(newSession.messages || []);
+    setAllSessions(loadAllSessions());
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    const remaining = deleteSessionFromHistory(sessionId);
+    setAllSessions(remaining);
+    if (activeSession.id === sessionId) {
+      if (remaining.length > 0) {
+        handleSelectSession(remaining[0]);
+      } else {
+        handleNewSession();
+      }
+    }
+  };
 
   // Refs for Speech Recognition and Audio Meter
   const recognitionRef = useRef<any>(null);
@@ -253,8 +404,19 @@ export default function App() {
     setIsLiveConversation(true);
     consecutiveSilenceCountRef.current = 0;
     playToneChime('wake');
-    const introSpeech = 'Hlo Mr Robert. I am here, what is on your mind?';
+    const introSpeech = 'Live call connected. How can I assist you today?';
     setLastResponse(introSpeech);
+
+    const liveStartMsg: ChatMessage = {
+      id: `live-start-${Date.now()}`,
+      sender: 'assistant',
+      text: 'Live audio connection active. Listening for your voice.',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      speakerVerified: true,
+      webGrounded: true,
+    };
+    setMessages((prev) => [...prev, liveStartMsg]);
+
     speakResponse(introSpeech, () => {
       if (isLiveConversationRef.current) {
         playToneChime('listen');
@@ -276,7 +438,16 @@ export default function App() {
     }
     stopAudioMeterLoop();
     setState('idle');
-    setLastResponse('Conversation ended. Say "Hey RODEX" to talk again.');
+    const endText = 'Conversation ended. Say "Hey RODEX" to talk again.';
+    setLastResponse(endText);
+
+    const liveEndMsg: ChatMessage = {
+      id: `live-end-${Date.now()}`,
+      sender: 'assistant',
+      text: 'Live audio call disconnected. Session transcript preserved and ready to retrieve anytime.',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, liveEndMsg]);
   };
 
   // Send query to server-side Gemini API or handle direct "Hey RODEX" wake-word
@@ -308,13 +479,13 @@ export default function App() {
         sender: 'user',
         text: userText,
         timestamp,
-        speaker: 'Mr. Robert',
+        speaker: 'User',
         speakerVerified: true,
       };
 
       const exitReply = wasLive
-        ? 'Call ended as instructed, Mr. Robert. I am on standby whenever you need me.'
-        : 'Goodbye Mr. Robert. Have a wonderful day! I remain on standby.';
+        ? 'Call ended. I remain on standby whenever you need me.'
+        : 'Goodbye. Have a wonderful day, I remain on standby.';
       const assistantMsg: ChatMessage = {
         id: createId('assistant'),
         sender: 'assistant',
@@ -330,6 +501,37 @@ export default function App() {
 
     // Prime voice synthesis engine to guarantee audio playback
     rodexSynth.prime();
+
+    // Handle explicit user request to retrieve or display the live chat session
+    if (
+      /retrieve.*(chat|session|transcript|log)|show.*(chat|session|transcript)|open.*(chat|session)|view.*(chat|session)|display.*(chat|session)/i.test(
+        userText
+      )
+    ) {
+      triggerHaptic('tap');
+      setIsChatOpen(true);
+      const retrieveReply =
+        'Displaying your chat conversation on screen.';
+      const userMsg: ChatMessage = {
+        id: createId('user'),
+        sender: 'user',
+        text: userText,
+        timestamp,
+        speaker: 'User',
+        speakerVerified: true,
+      };
+      const assistantMsg: ChatMessage = {
+        id: createId('assistant'),
+        sender: 'assistant',
+        text: retrieveReply,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        webGrounded: true,
+      };
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      setLastResponse(retrieveReply);
+      speakResponse(retrieveReply);
+      return;
+    }
 
     // Check if user called or activated RODEX ("Hey RODEX", "RODEX", "Hey RODEX what is the latest world news?", etc.)
     const { isCall, command } = extractHeyRodexCommand(userText);
@@ -347,12 +549,12 @@ export default function App() {
         sender: 'user',
         text: userText,
         timestamp,
-        speaker: 'Mr. Robert',
+        speaker: 'User',
         speakerVerified: true,
       };
 
-      const greetingSpeech = 'Hlo Mr Robert. I am here, what is on your mind?';
-      const greetingFullText = 'Hlo Mr Robert! I am listening. How can I assist you with world news, internet intelligence, or anything today?';
+      const greetingSpeech = 'I am here. How can I assist you?';
+      const greetingFullText = 'I am listening. How can I assist you today?';
 
       const assistantMsg: ChatMessage = {
         id: createId('assistant'),
@@ -412,14 +614,14 @@ export default function App() {
       sender: 'user',
       text: userText,
       timestamp,
-      speaker: 'Mr. Robert',
+      speaker: 'User',
       speakerVerified: true,
       imageUrl: imagePayload ? `data:${imagePayload.mimeType};base64,${imagePayload.data}` : undefined,
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setState('thinking');
-    setLastResponse('Neural Core: Computing at 480M+ ops/sec • Searching World Wide Web...');
+    setLastResponse('RODEX is thinking...');
 
     try {
       // Build conversation history payload
@@ -428,9 +630,8 @@ export default function App() {
         text: m.text,
       }));
 
-      const customInstruction = isCall
-        ? 'The user is Mr. Robert and activated you with "Hey RODEX". You recognize his voice. Address him starting with "Hlo Mr Robert" in your reply, and provide fresh, real-time web-grounded information from the Internet.'
-        : 'The user is Mr. Robert. You recognize his voice. Address him respectfully as Mr. Robert, and provide fresh, real-time web-grounded information from the Internet.';
+      const customInstruction =
+        'You are RODEX, an advanced, highly intelligent AI assistant. Provide clear, direct, accurate, and helpful answers with real-time web-grounded information when appropriate. Keep spoken responses concise and conversational.';
 
       const clientFormattedTime = new Date().toLocaleString([], {
         dateStyle: 'full',
@@ -439,6 +640,10 @@ export default function App() {
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Kampala';
 
       const queryToSend = isCall && command ? command : userText;
+      const lowerQ = queryToSend.toLowerCase();
+      if (lowerQ.startsWith('play ') || lowerQ.includes('play music') || lowerQ.includes('music video') || lowerQ.includes('search song') || lowerQ.includes('what is playing')) {
+        setIsMediaHubOpen(true);
+      }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -475,6 +680,15 @@ export default function App() {
         searchQueries,
         webGrounded,
       };
+
+      if (data.spotify) {
+        if (data.spotify.playback !== undefined) {
+          setSpotifyPlayback(data.spotify.playback);
+        }
+        if (data.spotify.device !== undefined) {
+          setSpotifyDevice(data.spotify.device);
+        }
+      }
 
       setMessages((prev) => [...prev, assistantMsg]);
       setLastResponse(reply);
@@ -727,7 +941,7 @@ export default function App() {
       case 'listening':
         return transcript || 'Listening to your voice...';
       case 'thinking':
-        return `RODEX is thinking at ${thinkingOps} ops/sec...`;
+        return 'RODEX is thinking...';
       case 'speaking':
         return 'Speaking response...';
       case 'idle':
@@ -742,71 +956,35 @@ export default function App() {
         id="rodex-main-screen"
         className="w-full h-full flex flex-col justify-between relative bg-black text-white overflow-hidden select-none"
       >
-        {/* Top Futuristic Header */}
-        <header className="px-5 py-3 flex items-center justify-between z-20 bg-black/60 backdrop-blur-md border-b border-neutral-900/60">
+        {/* Top Minimal Header */}
+        <header className="px-5 py-3.5 flex items-center justify-between z-20 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-900/80">
           <div className="flex items-center gap-2.5">
             <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
             <h1 className="text-sm font-bold tracking-[0.25em] text-white">RODEX</h1>
-            <span className="text-[10px] font-mono tracking-widest text-cyan-500/80 px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/40">
-              v1.0
-            </span>
           </div>
 
-          {/* Center Header Pill: Live Stream Active or Verified Voice ID for Mr. Robert */}
+          {/* Center: Live Call indicator if active */}
           <div className="flex items-center">
-            {isLiveConversation ? (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/70 shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-ping" />
-                <span className="text-[10px] font-bold tracking-wider text-emerald-300 uppercase">
+            {isLiveConversation && (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.3)] animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                <span className="text-[10px] font-bold tracking-wider text-rose-300 uppercase">
                   Live Call
                 </span>
                 <button
                   id="header-end-call-btn"
                   onClick={endLiveCall}
-                  className="ml-1 px-1.5 py-0.5 rounded-full bg-red-950 hover:bg-red-900 border border-red-700 text-red-300 text-[9px] font-bold cursor-pointer transition-colors"
+                  className="ml-1 px-1.5 py-0.5 rounded-full bg-red-900 hover:bg-red-800 border border-red-600 text-red-100 text-[9px] font-bold cursor-pointer transition-colors"
                   title="End Live Call"
                 >
                   End
                 </button>
               </div>
-            ) : (
-              <button
-                id="header-voice-id-btn"
-                onClick={() => {
-                  triggerHaptic('tap');
-                  setIsVoiceProfileOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-950/90 border border-neutral-800 hover:border-cyan-500/50 transition-all shadow-sm group cursor-pointer active:scale-95"
-                title="Voice Biometrics: Mr. Robert (Verified)"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse" />
-                <span className="text-[11px] text-neutral-300 font-medium group-hover:text-cyan-300 transition-colors">
-                  Mr. Robert
-                </span>
-                <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/80 font-mono">
-                  ID
-                </span>
-              </button>
             )}
-
-            {/* World Wide Web Verification & Real-Time API Monitor Button */}
-            <button
-              id="header-www-verify-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsWebVerifyOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 transition-all shadow-sm cursor-pointer active:scale-95 text-[10px] font-mono"
-              title="Verify RODEX World Wide Web Link & Real-Time API"
-            >
-              <Globe className="w-3 h-3 text-emerald-400" />
-              <span className="font-semibold tracking-tight">WWW VERIFIED</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            </button>
           </div>
 
+          {/* Right: Essential Window Controls */}
           <div className="flex items-center gap-1">
-            {/* Audio Voice Mute Toggle */}
             <button
               id="audio-mute-toggle"
               onClick={() => {
@@ -823,11 +1001,10 @@ export default function App() {
               )}
             </button>
 
-            {/* Chat History Icon Button */}
             <button
               id="header-chat-btn"
               onClick={() => setIsChatOpen(true)}
-              title="Open Chat History"
+              title="Open Chat Session"
               className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all relative"
             >
               <MessageSquare className="w-4 h-4" />
@@ -836,11 +1013,22 @@ export default function App() {
               )}
             </button>
 
-            {/* Settings Icon Button */}
+            <button
+              id="header-media-hub-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsMediaHubOpen(true);
+              }}
+              title="Web Music & Video Hub"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400"
+            >
+              <Music2 className="w-4 h-4" />
+            </button>
+
             <button
               id="header-settings-btn"
               onClick={() => setIsSettingsOpen(true)}
-              title="RODEX Settings"
+              title="Settings"
               className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all"
             >
               <Settings className="w-4 h-4" />
@@ -848,51 +1036,53 @@ export default function App() {
           </div>
         </header>
 
-        {/* Center: The Large Glowing AI Orb - Pure, Grand & Uncluttered (All Tabs Removed Around Orb) */}
+        {/* Center: The Large Glowing AI Orb - Pure, Grand & Uncluttered Focus */}
         <div className="flex-1 flex flex-col items-center justify-center relative px-6 w-full">
           {/* Subtle Ambient Radial Glow */}
-          <div className="absolute w-80 h-80 rounded-full bg-cyan-600/10 blur-[100px] pointer-events-none" />
+          <div
+            className={`absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none transition-colors duration-700 ${currentOrbTheme.ambientGlowClass}`}
+          />
 
           {/* Central Orb Identity */}
-          <div className="relative my-auto flex flex-col items-center py-4">
+          <div className="relative my-auto flex flex-col items-center py-2">
             <Orb
               state={state}
               audioLevel={audioLevel}
               pitchHz={pitchHz}
-              size={250}
+              size={260}
               onClick={startListening}
+              activeMode={activeMode}
+              isLive={isLiveConversation}
+              themeAccent={themeAccent}
             />
           </div>
 
-          {/* Clean Subtitle & Speech Visualizer Text */}
-          <div className="w-full max-w-sm text-center mb-6 min-h-[50px] flex items-center justify-center pointer-events-none">
+          {/* Clean Subtitle & Status Text */}
+          <div className="w-full max-w-sm text-center mb-4 min-h-[44px] flex items-center justify-center pointer-events-none">
             {state === 'listening' ? (
-              <p className="text-xs sm:text-sm text-neutral-300 font-normal leading-relaxed line-clamp-3 px-4 transition-all">
-                <span className="text-cyan-300 italic font-medium">"{getStatusText()}"</span>
+              <p className="text-xs sm:text-sm text-cyan-300 font-normal leading-relaxed line-clamp-3 px-4 italic animate-pulse">
+                "{transcript || 'Listening to your voice...'}"
               </p>
             ) : state === 'thinking' ? (
-              <div className="flex flex-col items-center gap-1.5 animate-pulse px-4">
-                <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.35)]">
-                  <Zap className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                  <span className="text-[11px] font-mono font-bold tracking-wider text-emerald-300">
-                    NEURAL CORE: {thinkingOps} OPS/SEC
-                  </span>
-                </div>
-                <span className="text-[10px] text-neutral-400 font-mono tracking-wide">
-                  Computing millions of inferences/sec • Live Web Grounding
-                </span>
+              <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs font-medium animate-pulse">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                <span>RODEX is thinking...</span>
               </div>
+            ) : state === 'speaking' ? (
+              <p className="text-xs sm:text-sm text-neutral-300 font-normal leading-relaxed line-clamp-3 px-4">
+                {lastResponse || 'Speaking response...'}
+              </p>
             ) : (
-              <p className="text-xs sm:text-sm text-neutral-300 font-normal leading-relaxed line-clamp-3 px-4 transition-all">
-                {lastResponse}
+              <p className="text-xs text-neutral-400 font-normal leading-relaxed line-clamp-2 px-4">
+                {lastResponse || 'Tap orb or microphone to speak'}
               </p>
             )}
           </div>
         </div>
 
-        {/* Bottom Section: Tap-To-Talk Microphone Controller */}
-        <div className="w-full flex flex-col items-center pb-2 z-20">
-          <div className="relative mb-3 flex items-center justify-center gap-4">
+        {/* Bottom Section: Microphone and Voice-Status Controls */}
+        <div className="w-full flex flex-col items-center pb-6 pt-2 z-20">
+          <div className="relative mb-2.5 flex items-center justify-center gap-4">
             {/* Glow Aura when listening */}
             {state === 'listening' && (
               <div className="absolute w-24 h-24 rounded-full bg-cyan-400/30 blur-xl animate-pulse pointer-events-none" />
@@ -908,19 +1098,19 @@ export default function App() {
                   : state === 'speaking'
                   ? 'bg-teal-950 text-teal-300 border-teal-500/80 shadow-[0_0_20px_rgba(20,184,166,0.3)]'
                   : state === 'thinking'
-                  ? 'bg-neutral-900 text-emerald-400 border-emerald-500/50'
+                  ? 'bg-amber-950 text-amber-300 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
                   : isLiveConversation
-                  ? 'bg-emerald-950 text-emerald-300 border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.4)] animate-pulse'
-                  : 'bg-neutral-950 hover:bg-neutral-900 text-cyan-400 border-neutral-800 hover:border-cyan-500/50 shadow-[0_0_15px_rgba(0,0,0,0.8)]'
+                  ? 'bg-rose-950 text-rose-300 border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.4)] animate-pulse'
+                  : 'bg-neutral-900/90 hover:bg-neutral-850 text-cyan-400 border-neutral-800 hover:border-cyan-500/50 shadow-[0_0_20px_rgba(0,0,0,0.8)]'
               }`}
               title={
                 state === 'listening'
                   ? 'Tap to send immediately'
                   : state === 'speaking'
-                  ? 'Tap or speak to interrupt RODEX'
+                  ? 'Tap or speak to interrupt'
                   : isLiveConversation
                   ? 'Live Call Active - Tap to speak'
-                  : 'Tap to talk with RODEX'
+                  : 'Tap to speak with RODEX'
               }
             >
               {state === 'listening' ? (
@@ -930,7 +1120,7 @@ export default function App() {
               ) : state === 'thinking' ? (
                 <Sparkles className="w-7 h-7 animate-spin" />
               ) : isLiveConversation ? (
-                <Mic className="w-7 h-7 text-emerald-400" />
+                <Mic className="w-7 h-7 text-rose-300" />
               ) : (
                 <Mic className="w-7 h-7" />
               )}
@@ -942,43 +1132,24 @@ export default function App() {
                 id="hangup-call-btn"
                 onClick={endLiveCall}
                 className="w-12 h-12 rounded-full bg-red-950/90 hover:bg-red-900 border border-red-600/80 text-red-300 flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.35)] active:scale-90 transition-all cursor-pointer"
-                title="Hang up / End Real-Time Call"
+                title="End Live Call"
               >
                 <PhoneOff className="w-5 h-5" />
               </button>
             )}
           </div>
 
-          <span className="text-[11px] font-medium tracking-wider text-neutral-400 mb-2">
+          <span className="text-[11px] font-medium tracking-wider text-neutral-500">
             {state === 'listening'
-              ? isLiveConversation
-                ? 'LISTENING TO MR. ROBERT • TALK NATURALLY'
-                : 'LISTENING • TAP TO SEND'
+              ? 'LISTENING • TAP TO SEND'
               : state === 'speaking'
-              ? 'RODEX IS SPEAKING • TAP OR SPEAK TO INTERRUPT'
+              ? 'SPEAKING • TAP TO INTERRUPT'
               : state === 'thinking'
-              ? `NEURAL CAPACITY: ${thinkingOps} OPS/SEC • COMPUTING MILLIONS/SEC`
+              ? 'PROCESSING...'
               : isLiveConversation
-              ? 'LIVE CALL ACTIVE • SAY "END CALL" OR TAP 📵 TO END'
+              ? 'LIVE CALL ACTIVE • SAY "END CALL" OR TAP END'
               : 'TAP TO TALK OR SAY "HEY RODEX"'}
           </span>
-
-          {/* Android Navigation Action Bar with Live Updated Tabs */}
-          <ActionBar
-            activeMode={activeMode}
-            onSelectMode={(mode) => {
-              if (mode === 'home') {
-                setActiveMode('home');
-              } else if (mode === 'chat') {
-                setIsChatOpen(true);
-              } else {
-                setActiveMode(mode);
-              }
-            }}
-            messageCount={messages.length}
-            hasWebIntel={lastSources.length > 0}
-            isLive={isLiveConversation}
-          />
         </div>
 
         {/* Android Native Permission Dialog */}
@@ -1027,12 +1198,25 @@ export default function App() {
         <ChatSheet
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
+          activeSession={activeSession}
+          allSessions={allSessions}
+          onSelectSession={handleSelectSession}
+          onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
           messages={messages}
           onSendMessage={(text) => handleSendMessage(text)}
           onReplayAudio={(text) => speakResponse(text)}
           onClearHistory={() => setMessages([])}
           assistantState={state}
           onStartVoice={startListening}
+          isLiveConversation={isLiveConversation}
+          onToggleLiveCall={() => {
+            if (isLiveConversation) {
+              endLiveCall();
+            } else {
+              startLiveCall();
+            }
+          }}
         />
 
         {/* Settings Modal */}
@@ -1042,13 +1226,23 @@ export default function App() {
           voiceSettings={voiceSettings}
           onUpdateVoiceSettings={setVoiceSettings}
           themeAccent={themeAccent}
-          onUpdateTheme={setThemeAccent}
+          onUpdateTheme={handleUpdateTheme}
           onRequestMicPermission={requestMicPermission}
           micPermissionGranted={micPermissionGranted}
           onOpenVoiceProfile={() => setIsVoiceProfileOpen(true)}
+          onOpenSpotify={() => setIsSpotifyOpen(true)}
+          onOpenWebVerify={() => setIsWebVerifyOpen(true)}
+          onSelectMode={(mode) => {
+            if (mode === 'home') {
+              setActiveMode('home');
+              setIsChatOpen(false);
+            } else {
+              setActiveMode(mode);
+            }
+          }}
         />
 
-        {/* Voice Profile & Biometrics Modal (Mr. Robert) */}
+        {/* Voice Profile & Biometrics Modal */}
         <VoiceProfileModal
           isOpen={isVoiceProfileOpen}
           onClose={() => setIsVoiceProfileOpen(false)}
@@ -1059,7 +1253,7 @@ export default function App() {
               confidence: 99.8,
               voiceprintStatus: 'calibrated',
             }));
-            speakResponse('Voice profile recalibrated successfully for Mr. Robert.');
+            speakResponse('Voice profile recalibrated successfully.');
           }}
           onTestWakeWord={() => {
             setIsVoiceProfileOpen(false);
@@ -1073,6 +1267,7 @@ export default function App() {
           onClose={() => setActiveMode('home')}
           onSubmitPrompt={(text, image) => handleSendMessage(text, image)}
           currentSources={lastSources}
+          onOpenSpotify={() => setIsSpotifyOpen(true)}
         />
 
         {/* World Wide Web Verification & Real-Time API Monitor Modal */}
@@ -1083,6 +1278,20 @@ export default function App() {
             setIsWebVerifyOpen(false);
             handleSendMessage(prompt);
           }}
+        />
+
+        {/* Spotify PC Access & Player Modal */}
+        <SpotifyPlayerModal
+          isOpen={isSpotifyOpen}
+          onClose={() => setIsSpotifyOpen(false)}
+          onSpeakStatus={(text) => speakResponse(text)}
+        />
+
+        {/* Web Music & Video Intelligence Hub Modal */}
+        <WebMediaHubModal
+          isOpen={isMediaHubOpen}
+          onClose={() => setIsMediaHubOpen(false)}
+          onSpeakStatus={(text) => speakResponse(text)}
         />
       </main>
     </AndroidFrame>

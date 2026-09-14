@@ -92,7 +92,7 @@ export const VoiceProfileModal: React.FC<VoiceProfileModalProps> = ({
                     {voiceProfile.speakerName}
                   </h3>
                   <p className="text-xs text-neutral-400 mt-0.5">
-                    Primary Commander & Voice Signature Owner
+                    Calibrated Voice Signature
                   </p>
                 </div>
 
@@ -130,7 +130,7 @@ export const VoiceProfileModal: React.FC<VoiceProfileModalProps> = ({
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/70 border border-neutral-800">
                     <span className="text-neutral-400">RODEX responds:</span>
                     <code className="text-emerald-300 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
-                      "Hlo Mr Robert"
+                      "I am here. How can I assist you?"
                     </code>
                   </div>
                 </div>
