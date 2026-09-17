@@ -170,12 +170,87 @@ export const ORB_THEMES: Record<string, OrbGlowTheme> = {
     badgeText: 'text-blue-300',
     badgeBorder: 'border-blue-800/80',
   },
+
+  // Error: Crimson Red Alert
+  error: {
+    id: 'error',
+    name: 'System Alert',
+    label: 'Error Alert Crimson',
+    primaryRGB: [239, 68, 68], // #ef4444
+    secondaryRGB: [248, 113, 113], // #f87171
+    accentRGB: [185, 28, 28], // #b91c1c
+    glowHex: '#ef4444',
+    coreGradient:
+      'radial-gradient(circle at 35% 35%, #fee2e2 0%, #f87171 22%, #ef4444 45%, #dc2626 65%, #b91c1c 78%, #991b1b 92%, #1a0505 100%)',
+    meshGradient:
+      'conic-gradient(from 45deg, #ef4444, #f87171, #b91c1c, #dc2626, #ef4444)',
+    boxShadow: (_state, _level) => {
+      return '0 0 75px rgba(239, 68, 68, 0.8), inset 0 0 45px rgba(248, 113, 113, 0.7)';
+    },
+    atmosphereClass: 'bg-red-500/35',
+    ambientGlowClass: 'bg-red-600/22',
+    ringBorderColor: 'rgba(239, 68, 68, 0.65)',
+    badgeBg: 'bg-red-950/90',
+    badgeText: 'text-red-300',
+    badgeBorder: 'border-red-700/90',
+  },
+
+  // Permission Required: High-Security Amber Lock
+  permission_required: {
+    id: 'permission_required',
+    name: 'Security Shield',
+    label: 'Operator Permission Amber',
+    primaryRGB: [245, 158, 11], // #f59e0b
+    secondaryRGB: [251, 191, 36], // #fbbf24
+    accentRGB: [217, 119, 6], // #d97706
+    glowHex: '#f59e0b',
+    coreGradient:
+      'radial-gradient(circle at 35% 35%, #fef3c7 0%, #fbbf24 22%, #f59e0b 45%, #d97706 65%, #b45309 78%, #78350f 92%, #140801 100%)',
+    meshGradient:
+      'conic-gradient(from 45deg, #f59e0b, #fbbf24, #d97706, #fbbf24, #f59e0b)',
+    boxShadow: (_state, _level) => {
+      return '0 0 75px rgba(245, 158, 11, 0.8), inset 0 0 45px rgba(251, 191, 36, 0.7)';
+    },
+    atmosphereClass: 'bg-amber-500/35',
+    ambientGlowClass: 'bg-amber-500/22',
+    ringBorderColor: 'rgba(245, 158, 11, 0.65)',
+    badgeBg: 'bg-amber-950/90',
+    badgeText: 'text-amber-300',
+    badgeBorder: 'border-amber-600/90',
+  },
+
+  // Tool Execution: Cyber Violet / Cobalt
+  executing_tool: {
+    id: 'executing_tool',
+    name: 'Tool Executor',
+    label: 'Tool Execution Violet',
+    primaryRGB: [139, 92, 246], // #8b5cf6
+    secondaryRGB: [59, 130, 246], // #3b82f6
+    accentRGB: [6, 182, 212], // #06b6d4
+    glowHex: '#8b5cf6',
+    coreGradient:
+      'radial-gradient(circle at 35% 35%, #ede9fe 0%, #a78bfa 22%, #8b5cf6 45%, #6366f1 65%, #3b82f6 78%, #1d4ed8 92%, #08031a 100%)',
+    meshGradient:
+      'conic-gradient(from 45deg, #8b5cf6, #3b82f6, #06b6d4, #a78bfa, #8b5cf6)',
+    boxShadow: (_state, level) => {
+      return `0 0 ${75 + level * 25}px rgba(139, 92, 246, 0.75), inset 0 0 45px rgba(59, 130, 246, 0.65)`;
+    },
+    atmosphereClass: 'bg-violet-500/35',
+    ambientGlowClass: 'bg-violet-600/20',
+    ringBorderColor: 'rgba(139, 92, 246, 0.55)',
+    badgeBg: 'bg-violet-950/90',
+    badgeText: 'text-violet-300',
+    badgeBorder: 'border-violet-700/80',
+  },
 };
 
 /**
  * Resolves the active theme-aware glow palette dynamically based on:
+ * - System Error (Alert Crimson)
+ * - Operator Permission Required (Warning Amber)
+ * - Tool Execution (Cyber Violet)
  * - Live calls (Ruby)
- * - Thinking state (Gold)
+ * - Thinking/Processing state (Gold)
  * - Active App Mode (e.g. Spotify -> Emerald, Vision -> Purple, Web -> Cyan/Teal)
  * - Idle state (Cyan default)
  * - Or explicit user manual override theme if set
@@ -188,22 +263,33 @@ export function getActiveOrbTheme(params: {
 }): OrbGlowTheme {
   const { state, isLive = false, activeMode = 'home', themeAccent = 'auto' } = params;
 
-  // 1. Highest Priority: Live Calls are always Ruby
+  // 1. Critical System States
+  if (state === 'error') {
+    return ORB_THEMES.error;
+  }
+  if (state === 'permission_required') {
+    return ORB_THEMES.permission_required;
+  }
+  if (state === 'executing_tool') {
+    return ORB_THEMES.executing_tool;
+  }
+
+  // 2. High Priority: Live Calls are Ruby
   if (isLive) {
     return ORB_THEMES.ruby;
   }
 
-  // 2. High Priority: Neural Thinking is Gold
-  if (state === 'thinking') {
+  // 3. High Priority: Neural Thinking & Processing is Gold
+  if (state === 'thinking' || state === 'processing') {
     return ORB_THEMES.gold;
   }
 
-  // 3. User manual override (if set to a specific accent other than 'auto' and 'cyan')
+  // 4. User manual override (if set to a specific accent other than 'auto' and 'cyan')
   if (themeAccent && themeAccent !== 'auto' && themeAccent !== 'cyan' && ORB_THEMES[themeAccent]) {
     return ORB_THEMES[themeAccent];
   }
 
-  // 4. Active mode shifting
+  // 5. Active mode shifting
   if (activeMode === 'spotify') {
     return ORB_THEMES.emerald;
   }
@@ -214,7 +300,7 @@ export function getActiveOrbTheme(params: {
     return ORB_THEMES.azure;
   }
 
-  // 5. Explicit user choice of cyan, or default idle
+  // 6. Explicit user choice of cyan, or default idle
   if (themeAccent === 'cyan' || themeAccent === 'auto') {
     return ORB_THEMES.cyan;
   }

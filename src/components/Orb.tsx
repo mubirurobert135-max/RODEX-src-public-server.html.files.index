@@ -26,6 +26,27 @@ interface NeuralParticle {
   depth: number;
 }
 
+// Utility to generate precision SVG arc paths
+function describeSvgArc(
+  cx: number,
+  cy: number,
+  radius: number,
+  startAngleDeg: number,
+  endAngleDeg: number
+): string {
+  const startRad = ((startAngleDeg - 90) * Math.PI) / 180.0;
+  const endRad = ((endAngleDeg - 90) * Math.PI) / 180.0;
+
+  const x1 = cx + radius * Math.cos(startRad);
+  const y1 = cy + radius * Math.sin(startRad);
+  const x2 = cx + radius * Math.cos(endRad);
+  const y2 = cy + radius * Math.sin(endRad);
+
+  const largeArcFlag = endAngleDeg - startAngleDeg <= 180 ? '0' : '1';
+
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 ${largeArcFlag} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+}
+
 export const Orb: React.FC<OrbProps> = ({
   state,
   audioLevel = 0,
@@ -48,6 +69,76 @@ export const Orb: React.FC<OrbProps> = ({
   }, [state, isLive, activeMode, themeAccent]);
 
   const themeRef = useRef<OrbGlowTheme>(activeTheme);
+
+  // Memoize SVG path geometries based on Orb size to eliminate GC churn and CPU overhead
+  const memoizedSvgPaths = useMemo(() => {
+    const center = (size + 130) / 2;
+    const outerRadius = size / 2 + 18;
+    const caliperRadius = size / 2 + 28;
+    const reticleRadius = size / 2 + 38;
+
+    // 1. Segmented orbital arcs (3 symmetric arc segments)
+    const orbitalArcs = [
+      describeSvgArc(center, center, outerRadius, 15, 75),
+      describeSvgArc(center, center, outerRadius, 135, 195),
+      describeSvgArc(center, center, outerRadius, 255, 315),
+    ];
+
+    // 2. Counter-rotating outer reticle arcs (4 quadrants)
+    const counterArcs = [
+      describeSvgArc(center, center, reticleRadius, 0, 45),
+      describeSvgArc(center, center, reticleRadius, 90, 135),
+      describeSvgArc(center, center, reticleRadius, 180, 225),
+      describeSvgArc(center, center, reticleRadius, 270, 315),
+    ];
+
+    // 3. Precision optical caliper corner ticks (12 points at 30 deg)
+    let caliperTicksPath = '';
+    for (let t = 0; t < 12; t++) {
+      const angleRad = (t * Math.PI) / 6;
+      const isCardinal = t % 3 === 0;
+      const len = isCardinal ? 7 : 4;
+      const r1 = caliperRadius - 1;
+      const r2 = caliperRadius + len;
+      const x1 = center + Math.cos(angleRad) * r1;
+      const y1 = center + Math.sin(angleRad) * r1;
+      const x2 = center + Math.cos(angleRad) * r2;
+      const y2 = center + Math.sin(angleRad) * r2;
+      caliperTicksPath += `M ${x1.toFixed(2)} ${y1.toFixed(2)} L ${x2.toFixed(2)} ${y2.toFixed(2)} `;
+    }
+
+    // 4. Optical Corner HUD brackets
+    const bracketOffset = size / 2 + 30;
+    const bSize = 9;
+    const cornerBracketsPath = [
+      `M ${center - bracketOffset + bSize} ${center - bracketOffset} L ${center - bracketOffset} ${center - bracketOffset} L ${center - bracketOffset} ${center - bracketOffset + bSize}`,
+      `M ${center + bracketOffset - bSize} ${center - bracketOffset} L ${center + bracketOffset} ${center - bracketOffset} L ${center + bracketOffset} ${center - bracketOffset + bSize}`,
+      `M ${center - bracketOffset + bSize} ${center + bracketOffset} L ${center - bracketOffset} ${center + bracketOffset} L ${center - bracketOffset} ${center + bracketOffset - bSize}`,
+      `M ${center + bracketOffset - bSize} ${center + bracketOffset} L ${center + bracketOffset} ${center + bracketOffset} L ${center + bracketOffset} ${center + bracketOffset - bSize}`,
+    ].join(' ');
+
+    // 5. Cardinal alignment crosshairs
+    const crosshairLen = 12;
+    const crosshairGap = size / 2 + 10;
+    const crosshairsPath = `
+      M ${center - crosshairGap - crosshairLen} ${center} L ${center - crosshairGap} ${center}
+      M ${center + crosshairGap} ${center} L ${center + crosshairGap + crosshairLen} ${center}
+      M ${center} ${center - crosshairGap - crosshairLen} L ${center} ${center - crosshairGap}
+      M ${center} ${center + crosshairGap} L ${center} ${center + crosshairGap + crosshairLen}
+    `;
+
+    return {
+      orbitalArcs,
+      counterArcs,
+      caliperTicksPath,
+      cornerBracketsPath,
+      crosshairsPath,
+      center,
+      outerRadius,
+      caliperRadius,
+      reticleRadius,
+    };
+  }, [size]);
 
   // Interactive 3D tilt and pointer-tracking physics
   const [pointerCoord, setPointerCoord] = useState<{ x: number; y: number; isHovered: boolean }>({
@@ -104,6 +195,11 @@ export const Orb: React.FC<OrbProps> = ({
     const startTime = performance.now();
     const canvasMargin = 65;
 
+    // 60 FPS requestAnimationFrame throttling & delta-time synchronization
+    const TARGET_FPS = 60;
+    const FRAME_INTERVAL = 1000 / TARGET_FPS; // ~16.67ms
+    let lastFrameTime = performance.now();
+
     // Smoothed RGB color channels for smooth organic transition between themes
     let smoothedR = themeRef.current.primaryRGB[0];
     let smoothedG = themeRef.current.primaryRGB[1];
@@ -138,6 +234,18 @@ export const Orb: React.FC<OrbProps> = ({
 
     const render = (now: number) => {
       animId = requestAnimationFrame(render);
+
+      // Skip CPU/GPU rendering cycles when tab is hidden
+      if (document.hidden) {
+        return;
+      }
+
+      // Throttle to 60 FPS: drop redundant frames on 120Hz/144Hz displays
+      const elapsedSinceLast = now - lastFrameTime;
+      if (elapsedSinceLast < FRAME_INTERVAL - 1.0) {
+        return;
+      }
+      lastFrameTime = now - (elapsedSinceLast % FRAME_INTERVAL);
 
       const currentState = stateRef.current;
       const currentTheme = themeRef.current;
@@ -359,8 +467,9 @@ export const Orb: React.FC<OrbProps> = ({
       const maxSynapseDist =
         (38 + normPitch * 28 + smoothedLevel * 28 + (isThinking ? 18 : 0)) *
         (currentSize / 280);
+      const maxSynapseDistSq = maxSynapseDist * maxSynapseDist;
 
-      // Draw Synaptic Filaments
+      // Draw Synaptic Filaments with squared-distance pre-culling
       for (let i = 0; i < numParticles; i++) {
         const p1 = particles[i];
         const px1 = center + p1.x;
@@ -370,9 +479,10 @@ export const Orb: React.FC<OrbProps> = ({
           const p2 = particles[j];
           const dx = p1.x - p2.x;
           const dy = p1.y - p2.y;
-          const dist = Math.hypot(dx, dy);
+          const distSq = dx * dx + dy * dy;
 
-          if (dist < maxSynapseDist) {
+          if (distSq < maxSynapseDistSq) {
+            const dist = Math.sqrt(distSq);
             const proximity = 1 - dist / maxSynapseDist;
             const synapseAlpha = isThinking
               ? proximity * 0.78
@@ -584,6 +694,81 @@ export const Orb: React.FC<OrbProps> = ({
         }}
       />
 
+      {/* Memoized High-Precision Vector HUD & Optical Reticle SVG Overlay */}
+      <svg
+        className="absolute pointer-events-none z-15"
+        style={{
+          width: size + 130,
+          height: size + 130,
+          top: -65,
+          left: -65,
+        }}
+        viewBox={`0 0 ${size + 130} ${size + 130}`}
+      >
+        <g
+          style={{
+            transformOrigin: `${memoizedSvgPaths.center}px ${memoizedSvgPaths.center}px`,
+          }}
+        >
+          {/* Caliper Ticks */}
+          <path
+            d={memoizedSvgPaths.caliperTicksPath}
+            stroke={`rgba(${activeTheme.secondaryRGB.join(',')}, ${
+              state === 'thinking' ? 0.85 : state === 'listening' || state === 'speaking' ? 0.7 : 0.4
+            })`}
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+
+          {/* Corner HUD Brackets */}
+          <path
+            d={memoizedSvgPaths.cornerBracketsPath}
+            stroke={`rgba(${activeTheme.primaryRGB.join(',')}, ${
+              state === 'thinking' ? 0.65 : 0.35
+            })`}
+            strokeWidth="1"
+            fill="none"
+          />
+
+          {/* Cardinal Alignment Crosshairs */}
+          <path
+            d={memoizedSvgPaths.crosshairsPath}
+            stroke={`rgba(${activeTheme.primaryRGB.join(',')}, 0.28)`}
+            strokeWidth="0.9"
+            strokeDasharray="2, 4"
+          />
+
+          {/* Segmented Orbital Reticle Arcs */}
+          {memoizedSvgPaths.orbitalArcs.map((arcD, idx) => (
+            <path
+              key={`orbit-arc-${idx}`}
+              d={arcD}
+              stroke={`rgba(${activeTheme.primaryRGB.join(',')}, ${
+                state === 'thinking' ? 0.85 : state === 'listening' || state === 'speaking' ? 0.55 : 0.3
+              })`}
+              strokeWidth="1.4"
+              fill="none"
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* Counter-rotating outer arcs */}
+          {memoizedSvgPaths.counterArcs.map((arcD, idx) => (
+            <path
+              key={`counter-arc-${idx}`}
+              d={arcD}
+              stroke={`rgba(${activeTheme.accentRGB.join(',')}, ${
+                state === 'thinking' ? 0.75 : 0.25
+              })`}
+              strokeWidth="1.1"
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray="4, 6"
+            />
+          ))}
+        </g>
+      </svg>
+
       {/* Atmospheric Aurora Aura Glow - Color shifts with theme & mode */}
       <div
         className={`absolute inset-0 rounded-full transition-all duration-700 pointer-events-none blur-3xl ${
@@ -651,11 +836,39 @@ export const Orb: React.FC<OrbProps> = ({
         />
       )}
 
-      {/* Quantum Accelerator Ring for Thinking State */}
-      {state === 'thinking' && (
+      {/* Quantum Accelerator Ring for Thinking / Processing State */}
+      {(state === 'thinking' || state === 'processing') && (
         <div
           className="absolute inset-[-12px] rounded-full border-2 border-dashed animate-orb-spin-slow pointer-events-none transition-colors duration-500"
           style={{ borderColor: activeTheme.ringBorderColor }}
+        />
+      )}
+
+      {/* Cyber Accelerator Ring for Tool Execution State */}
+      {state === 'executing_tool' && (
+        <>
+          <div
+            className="absolute inset-[-14px] rounded-full border-2 border-dashed animate-orb-spin-reverse pointer-events-none transition-colors duration-500"
+            style={{ borderColor: activeTheme.ringBorderColor }}
+          />
+          <div
+            className="absolute inset-[-6px] rounded-full border animate-ping opacity-60 pointer-events-none transition-colors duration-500"
+            style={{ borderColor: activeTheme.ringBorderColor, animationDuration: '2s' }}
+          />
+        </>
+      )}
+
+      {/* High-Security Shield Ring for Permission Required */}
+      {state === 'permission_required' && (
+        <div
+          className="absolute inset-[-10px] rounded-full border-2 border-amber-500/80 animate-pulse pointer-events-none shadow-[0_0_20px_rgba(245,158,11,0.5)]"
+        />
+      )}
+
+      {/* Alert Warning Ring for Error State */}
+      {state === 'error' && (
+        <div
+          className="absolute inset-[-12px] rounded-full border-2 border-red-500/90 animate-pulse pointer-events-none shadow-[0_0_25px_rgba(239,68,68,0.6)]"
         />
       )}
 

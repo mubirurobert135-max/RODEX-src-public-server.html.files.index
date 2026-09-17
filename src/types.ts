@@ -1,9 +1,64 @@
-export type AssistantState = 'idle' | 'listening' | 'thinking' | 'speaking';
+export type AssistantState =
+  | 'idle'
+  | 'listening'
+  | 'thinking'
+  | 'processing'
+  | 'executing_tool'
+  | 'speaking'
+  | 'error'
+  | 'permission_required';
 
 export interface WebSource {
   title: string;
   url: string;
   domain?: string;
+}
+
+export interface PlanStep {
+  stepNumber: number;
+  description: string;
+  toolName?: string;
+  toolParams?: any;
+  status: 'pending' | 'executing' | 'completed' | 'failed' | 'skipped' | 'requires_permission';
+  result?: any;
+}
+
+export interface ToolExecutionRecord {
+  toolName: string;
+  inputParams: any;
+  result: any;
+  latencyMs: number;
+  timestamp: string;
+  validated: boolean;
+}
+
+export interface OrchestrationTrace {
+  intent: {
+    primaryIntent: string;
+    confidence: number;
+    extractedEntities: Record<string, any>;
+    suggestedTools: string[];
+    requiresPlanning: boolean;
+    riskLevel: string;
+  };
+  plan?: {
+    goal: string;
+    steps: PlanStep[];
+    selectedModel: string;
+    estimatedComplexity: string;
+  };
+  executedTools: ToolExecutionRecord[];
+  selectedModel: string;
+  validationPassed: boolean;
+  totalLatencyMs: number;
+  recoveredFromError?: boolean;
+}
+
+export interface PendingActionConfirmation {
+  actionId: string;
+  toolName: string;
+  description: string;
+  params: any;
 }
 
 export interface ChatMessage {
@@ -18,6 +73,8 @@ export interface ChatMessage {
   sources?: WebSource[];
   searchQueries?: string[];
   webGrounded?: boolean;
+  orchestrationTrace?: OrchestrationTrace;
+  pendingConfirmation?: PendingActionConfirmation;
 }
 
 export interface VoiceProfile {
@@ -104,6 +161,7 @@ export interface VoiceSettings {
   audioSens: number; // 1 to 5
   webSearchEnabled?: boolean;
   hapticFeedbackEnabled?: boolean; // Navigator Vibration API physical feedback
+  performanceMode?: 'ultra' | 'balanced' | 'deep_reasoning'; // Ultra-low latency engine vs balanced vs deep
   customWakeWord?: CustomWakeWordConfig;
 }
 
@@ -137,6 +195,75 @@ export interface ChatSession {
   isLive: boolean;
   messages: ChatMessage[];
   speaker: string;
+}
+
+export type SecuritySeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type SecurityCategory = 'system' | 'network' | 'application' | 'account' | 'malware' | 'phishing';
+export type SecuritySystemStatus = 'protected' | 'monitoring' | 'attention_required';
+
+export interface SecurityIncident {
+  id: string;
+  title: string;
+  category: SecurityCategory;
+  severity: SecuritySeverity;
+  status: 'detected' | 'investigating' | 'mitigated' | 'resolved';
+  timestamp: string;
+  affectedResource: string;
+  evidence: string;
+  confidence: number; // 0 to 100
+  possibleImpact: string;
+  recommendedActions: string[];
+  isConfirmed: 'confirmed' | 'suspected' | 'anomaly';
+  source: string;
+}
+
+export interface SecurityState {
+  status: SecuritySystemStatus;
+  monitoringActive: boolean;
+  lastScannedAt: string;
+  totalChecks: number;
+  threatsCount: number;
+  incidents: SecurityIncident[];
+}
+
+
+export type UpdateCategory = 'ai_model' | 'dependency' | 'security' | 'architecture' | 'configuration';
+export type UpdateRecommendationLevel = 'ignore' | 'monitor' | 'recommend' | 'prepare';
+export type UpdatePolicyLevel = 1 | 2 | 3 | 4;
+
+export interface TechnologyUpdateItem {
+  id: string;
+  name: string;
+  category: UpdateCategory;
+  currentVersion: string;
+  availableVersion: string;
+  releaseDate: string;
+  description: string;
+  securityRelevant: boolean;
+  compatibilityScore: number; // 0 to 100
+  potentialBenefits: string[];
+  potentialRisks: string[];
+  breakingChangesWarning?: string;
+  complexity: 'low' | 'medium' | 'high';
+  recommendation: UpdateRecommendationLevel;
+  status: 'discovered' | 'approved' | 'testing' | 'applied' | 'rolled_back';
+  timestamp: string;
+}
+
+export interface SystemUpdateState {
+  version: string;
+  lastCheckedAt: string;
+  policyLevel: UpdatePolicyLevel;
+  autoApplyLowRisk: boolean;
+  updates: TechnologyUpdateItem[];
+  history: Array<{
+    id: string;
+    updateName: string;
+    action: string;
+    timestamp: string;
+    success: boolean;
+    details: string;
+  }>;
 }
 
 export interface MediaSearchResult {

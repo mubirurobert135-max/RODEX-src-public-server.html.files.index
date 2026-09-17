@@ -21,6 +21,16 @@ import {
   Download,
   Share2,
   Sparkles,
+  Cpu,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Terminal,
+  Play,
+  Youtube,
 } from 'lucide-react';
 import { ChatMessage, AssistantState, ChatSession } from '../types';
 import { triggerHaptic } from '../utils/haptics';
@@ -42,6 +52,7 @@ interface ChatSheetProps {
   onStartVoice: () => void;
   isLiveConversation: boolean;
   onToggleLiveCall: () => void;
+  onConfirmAction?: (actionId: string, toolName: string, params: any) => Promise<void>;
 }
 
 export const ChatSheet: React.FC<ChatSheetProps> = ({
@@ -60,13 +71,20 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   onStartVoice,
   isLiveConversation,
   onToggleLiveCall,
+  onConfirmAction,
 }) => {
   const [inputText, setInputText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedTranscript, setCopiedTranscript] = useState(false);
   const [showSessionDrawer, setShowSessionDrawer] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
+  const [expandedTraces, setExpandedTraces] = useState<Record<string, boolean>>({});
+  const [approvingActionId, setApprovingActionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const toggleTrace = (id: string) => {
+    setExpandedTraces((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -427,6 +445,76 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                     )}
                     <p className="whitespace-pre-wrap select-text">{msg.text}</p>
 
+                    {/* Dedicated Browser Destination / YouTube Execution Card */}
+                    {msg.sender === 'assistant' &&
+                      msg.orchestrationTrace?.executedTools?.some(
+                        (t) => t.toolName === 'open_approved_url' && t.result?.success && t.result?.output?.url
+                      ) && (
+                        <div className="mt-3 space-y-2">
+                          {msg.orchestrationTrace.executedTools
+                            .filter((t) => t.toolName === 'open_approved_url' && t.result?.success && t.result?.output?.url)
+                            .map((toolRec, tIdx) => {
+                              const out = toolRec.result.output;
+                              const isYt = out.destinationType === 'youtube' || out.domain?.includes('youtube');
+                              const isGg = out.destinationType === 'google' || out.domain?.includes('google');
+
+                              return (
+                                <div
+                                  key={`launch-${tIdx}-${out.url}`}
+                                  className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                    isYt
+                                      ? 'bg-red-950/40 border-red-500/40'
+                                      : isGg
+                                      ? 'bg-blue-950/40 border-blue-500/40'
+                                      : 'bg-cyan-950/40 border-cyan-500/40'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div
+                                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                        isYt
+                                          ? 'bg-red-600 text-white'
+                                          : isGg
+                                          ? 'bg-blue-600 text-white'
+                                          : 'bg-cyan-600 text-black'
+                                      }`}
+                                    >
+                                      {isYt ? (
+                                        <Youtube className="w-4 h-4" />
+                                      ) : (
+                                        <Globe className="w-4 h-4" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-semibold text-white truncate">
+                                        {out.label || 'Web Destination'}
+                                      </p>
+                                      <span className="text-[10px] text-neutral-400 block truncate font-mono">
+                                        {out.url}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    onClick={() => {
+                                      triggerHaptic('tap');
+                                      window.open(out.url, '_blank', 'noopener,noreferrer');
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0 shadow-sm ${
+                                      isYt
+                                        ? 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)]'
+                                        : 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                                    }`}
+                                  >
+                                    <span>{isYt ? 'Open YouTube' : 'Open in Browser'}</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
                     {/* Web Search Queries & Grounded Sources from World Wide Web */}
                     {msg.sender === 'assistant' &&
                       ((msg.sources && msg.sources.length > 0) ||
@@ -480,6 +568,135 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                           )}
                         </div>
                       )}
+
+                    {/* Pending Action Confirmation Card */}
+                    {msg.sender === 'assistant' && msg.pendingConfirmation && (
+                      <div className="mt-3 p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>Operator Approval Required</span>
+                        </div>
+                        <p className="text-xs text-neutral-300 leading-relaxed">
+                          {msg.pendingConfirmation.description}
+                        </p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={async () => {
+                              if (onConfirmAction && msg.pendingConfirmation) {
+                                setApprovingActionId(msg.pendingConfirmation.actionId);
+                                try {
+                                  await onConfirmAction(
+                                    msg.pendingConfirmation.actionId,
+                                    msg.pendingConfirmation.toolName,
+                                    msg.pendingConfirmation.params
+                                  );
+                                } finally {
+                                  setApprovingActionId(null);
+                                }
+                              }
+                            }}
+                            disabled={approvingActionId === msg.pendingConfirmation.actionId}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold flex items-center gap-1 transition-all disabled:opacity-50"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>
+                              {approvingActionId === msg.pendingConfirmation.actionId
+                                ? 'Executing...'
+                                : 'Approve & Execute'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Orchestration & Reasoning Trace View */}
+                    {msg.sender === 'assistant' && msg.orchestrationTrace && (
+                      <div className="mt-2.5 pt-2 border-t border-neutral-800/60">
+                        <button
+                          type="button"
+                          onClick={() => toggleTrace(msg.id)}
+                          className="w-full flex items-center justify-between text-[10px] text-neutral-400 hover:text-cyan-400 transition-colors py-1"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Cpu className="w-3 h-3 text-cyan-400" />
+                            <span className="font-mono font-medium text-cyan-300">
+                              Orchestrator: {msg.orchestrationTrace.intent.primaryIntent}
+                            </span>
+                            <span className="text-neutral-500">•</span>
+                            <span className="text-neutral-400">
+                              {msg.orchestrationTrace.totalLatencyMs}ms
+                            </span>
+                            {msg.orchestrationTrace.validationPassed && (
+                              <span className="px-1 py-0.2 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 text-[9px]">
+                                Verified
+                              </span>
+                            )}
+                          </div>
+                          {expandedTraces[msg.id] ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-neutral-400" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
+                          )}
+                        </button>
+
+                        {expandedTraces[msg.id] && (
+                          <div className="mt-2 p-2.5 rounded-lg bg-neutral-900/80 border border-neutral-800 text-[11px] space-y-2 font-mono">
+                            <div className="flex items-center justify-between text-neutral-400 pb-1 border-b border-neutral-800">
+                              <span>Model: {msg.orchestrationTrace.selectedModel}</span>
+                              <span>Confidence: {Math.round(msg.orchestrationTrace.intent.confidence * 100)}%</span>
+                            </div>
+
+                            {/* Plan Steps */}
+                            {msg.orchestrationTrace.plan && msg.orchestrationTrace.plan.steps.length > 0 && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider text-cyan-400 mb-1 flex items-center gap-1">
+                                  <Layers className="w-3 h-3" />
+                                  <span>Task Plan</span>
+                                </div>
+                                <div className="space-y-1 pl-1">
+                                  {msg.orchestrationTrace.plan.steps.map((step) => (
+                                    <div key={step.stepNumber} className="flex items-start gap-1.5 text-neutral-300">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                                      <span>
+                                        {step.stepNumber}. {step.description}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Executed Tools */}
+                            {msg.orchestrationTrace.executedTools && msg.orchestrationTrace.executedTools.length > 0 && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider text-cyan-400 mb-1 flex items-center gap-1">
+                                  <Terminal className="w-3 h-3" />
+                                  <span>Executed Tools</span>
+                                </div>
+                                <div className="space-y-1.5 pl-1">
+                                  {msg.orchestrationTrace.executedTools.map((t, idx) => (
+                                    <div
+                                      key={`tool-${idx}`}
+                                      className="p-1.5 rounded bg-black/50 border border-neutral-800/80 text-[10px]"
+                                    >
+                                      <div className="flex items-center justify-between text-cyan-300">
+                                        <span>tool: {t.toolName}</span>
+                                        <span className="text-neutral-400">{t.latencyMs}ms</span>
+                                      </div>
+                                      {t.result.message && (
+                                        <div className="text-neutral-300 mt-0.5 truncate">
+                                          output: {t.result.message}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Action buttons on RODEX messages */}
                     {msg.sender === 'assistant' && (

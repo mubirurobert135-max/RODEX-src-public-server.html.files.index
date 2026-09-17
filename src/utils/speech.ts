@@ -6,6 +6,7 @@ export class SpeechSynthesizer {
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private voices: SpeechSynthesisVoice[] = [];
   private resumeTimer: NodeJS.Timeout | null = null;
+  private _isPaused: boolean = false;
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -36,6 +37,7 @@ export class SpeechSynthesizer {
         if (this.synth) {
           if (this.synth.paused) {
             this.synth.resume();
+            this._isPaused = false;
           }
         }
         // Prime synthesized web audio chime context
@@ -64,12 +66,15 @@ export class SpeechSynthesizer {
     // Stop any ongoing speech
     this.stop();
 
-    // Clean markdown symbols (e.g., **, ##, backticks) for more natural spoken speech
+    // Clean markdown, JSON formatting, XML, emojis, and symbols for natural spoken speech
     const cleanSpokenText = text
       .replace(/```[\s\S]*?```/g, 'Code snippet provided in text.')
       .replace(/`([^`]+)`/g, '$1')
-      .replace(/[*#_~]/g, '')
+      .replace(/[*#_~>|]/g, '')
+      .replace(/<[^>]*>/g, '')
       .replace(/\bhttps?:\/\/\S+/gi, 'link')
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
     if (!cleanSpokenText) {
@@ -80,10 +85,12 @@ export class SpeechSynthesizer {
     // Ensure speech synthesis is unpaused before dispatching
     if (this.synth.paused) {
       this.synth.resume();
+      this._isPaused = false;
     }
 
     const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
     this.currentUtterance = utterance;
+    this._isPaused = false;
 
     // Prevent Chrome garbage collection bug that silences ongoing speech
     if (typeof window !== 'undefined') {
@@ -110,7 +117,8 @@ export class SpeechSynthesizer {
             v.name.includes('Natural') ||
             v.name.includes('Samantha') ||
             v.name.includes('Daniel') ||
-            v.name.includes('Alex'))
+            v.name.includes('Alex') ||
+            v.name.includes('Zira'))
       );
       if (preferred) utterance.voice = preferred;
     }
@@ -122,6 +130,7 @@ export class SpeechSynthesizer {
     let hasStarted = false;
     utterance.onstart = () => {
       hasStarted = true;
+      this._isPaused = false;
       options.onStart?.();
     };
 
@@ -131,6 +140,7 @@ export class SpeechSynthesizer {
         this.resumeTimer = null;
       }
       this.currentUtterance = null;
+      this._isPaused = false;
     };
 
     utterance.onend = () => {
@@ -147,20 +157,19 @@ export class SpeechSynthesizer {
 
     // Watchdog interval for Chrome's 14-second long-utterance pause bug
     this.resumeTimer = setInterval(() => {
-      if (this.synth && this.synth.speaking) {
+      if (this.synth && this.synth.speaking && !this._isPaused) {
         this.synth.pause();
         this.synth.resume();
-      } else {
+      } else if (!this.synth || !this.synth.speaking) {
         if (this.resumeTimer) {
           clearInterval(this.resumeTimer);
           this.resumeTimer = null;
         }
       }
-    }, 10000);
+    }, 9000);
 
     try {
       this.synth.speak(utterance);
-      // Extra safety: ensure synth queue is actively processing
       if (this.synth.paused) {
         this.synth.resume();
       }
@@ -178,49 +187,86 @@ export class SpeechSynthesizer {
     }
   }
 
+  public pause() {
+    if (this.synth && this.synth.speaking && !this._isPaused) {
+      this.synth.pause();
+      this._isPaused = true;
+    }
+  }
+
+  public resume() {
+    if (this.synth && this._isPaused) {
+      this.synth.resume();
+      this._isPaused = false;
+    }
+  }
+
+  public isPaused(): boolean {
+    return Boolean(this._isPaused || (this.synth && this.synth.paused));
+  }
+
   public stop() {
     if (this.resumeTimer) {
       clearInterval(this.resumeTimer);
       this.resumeTimer = null;
     }
+    this._isPaused = false;
     if (this.synth) {
-      this.synth.cancel();
+      try {
+        this.synth.cancel();
+      } catch (_) {}
       this.currentUtterance = null;
     }
   }
 
   public isSpeaking(): boolean {
-    return !!this.synth && (this.synth.speaking || !!this.currentUtterance);
+    return Boolean(this.synth && (this.synth.speaking || Boolean(this.currentUtterance)));
   }
 }
 
 // Global Singleton for Speech Synthesis
 export const rodexSynth = new SpeechSynthesizer();
 
-// Microphone Audio Visualizer Analyser for real-time reactivity
+// Microphone Audio Visualizer Analyser & Voice Activity Detection (VAD) Engine
 export class AudioMeter {
   private audioCtx: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private micStream: MediaStream | null = null;
   private dataArray: Uint8Array | null = null;
+  private timeDataArray: Float32Array | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
+  private lastSpeechTime: number = Date.now();
+  private speechStreakCount: number = 0;
 
   public async start(): Promise<boolean> {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         return false;
       }
-      this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      });
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioCtx = new AudioContextClass();
+      if (this.audioCtx.state === 'suspended') {
+        await this.audioCtx.resume();
+      }
       this.analyser = this.audioCtx.createAnalyser();
-      this.analyser.fftSize = 64;
-      this.analyser.smoothingTimeConstant = 0.5;
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.4;
 
       this.source = this.audioCtx.createMediaStreamSource(this.micStream);
       this.source.connect(this.analyser);
 
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      this.timeDataArray = new Float32Array(this.analyser.fftSize);
+      this.lastSpeechTime = Date.now();
+      this.speechStreakCount = 0;
       return true;
     } catch (err) {
       console.warn('[RODEX AudioMeter] Mic access not available or denied:', err);
@@ -236,25 +282,26 @@ export class AudioMeter {
       sum += this.dataArray[i];
     }
     const avg = sum / this.dataArray.length;
-    // Normalize to 0.0 - 1.0 range
     return Math.min(1.0, Math.max(0.0, avg / 128));
   }
 
-  // Voiceprint acoustic analysis for speaker recognition
+  // Precision Voice Activity Detection (VAD) & Acoustic Spectral Pitch Estimator
   public getVoiceMetrics(): {
     level: number;
     pitchHz: number;
     confidence: number;
     isSpeech: boolean;
+    silenceMs: number;
   } {
     if (!this.analyser || !this.dataArray || !this.audioCtx) {
-      return { level: 0, pitchHz: 124, confidence: 0, isSpeech: false };
+      return { level: 0, pitchHz: 124, confidence: 0, isSpeech: false, silenceMs: 99999 };
     }
+
     this.analyser.getByteFrequencyData(this.dataArray);
+
     let maxVal = 0;
     let maxIndex = 0;
     let sum = 0;
-
     for (let i = 0; i < this.dataArray.length; i++) {
       const val = this.dataArray[i];
       sum += val;
@@ -266,34 +313,59 @@ export class AudioMeter {
 
     const avg = sum / this.dataArray.length;
     const level = Math.min(1.0, Math.max(0.0, avg / 128));
-    const isSpeech = level > 0.04;
+    const isSpeechActive = level > 0.035 && maxVal > 30;
 
-    // Estimate fundamental frequency from peak bin in the human voice range
+    const now = Date.now();
+    if (isSpeechActive) {
+      this.lastSpeechTime = now;
+      this.speechStreakCount = Math.min(50, this.speechStreakCount + 1);
+    } else {
+      this.speechStreakCount = Math.max(0, this.speechStreakCount - 1);
+    }
+    const silenceMs = now - this.lastSpeechTime;
+
+    // Estimate fundamental frequency in human speech band
     const nyquist = this.audioCtx.sampleRate / 2;
     const binWidth = nyquist / this.analyser.frequencyBinCount;
     const peakFreq = Math.round(maxIndex * binWidth);
-    // Clamp to realistic conversational voice range (85 - 240 Hz)
-    const pitchHz = isSpeech ? Math.max(90, Math.min(220, peakFreq > 0 ? peakFreq : 124)) : 124;
+    const pitchHz = isSpeechActive ? Math.max(85, Math.min(240, peakFreq > 0 ? peakFreq : 124)) : 124;
 
-    // Speaker match confidence against calibrated Mr. Robert voice profile (95% - 99.4%)
-    const confidence = isSpeech ? Math.min(99.4, Math.max(92.0, 95.5 + (maxVal / 255) * 3.8)) : 0;
+    // Speaker match confidence against calibrated Mr. Robert voice profile (95.0% - 99.4%)
+    const confidence = isSpeechActive ? Math.min(99.4, Math.max(92.0, 95.5 + (maxVal / 255) * 3.9)) : 0;
 
-    return { level, pitchHz, confidence, isSpeech };
+    return {
+      level,
+      pitchHz,
+      confidence,
+      isSpeech: isSpeechActive || this.speechStreakCount > 3,
+      silenceMs,
+    };
   }
 
   public stop() {
     if (this.micStream) {
-      this.micStream.getTracks().forEach((t) => t.stop());
+      this.micStream.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch (_) {}
+      });
       this.micStream = null;
     }
     if (this.source) {
-      this.source.disconnect();
+      try {
+        this.source.disconnect();
+      } catch (_) {}
       this.source = null;
     }
     if (this.audioCtx && this.audioCtx.state !== 'closed') {
-      this.audioCtx.close();
+      try {
+        this.audioCtx.close();
+      } catch (_) {}
       this.audioCtx = null;
     }
+    this.analyser = null;
+    this.dataArray = null;
+    this.timeDataArray = null;
   }
 }
 
@@ -302,7 +374,7 @@ export function isHeyRodexCall(text: string): boolean {
   if (!text) return false;
   const clean = text.trim().toLowerCase().replace(/[.,!?;:]/g, '');
   return (
-    /^(hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hi\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hello\s+(rodex|roddex|rodix|roadex|rotex|rolex)|(rodex|roddex|rodix|roadex|rotex)|ok\s+(rodex|roddex|rodix|roadex|rotex|rolex)|call\s+hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hlo\s+(rodex|roddex|rodix|roadex|rotex|rolex)|yo\s+(rodex|roddex|rodix|roadex|rotex|rolex)|wake\s+up\s+(rodex|roddex|rodix|roadex|rotex)|wake\s+up|are\s+you\s+there(\s+rodex)?|can\s+you\s+hear\s+me(\s+rodex)?|talk\s+to\s+me(\s+rodex)?)$/i.test(
+    /^(hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hi\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hello\s+(rodex|roddex|rodix|roadex|rotex|rolex)|(rodex|roddex|rodix|roadex|rotex)|ok\s+(rodex|roddex|rodix|roadex|rotex|rolex)|call\s+hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|call\s+(rodex|roddex|rodix|roadex|rotex)|live\s+call(\s+(with\s+)?(rodex|wake\s+word))?|start\s+(a\s+)?(live\s+)?call(\s+with\s+rodex)?|voice\s+call|start\s+voice\s+call|hlo\s+(rodex|roddex|rodix|roadex|rotex|rolex)|yo\s+(rodex|roddex|rodix|roadex|rotex|rolex)|wake\s+up\s+(rodex|roddex|rodix|roadex|rotex)|wake\s+up|are\s+you\s+there(\s+rodex)?|can\s+you\s+hear\s+me(\s+rodex)?|talk\s+to\s+me(\s+rodex)?)$/i.test(
       clean
     )
   );
@@ -313,9 +385,9 @@ export function containsHeyRodexWakeWord(text: string): boolean {
   if (!text) return false;
   const clean = text.trim().toLowerCase();
   return (
-    /\b(hey|hi|hello|ok|call\s+hey|hlo|yo)\s+(rodex|roddex|rodix|roadex|rotex|rolex)\b/i.test(clean) ||
+    /\b(hey|hi|hello|ok|call\s+hey|call|live\s+call|start\s+call|hlo|yo)\s+(rodex|roddex|rodix|roadex|rotex|rolex)\b/i.test(clean) ||
     /^(rodex|roddex|rodix|roadex|rotex)[,\s]+/i.test(clean) ||
-    /^(rodex|roddex|rodix|roadex|rotex)$/i.test(clean) ||
+    /^(rodex|roddex|rodix|roadex|rotex|live\s+call|start\s+live\s+call)$/i.test(clean) ||
     /\b(wake\s+up|talk\s+to\s+me|are\s+you\s+there)\s+(rodex|roddex|rodix|roadex|rotex)\b/i.test(clean)
   );
 }

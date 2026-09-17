@@ -247,7 +247,94 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </label>
             </section>
 
-            {/* 2. Wake-word Architecture */}
+            {/* 2. Neural Acceleration & Latency Mode */}
+            <section className="bg-neutral-950 border border-neutral-900 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <span>Performance & Latency</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-400 border border-amber-800/60 font-semibold tracking-wide uppercase">
+                  {voiceSettings.performanceMode === 'deep_reasoning'
+                    ? 'Pro Reasoning'
+                    : voiceSettings.performanceMode === 'balanced'
+                    ? 'Balanced Fast'
+                    : '⚡ Ultra-Fast 680M+'}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Tune the neural inference engine and response acceleration speed:
+              </p>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateVoiceSettings({
+                      ...voiceSettings,
+                      performanceMode: 'ultra',
+                      rate: Math.max(voiceSettings.rate, 1.05),
+                    })
+                  }
+                  className={`p-2.5 rounded-xl border text-left transition-all active:scale-95 cursor-pointer ${
+                    (voiceSettings.performanceMode || 'ultra') === 'ultra'
+                      ? 'border-cyan-500/80 bg-cyan-950/40 text-cyan-300'
+                      : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1 text-xs font-semibold">
+                    <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>Ultra-Fast</span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 mt-1 block">Sub-second voice & instant caching</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateVoiceSettings({
+                      ...voiceSettings,
+                      performanceMode: 'balanced',
+                    })
+                  }
+                  className={`p-2.5 rounded-xl border text-left transition-all active:scale-95 cursor-pointer ${
+                    voiceSettings.performanceMode === 'balanced'
+                      ? 'border-cyan-500/80 bg-cyan-950/40 text-cyan-300'
+                      : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1 text-xs font-semibold">
+                    <Cpu className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>Balanced</span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 mt-1 block">Optimal accuracy & swift latency</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateVoiceSettings({
+                      ...voiceSettings,
+                      performanceMode: 'deep_reasoning',
+                    })
+                  }
+                  className={`p-2.5 rounded-xl border text-left transition-all active:scale-95 cursor-pointer ${
+                    voiceSettings.performanceMode === 'deep_reasoning'
+                      ? 'border-cyan-500/80 bg-cyan-950/40 text-cyan-300'
+                      : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1 text-xs font-semibold">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Pro Deep</span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 mt-1 block">Maximum detail & complex logic</span>
+                </button>
+              </div>
+            </section>
+
+            {/* 3. Wake-word Architecture */}
             <section className="bg-neutral-950 border border-neutral-900 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">

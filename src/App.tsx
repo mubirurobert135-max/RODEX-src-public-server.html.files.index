@@ -18,6 +18,12 @@ import {
   Music2,
   Maximize2,
   Minimize2,
+  Shield,
+  RefreshCw,
+  Award,
+  Play,
+  Youtube,
+  X,
 } from 'lucide-react';
 import { Orb } from './components/Orb';
 import { ActionBar } from './components/ActionBar';
@@ -28,6 +34,9 @@ import { VoiceProfileModal } from './components/VoiceProfileModal';
 import { WebVerificationModal } from './components/WebVerificationModal';
 import { SpotifyPlayerModal } from './components/SpotifyPlayerModal';
 import { WebMediaHubModal } from './components/WebMediaHubModal';
+import { SecurityCenterModal } from './components/SecurityCenterModal';
+import { UpdateCenterModal } from './components/UpdateCenterModal';
+import { CreatorProfileModal } from './components/CreatorProfileModal';
 import { SpotifyMiniBar } from './components/SpotifyMiniBar';
 import { AndroidFrame } from './components/AndroidFrame';
 import {
@@ -48,6 +57,7 @@ import {
   isHeyRodexCall,
   containsHeyRodexWakeWord,
   extractHeyRodexCommand,
+  checkWakeWordMatch,
   playToneChime,
   isConversationExit,
 } from './utils/speech';
@@ -71,6 +81,9 @@ export default function App() {
   const [isWebVerifyOpen, setIsWebVerifyOpen] = useState(false);
   const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
   const [isMediaHubOpen, setIsMediaHubOpen] = useState(false);
+  const [isSecurityOpen, setIsSecurityOpen] = useState(false);
+  const [isUpdateOpen, setIsUpdateOpen] = useState(false);
+  const [isCreatorOpen, setIsCreatorOpen] = useState(false);
 
   // Live Chat Sessions & Persistence
   const [activeSession, setActiveSession] = useState<ChatSession>(() => loadActiveSession());
@@ -228,6 +241,59 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => activeSession.messages || []);
   const [lastSources, setLastSources] = useState<WebSource[]>([]);
   const [lastSearchQueries, setLastSearchQueries] = useState<string[]>([]);
+
+  // Browser Navigation & Web-Opening Execution Feedback
+  const [browserActionToast, setBrowserActionToast] = useState<{
+    url: string;
+    label: string;
+    destinationType?: 'youtube' | 'google' | 'website';
+    status: 'opened' | 'blocked';
+    timestamp: number;
+  } | null>(null);
+
+  const handleOpenUrlInBrowser = useCallback(
+    (url: string, label?: string, destinationType?: 'youtube' | 'google' | 'website') => {
+      if (!url) return;
+      const cleanUrl = url.trim();
+      const siteLabel =
+        label ||
+        (cleanUrl.includes('youtube.com')
+          ? 'YouTube'
+          : cleanUrl.includes('google.com')
+          ? 'Google'
+          : 'External Website');
+
+      try {
+        const openedWindow = window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+        const isBlocked =
+          !openedWindow || openedWindow.closed || typeof openedWindow.closed === 'undefined';
+
+        setBrowserActionToast({
+          url: cleanUrl,
+          label: siteLabel,
+          destinationType,
+          status: isBlocked ? 'blocked' : 'opened',
+          timestamp: Date.now(),
+        });
+
+        if (!isBlocked) {
+          setTimeout(() => {
+            setBrowserActionToast((prev) => (prev?.url === cleanUrl ? null : prev));
+          }, 8000);
+        }
+      } catch (err) {
+        console.warn('[RODEX Browser Open Error]', err);
+        setBrowserActionToast({
+          url: cleanUrl,
+          label: siteLabel,
+          destinationType,
+          status: 'blocked',
+          timestamp: Date.now(),
+        });
+      }
+    },
+    []
+  );
 
   // Synchronize Active Session with Local Storage
   useEffect(() => {
@@ -533,9 +599,9 @@ export default function App() {
       return;
     }
 
-    // Check if user called or activated RODEX ("Hey RODEX", "RODEX", "Hey RODEX what is the latest world news?", etc.)
-    const { isCall, command } = extractHeyRodexCommand(userText);
-    const isPureActivation = isHeyRodexCall(userText) || (isCall && !command.trim());
+    // Check if user called or activated RODEX ("Hey RODEX", "RODEX", "Hey RODEX what is the latest world news?", custom wake-word, etc.)
+    const wakeMatch = checkWakeWordMatch(userText, voiceSettings.customWakeWord);
+    const { isCall, isPureActivation, command } = wakeMatch;
 
     if (isPureActivation) {
       triggerHaptic('activate');
@@ -644,6 +710,15 @@ export default function App() {
       if (lowerQ.startsWith('play ') || lowerQ.includes('play music') || lowerQ.includes('music video') || lowerQ.includes('search song') || lowerQ.includes('what is playing')) {
         setIsMediaHubOpen(true);
       }
+      if (lowerQ.includes('security status') || lowerQ.includes('are there any threats') || lowerQ.includes('security incidents') || lowerQ.includes('security alert') || lowerQ.includes('security scan')) {
+        setIsSecurityOpen(true);
+      }
+      if (lowerQ.includes('update system') || lowerQ.includes('check updates') || lowerQ.includes('software update') || lowerQ.includes('technology updates')) {
+        setIsUpdateOpen(true);
+      }
+      if (lowerQ.includes('who am i') || lowerQ.includes('who created you') || lowerQ.includes('who is your founder') || lowerQ.includes('who developed') || lowerQ.includes('who is robert') || lowerQ.includes('creator profile')) {
+        setIsCreatorOpen(true);
+      }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -658,6 +733,7 @@ export default function App() {
           clientFormattedTime,
           timeZone,
           clientTime: new Date().toISOString(),
+          performanceMode: voiceSettings.performanceMode || 'ultra',
         }),
       });
 
@@ -679,6 +755,8 @@ export default function App() {
         sources,
         searchQueries,
         webGrounded,
+        orchestrationTrace: data.orchestrationTrace,
+        pendingConfirmation: data.pendingConfirmation,
       };
 
       if (data.spotify) {
@@ -695,15 +773,46 @@ export default function App() {
       setLastSources(sources);
       setLastSearchQueries(searchQueries);
 
-      // Speak response aloud, and if in live conversation, seamlessly auto-listen for Mr. Robert's reply!
-      speakResponse(reply, () => {
-        if (isLiveConversationRef.current) {
-          playToneChime('listen');
-          startListening();
+      // Execute browser-opening tools returned by the orchestrator
+      if (data.orchestrationTrace?.executedTools?.length > 0) {
+        for (const executedTool of data.orchestrationTrace.executedTools) {
+          if (
+            executedTool.toolName === 'open_approved_url' &&
+            executedTool.result?.success &&
+            executedTool.result?.output?.url
+          ) {
+            handleOpenUrlInBrowser(
+              executedTool.result.output.url,
+              executedTool.result.output.label,
+              executedTool.result.output.destinationType
+            );
+          }
         }
-      });
+      }
+
+      // Reflect tool execution state if tools were executed
+      if (data.orchestrationTrace?.executedTools?.length > 0) {
+        setState('executing_tool');
+      }
+
+      // If pending confirmation is required, hold permission_required state
+      if (data.pendingConfirmation) {
+        setState('permission_required');
+        speakResponse(reply, () => {
+          setState('permission_required');
+        });
+      } else {
+        // Speak response aloud, and if in live conversation, seamlessly auto-listen for reply
+        speakResponse(reply, () => {
+          if (isLiveConversationRef.current) {
+            playToneChime('listen');
+            startListening();
+          }
+        });
+      }
     } catch (err: any) {
       console.error('[RODEX Chat error]', err);
+      setState('error');
       const errorText =
         'RODEX alert: Unable to reach the neural core. Please ensure your network is stable and Gemini API key is configured.';
       setLastResponse(errorText);
@@ -715,7 +824,41 @@ export default function App() {
         error: true,
       };
       setMessages((prev) => [...prev, errorMsg]);
-      speakResponse(errorText);
+      speakResponse(errorText, () => {
+        if (!isLiveConversationRef.current) {
+          setTimeout(() => {
+            setState('idle');
+          }, 2000);
+        }
+      });
+    }
+  };
+
+  const handleConfirmAction = async (actionId: string, toolName: string, params: any) => {
+    try {
+      const res = await fetch('/api/rodex/confirm-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actionId, toolName, params }),
+      });
+      const data = await res.json();
+      if (data.status === 'ok' && data.result) {
+        const confirmText = data.result.message || `Action "${toolName}" executed with verified operator permission.`;
+        const resultMsg: ChatMessage = {
+          id: `confirmed-${Date.now()}`,
+          sender: 'assistant',
+          text: confirmText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        if (params?.action === 'clear_history') {
+          setMessages([]);
+        } else {
+          setMessages((prev) => [...prev, resultMsg]);
+        }
+        speakResponse(confirmText);
+      }
+    } catch (err: any) {
+      console.error('[Action Confirmation Error]', err);
     }
   };
 
@@ -754,7 +897,11 @@ export default function App() {
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             currentText += event.results[i][0].transcript;
           }
-          if (containsHeyRodexWakeWord(currentText)) {
+          const isWakeTriggered =
+            containsHeyRodexWakeWord(currentText) ||
+            checkWakeWordMatch(currentText, voiceSettings.customWakeWord).isCall;
+
+          if (isWakeTriggered) {
             triggerHaptic('activate');
             try {
               wakeRec.stop();
@@ -941,12 +1088,19 @@ export default function App() {
       case 'listening':
         return transcript || 'Listening to your voice...';
       case 'thinking':
+      case 'processing':
         return 'RODEX is thinking...';
+      case 'executing_tool':
+        return 'Executing approved action...';
+      case 'permission_required':
+        return 'Operator approval required';
+      case 'error':
+        return 'System alert — Check connection';
       case 'speaking':
         return 'Speaking response...';
       case 'idle':
       default:
-        return 'Tap orb or mic to speak';
+        return isLiveConversation ? 'Live Call Active — Listening...' : 'Tap orb or mic to speak';
     }
   };
 
@@ -1026,6 +1180,42 @@ export default function App() {
             </button>
 
             <button
+              id="header-security-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsSecurityOpen(true);
+              }}
+              title="RODEX Security Center"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-emerald-400"
+            >
+              <Shield className="w-4 h-4" />
+            </button>
+
+            <button
+              id="header-update-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsUpdateOpen(true);
+              }}
+              title="Autonomous Update & Intelligence"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+
+            <button
+              id="header-creator-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsCreatorOpen(true);
+              }}
+              title="Creator Profile & Founder Recognition"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-amber-400"
+            >
+              <Award className="w-4 h-4" />
+            </button>
+
+            <button
               id="header-settings-btn"
               onClick={() => setIsSettingsOpen(true)}
               title="Settings"
@@ -1057,16 +1247,89 @@ export default function App() {
             />
           </div>
 
+          {/* Active Browser Action Notification / Launcher */}
+          {browserActionToast && (
+            <div
+              className={`mb-3 px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 max-w-sm w-full mx-auto shadow-xl backdrop-blur-md z-30 transition-all ${
+                browserActionToast.destinationType === 'youtube'
+                  ? 'bg-red-950/90 border-red-500/60 text-red-100'
+                  : 'bg-cyan-950/90 border-cyan-500/60 text-cyan-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    browserActionToast.destinationType === 'youtube'
+                      ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.5)]'
+                      : 'bg-cyan-600 text-black shadow-[0_0_12px_rgba(6,182,212,0.5)]'
+                  }`}
+                >
+                  {browserActionToast.destinationType === 'youtube' ? (
+                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                  ) : (
+                    <Globe className="w-4 h-4" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold truncate text-white">
+                    {browserActionToast.label}
+                  </p>
+                  <p className="text-[10px] text-neutral-300 truncate">
+                    {browserActionToast.status === 'blocked'
+                      ? 'Pop-up blocked: Tap to open'
+                      : 'Opening in browser tab'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  id="active-browser-action-open-btn"
+                  onClick={() => {
+                    triggerHaptic('tap');
+                    window.open(browserActionToast.url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white text-black hover:bg-neutral-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                >
+                  <span>Open</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setBrowserActionToast(null)}
+                  className="p-1 rounded-lg text-neutral-400 hover:text-white transition-colors"
+                  title="Dismiss"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Clean Subtitle & Status Text */}
           <div className="w-full max-w-sm text-center mb-4 min-h-[44px] flex items-center justify-center pointer-events-none">
             {state === 'listening' ? (
               <p className="text-xs sm:text-sm text-cyan-300 font-normal leading-relaxed line-clamp-3 px-4 italic animate-pulse">
                 "{transcript || 'Listening to your voice...'}"
               </p>
-            ) : state === 'thinking' ? (
+            ) : state === 'thinking' || state === 'processing' ? (
               <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs font-medium animate-pulse">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
                 <span>RODEX is thinking...</span>
+              </div>
+            ) : state === 'executing_tool' ? (
+              <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-violet-950/50 border border-violet-500/50 text-violet-300 text-xs font-medium animate-pulse">
+                <Sparkles className="w-3.5 h-3.5 text-violet-400 animate-spin" />
+                <span>Executing approved action...</span>
+              </div>
+            ) : state === 'permission_required' ? (
+              <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-950/60 border border-amber-500/60 text-amber-300 text-xs font-medium animate-pulse">
+                <Shield className="w-3.5 h-3.5 text-amber-400" />
+                <span>Operator approval required</span>
+              </div>
+            ) : state === 'error' ? (
+              <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-red-950/60 border border-red-500/60 text-red-300 text-xs font-medium animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
+                <span>System alert — Connection error</span>
               </div>
             ) : state === 'speaking' ? (
               <p className="text-xs sm:text-sm text-neutral-300 font-normal leading-relaxed line-clamp-3 px-4">
@@ -1074,7 +1337,7 @@ export default function App() {
               </p>
             ) : (
               <p className="text-xs text-neutral-400 font-normal leading-relaxed line-clamp-2 px-4">
-                {lastResponse || 'Tap orb or microphone to speak'}
+                {lastResponse || (isLiveConversation ? 'Live Call Active — Listening...' : 'Tap orb or microphone to speak')}
               </p>
             )}
           </div>
@@ -1210,6 +1473,7 @@ export default function App() {
           assistantState={state}
           onStartVoice={startListening}
           isLiveConversation={isLiveConversation}
+          onConfirmAction={handleConfirmAction}
           onToggleLiveCall={() => {
             if (isLiveConversation) {
               endLiveCall();
@@ -1291,6 +1555,27 @@ export default function App() {
         <WebMediaHubModal
           isOpen={isMediaHubOpen}
           onClose={() => setIsMediaHubOpen(false)}
+          onSpeakStatus={(text) => speakResponse(text)}
+        />
+
+        {/* RODEX Security Center Modal */}
+        <SecurityCenterModal
+          isOpen={isSecurityOpen}
+          onClose={() => setIsSecurityOpen(false)}
+          onSpeakStatus={(text) => speakResponse(text)}
+        />
+
+        {/* RODEX Autonomous Update & Intelligence Center Modal */}
+        <UpdateCenterModal
+          isOpen={isUpdateOpen}
+          onClose={() => setIsUpdateOpen(false)}
+          onSpeakStatus={(text) => speakResponse(text)}
+        />
+
+        {/* Creator Identity & Recognition Modal */}
+        <CreatorProfileModal
+          isOpen={isCreatorOpen}
+          onClose={() => setIsCreatorOpen(false)}
           onSpeakStatus={(text) => speakResponse(text)}
         />
       </main>
