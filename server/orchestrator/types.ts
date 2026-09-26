@@ -148,6 +148,8 @@ export interface OrchestratorTrace {
 export interface OrchestratorResponse {
   reply: string;
   trace: OrchestratorTrace;
+  openUrl?: string;
+  executedTools?: ToolExecutionRecord[];
   sources?: Array<{ title: string; url: string; domain?: string }>;
   searchQueries?: string[];
   webGrounded?: boolean;

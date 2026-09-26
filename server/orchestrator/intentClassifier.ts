@@ -598,7 +598,7 @@ export class IntentClassifier {
     }
 
     // 11. CREATOR INQUIRY
-    if (/\b(who created you|who is your founder|who developed you|who made you|who is robert|who is mubiru robert)\b/i.test(lower)) {
+    if (/\b(who created you|who is your founder|who developed you|who developed|developed rodex|who made you|who is robert|who is mubiru robert)\b/i.test(lower)) {
       return {
         primaryIntent: 'creator_inquiry',
         confidence: 0.99,

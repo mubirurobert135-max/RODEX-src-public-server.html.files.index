@@ -8,6 +8,7 @@ import {
   ActionStatus,
 } from './types';
 import { globalToolRegistry } from './registry';
+import { globalActionEngine } from './actionEngine';
 import { IntentClassifier } from './intentClassifier';
 import { TaskPlanner } from './planner';
 import { ContextMemoryManager } from './contextMemory';
@@ -118,6 +119,75 @@ export class IntelligenceOrchestrator {
       };
     }
 
+    // Fast-path 3: Level 1 Instant Deterministic Tool Execution (open_url, datetime_timezone, calculate_compute, media_control)
+    if (
+      (intent.primaryIntent === 'open_url' ||
+        intent.primaryIntent === 'datetime_timezone' ||
+        intent.primaryIntent === 'calculate_compute' ||
+        intent.primaryIntent === 'media_control') &&
+      intent.suggestedTools &&
+      intent.suggestedTools.length > 0
+    ) {
+      const toolName = intent.suggestedTools[0];
+      const toolStart = Date.now();
+      const executionContext: ToolExecutionContext = {
+        userName: 'Robert',
+        clientFormattedTime,
+        timeZone,
+        hasElevatedPermission,
+      };
+
+      const result = await globalActionEngine.executeAction(
+        toolName,
+        intent.extractedEntities || {},
+        executionContext
+      );
+
+      const toolLatency = Date.now() - toolStart;
+      const totalLatency = Date.now() - startTime;
+      const reply =
+        result.message ||
+        (result.output?.spokenMessage) ||
+        (result.output?.formatted ? `The current time is ${result.output.formatted}.` : null) ||
+        (result.output?.result !== undefined ? `Result: ${result.output.result}` : null) ||
+        'Action completed.';
+
+      return {
+        reply,
+        actionStatus: result.success ? 'completed' : 'failed',
+        openUrl: result.output?.url || intent.extractedEntities?.targetUrl,
+        sources: result.sources || [],
+        searchQueries: result.searchQueries || [],
+        executedTools: [
+          {
+            toolName,
+            inputParams: intent.extractedEntities || {},
+            result,
+            latencyMs: toolLatency,
+            timestamp: new Date().toISOString(),
+            validated: result.success,
+          },
+        ],
+        trace: {
+          intent,
+          executedTools: [
+            {
+              toolName,
+              inputParams: intent.extractedEntities || {},
+              result,
+              latencyMs: toolLatency,
+              timestamp: new Date().toISOString(),
+              validated: result.success,
+            },
+          ],
+          selectedModel: 'instant_fastpath',
+          validationPassed: result.success,
+          totalLatencyMs: totalLatency,
+          actionStatus: result.success ? 'completed' : 'failed',
+        },
+      };
+    }
+
     // 2. Cognitive Analysis, Context Retrieval, Long-Term Memory & User Profile Injection
     const reasoningAnalysis = ReasoningEngine.analyzeTask(userInput);
     const reasoningGuidance = ReasoningEngine.getPromptGuidance(reasoningAnalysis);
@@ -222,7 +292,7 @@ OPERATIONAL PRINCIPLES & CAPABILITY BOUNDARIES:
       }
 
       // Execute Tool safely
-      const result = await globalToolRegistry.executeTool(
+      const result = await globalActionEngine.executeAction(
         step.toolName,
         step.toolParams,
         executionContext

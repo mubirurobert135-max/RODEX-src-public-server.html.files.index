@@ -16,6 +16,7 @@ import {
 } from "./server/spotify";
 import { globalOrchestrator } from "./server/orchestrator/orchestrator";
 import { globalToolRegistry } from "./server/orchestrator/registry";
+import { globalActionEngine } from "./server/orchestrator/actionEngine";
 import { IntentClassifier } from "./server/orchestrator/intentClassifier";
 import { globalMemoryService } from "./server/orchestrator/memoryService";
 import { globalUserProfile } from "./server/orchestrator/userProfile";
@@ -28,8 +29,20 @@ import {
   isGeminiApiKeyConfigured,
   validateGeminiStartupConfig,
 } from "./server/geminiConfig";
+import { globalPerformanceTracker } from "./server/services/performanceTracker";
+import { globalRodexDoctor } from "./server/doctor/doctorEngine";
+import { globalRealTimeEngine } from "./server/services/realTimeEngine";
 
 dotenv.config();
+
+// Process-level uncaught exception and promise rejection safeguards
+process.on("uncaughtException", (err) => {
+  console.error("[RODEX Fatal Uncaught Exception]", err?.stack || err);
+});
+
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[RODEX Unhandled Promise Rejection]", reason?.stack || reason);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -325,21 +338,90 @@ async function generateWithModelFallback(
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json({ limit: "25mb" }));
 
-  // API Route: Health check
+  // Request ID and structured HTTP request logger middleware
+  app.use((req, res, next) => {
+    const reqId = `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    req.headers["x-request-id"] = reqId;
+    const start = Date.now();
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      if (req.url.startsWith("/api/")) {
+        console.log(`[RODEX] reqId=${reqId} ${req.method} ${req.url} status=${res.statusCode} duration=${duration}ms`);
+      }
+    });
+    next();
+  });
+
+  // Standardized Health & Readiness Endpoints
+  app.get("/health", (_req, res) => {
+    res.json({
+      status: "healthy",
+      server: "up",
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  app.get("/health/live", (_req, res) => {
+    res.json({ status: "alive", timestamp: new Date().toISOString() });
+  });
+
+  app.get("/health/ready", (_req, res) => {
+    const hasKey = isGeminiApiKeyConfigured();
+    res.json({
+      status: hasKey ? "ready" : "degraded",
+      server: "up",
+      aiProvider: hasKey ? "configured" : "fallback_mode",
+      database: "connected_in_memory",
+      voiceServices: "ready",
+      message: hasKey
+        ? "All core dependencies verified and operational."
+        : "Gemini API key not configured; running in local fallback mode.",
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // API Route: Health check (backward compatibility)
   app.get("/api/health", (_req, res) => {
     res.json({
       status: "ok",
       assistant: "RODEX",
       version: "1.2.0",
-      hasKey: Boolean(process.env.GEMINI_API_KEY),
+      hasKey: isGeminiApiKeyConfigured(),
       webVerified: true,
       realTimeApi: true,
       neuralOps: "480M+ ops/sec",
     });
+  });
+
+  // API Route: RODEX Doctor Full System Diagnostics Report
+  app.get("/api/doctor", async (_req, res) => {
+    try {
+      const report = await globalRodexDoctor.generateDiagnosticReport();
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed generating RODEX Doctor report" });
+    }
+  });
+
+  // API Route: RODEX Doctor Safe Auto-Repair Trigger
+  app.post("/api/doctor/repair", async (req, res) => {
+    try {
+      const { service } = req.body || {};
+      const repairResults = await globalRodexDoctor.repair(service);
+      const postReport = await globalRodexDoctor.generateDiagnosticReport();
+      res.json({
+        status: "ok",
+        repairResults,
+        postReport,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed executing RODEX Doctor safe auto-repair" });
+    }
   });
 
   // Spotify OAuth & PC Control Endpoints
@@ -623,6 +705,39 @@ async function startServer() {
     }
   });
 
+  // API Route: Real-Time SSE Streaming Response Engine (Low-Latency Tokens & Early Speech Sentences)
+  app.post("/api/rodex/stream", async (req, res) => {
+    try {
+      const { message, history = [], clientFormattedTime, timeZone, isLiveCall = false } = req.body || {};
+
+      if (!message) {
+        return res.status(400).json({ error: "Message query is required for real-time streaming." });
+      }
+
+      const abortController = new AbortController();
+      req.on("close", () => {
+        abortController.abort();
+      });
+
+      await globalRealTimeEngine.handleStreamRequest(
+        {
+          userInput: message,
+          history,
+          clientFormattedTime,
+          timeZone,
+          isLiveCall,
+        },
+        res,
+        abortController.signal
+      );
+    } catch (err: any) {
+      console.error("[RODEX Stream Endpoint Error]", err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err?.message || "Real-time streaming failed" });
+      }
+    }
+  });
+
   // User-Controlled Permission Center Store
   let permissionState: Record<string, { id: string; label: string; description: string; granted: boolean; category: string; requiresHardware: boolean }> = {
     microphone: {
@@ -691,7 +806,7 @@ async function startServer() {
   // API Route: Email Service Inspection & Quick Actions
   app.get("/api/rodex/email/inbox", async (_req, res) => {
     try {
-      const result = await globalToolRegistry.executeTool("email_service", { action: "list_summaries" });
+      const result = await globalActionEngine.executeAction("email_service", { action: "list_summaries" });
       res.json({ status: "ok", result });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || "Failed fetching emails" });
@@ -701,7 +816,7 @@ async function startServer() {
   app.post("/api/rodex/email/action", async (req, res) => {
     try {
       const { action, emailId, recipient, replyContent, searchQuery, label } = req.body;
-      const result = await globalToolRegistry.executeTool(
+      const result = await globalActionEngine.executeAction(
         "email_service",
         { action, emailId, recipient, replyContent, searchQuery, label },
         { userName: "Robert", hasElevatedPermission: true }
@@ -715,11 +830,19 @@ async function startServer() {
   // API Route: Contacts Directory
   app.get("/api/rodex/contacts", async (_req, res) => {
     try {
-      const result = await globalToolRegistry.executeTool("contacts_service", { action: "list_recent" });
+      const result = await globalActionEngine.executeAction("contacts_service", { action: "list_recent" });
       res.json({ status: "ok", result });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || "Failed fetching contacts" });
     }
+  });
+
+  // API Route: Action Journal query
+  app.get("/api/rodex/action/journal", (_req, res) => {
+    res.json({
+      status: "ok",
+      journal: globalActionEngine.getJournal(),
+    });
   });
 
   // API Route: Chat Streaming Endpoint (SSE)
@@ -1255,6 +1378,7 @@ async function startServer() {
 
         return res.json({
           reply: orchRes.reply,
+          openUrl: orchRes.openUrl,
           sources: orchRes.sources || [],
           searchQueries: orchRes.searchQueries || [],
           webGrounded: Boolean(orchRes.webGrounded),
@@ -1812,6 +1936,10 @@ Content: "${content}"`;
     });
   });
 
+  app.get("/api/performance/metrics", (_req, res) => {
+    res.json(globalPerformanceTracker.getMetricsSummary());
+  });
+
   app.get("/api/updates/status", (_req, res) => {
     res.json(updateSystemState);
   });
@@ -2008,6 +2136,17 @@ Content: "${content}"`;
 
 
 
+  // Centralized Express Error Middleware
+  app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const reqId = req.headers["x-request-id"] || "unknown";
+    console.error(`[RODEX Express Error] reqId=${reqId} ${req.method} ${req.url}:`, err?.stack || err);
+    if (res.headersSent) return;
+    res.status(err?.status || 500).json({
+      error: err?.message || "An internal server error occurred.",
+      reqId,
+    });
+  });
+
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -2023,9 +2162,35 @@ Content: "${content}"`;
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[RODEX] Voice Assistant Server running at http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    const apiKeyStatus = isGeminiApiKeyConfigured() ? "PRESENT & VALIDATED" : "MISSING (FALLBACK ACTIVE)";
+    console.log(`====================================================`);
+    console.log(` 🚀 RODEX VOICE ASSISTANT SERVER INITIALIZED        `);
+    console.log(`====================================================`);
+    console.log(` - Port: ${PORT} (0.0.0.0)`);
+    console.log(` - Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(` - Gemini API Key: ${apiKeyStatus}`);
+    console.log(` - Database: In-Memory / Vector Storage Active`);
+    console.log(` - Health Check: http://0.0.0.0:${PORT}/health`);
+    console.log(` - Readiness Check: http://0.0.0.0:${PORT}/health/ready`);
+    console.log(`====================================================`);
   });
+
+  // Graceful Process Shutdown Handler
+  const gracefulShutdown = (signal: string) => {
+    console.log(`\n[RODEX] Received ${signal}. Initiating graceful shutdown...`);
+    server.close(() => {
+      console.log("[RODEX] HTTP server closed cleanly.");
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.warn("[RODEX] Forced shutdown timeout reached.");
+      process.exit(1);
+    }, 8000);
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 startServer();

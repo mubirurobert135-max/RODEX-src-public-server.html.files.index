@@ -68,5 +68,96 @@
     "id": "mem_1790439171497_s6rcy",
     "createdAt": "2026-09-26T16:12:51.497Z",
     "updatedAt": "2026-09-26T16:12:51.497Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790452406843",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790452406843_i1yx1",
+    "createdAt": "2026-09-26T19:53:26.843Z",
+    "updatedAt": "2026-09-26T19:53:26.843Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790453058125",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790453058125_anjhv",
+    "createdAt": "2026-09-26T20:04:18.125Z",
+    "updatedAt": "2026-09-26T20:04:18.125Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790453060892",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790453060893_r7ljs",
+    "createdAt": "2026-09-26T20:04:20.893Z",
+    "updatedAt": "2026-09-26T20:04:20.893Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790454189208",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790454189209_02gpz",
+    "createdAt": "2026-09-26T20:23:09.209Z",
+    "updatedAt": "2026-09-26T20:23:09.209Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790454192521",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790454192522_ky4lg",
+    "createdAt": "2026-09-26T20:23:12.522Z",
+    "updatedAt": "2026-09-26T20:23:12.522Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790454769844",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790454769845_5f2un",
+    "createdAt": "2026-09-26T20:32:49.845Z",
+    "updatedAt": "2026-09-26T20:32:49.845Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790454772249",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790454772251_mk96g",
+    "createdAt": "2026-09-26T20:32:52.251Z",
+    "updatedAt": "2026-09-26T20:32:52.251Z"
   }
 ]

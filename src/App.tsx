@@ -28,6 +28,7 @@ import {
   Cpu,
   Film,
   Video as VideoIcon,
+  Stethoscope,
 } from 'lucide-react';
 import { Orb } from './components/Orb';
 import { ActionBar } from './components/ActionBar';
@@ -44,6 +45,7 @@ import { CreatorProfileModal } from './components/CreatorProfileModal';
 import { MemoryPersonalizationModal } from './components/MemoryPersonalizationModal';
 import { CapabilityHubModal } from './components/CapabilityHubModal';
 import { MediaStudioModal } from './components/MediaStudioModal';
+import { RodexDoctorModal } from './components/RodexDoctorModal';
 import { FirebaseAuthButton } from './components/FirebaseAuthButton';
 import { SpotifyMiniBar } from './components/SpotifyMiniBar';
 import { AndroidFrame } from './components/AndroidFrame';
@@ -95,6 +97,7 @@ export default function App() {
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isCapabilityOpen, setIsCapabilityOpen] = useState(false);
   const [isMediaStudioOpen, setIsMediaStudioOpen] = useState(false);
+  const [isDoctorOpen, setIsDoctorOpen] = useState(false);
   const [mediaStudioTab, setMediaStudioTab] = useState<'video' | 'image' | 'maps' | 'search' | 'gallery'>('video');
 
   // Live Chat Sessions & Persistence
@@ -355,6 +358,7 @@ export default function App() {
   const audioMeterRef = useRef<AudioMeter>(new AudioMeter());
   const animationFrameRef = useRef<number | null>(null);
   const wakeWordTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const speakIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check microphone permissions on mount
   useEffect(() => {
@@ -441,8 +445,12 @@ export default function App() {
       setState('speaking');
 
       // Synthesize pulse rhythm and harmonic pitch frequency for orb while speaking
+      if (speakIntervalRef.current) {
+        clearInterval(speakIntervalRef.current);
+        speakIntervalRef.current = null;
+      }
       const startTime = Date.now();
-      const speakInterval = setInterval(() => {
+      speakIntervalRef.current = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000;
         setAudioLevel(Math.abs(Math.sin(elapsed * 6)) * 0.45);
         // Modulate synthetic voice pitch frequency dynamically (135Hz - 175Hz)
@@ -458,14 +466,20 @@ export default function App() {
           setState('speaking');
         },
         onEnd: () => {
-          clearInterval(speakInterval);
+          if (speakIntervalRef.current) {
+            clearInterval(speakIntervalRef.current);
+            speakIntervalRef.current = null;
+          }
           setAudioLevel(0);
           setPitchHz(124);
           setState('idle');
           onComplete?.();
         },
         onError: () => {
-          clearInterval(speakInterval);
+          if (speakIntervalRef.current) {
+            clearInterval(speakIntervalRef.current);
+            speakIntervalRef.current = null;
+          }
           setAudioLevel(0);
           setPitchHz(124);
           setState('idle');
@@ -511,6 +525,10 @@ export default function App() {
     isLiveConversationRef.current = false;
     setIsLiveConversation(false);
     consecutiveSilenceCountRef.current = 0;
+    if (speakIntervalRef.current) {
+      clearInterval(speakIntervalRef.current);
+      speakIntervalRef.current = null;
+    }
     rodexSynth.stop();
     playToneChime('end');
     if (recognitionRef.current) {
@@ -753,100 +771,142 @@ export default function App() {
         setIsMemoryOpen(true);
       }
 
-      const res = await fetch('/api/chat', {
+      // Multimodal Image or Full Orchestration Path Fallback
+      if (imagePayload) {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: abortController.signal,
+          body: JSON.stringify({
+            message: queryToSend,
+            image: imagePayload,
+            history: historyPayload,
+            customInstruction,
+            liveConversation: isLiveConversationRef.current,
+            enableWebSearch: voiceSettings.webSearchEnabled !== false,
+            clientFormattedTime,
+            timeZone,
+            clientTime: new Date().toISOString(),
+            performanceMode: voiceSettings.performanceMode || 'ultra',
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+
+        const data = await res.json();
+        const reply = data.reply || 'RODEX response received.';
+        const sources: WebSource[] = data.sources || [];
+        const searchQueries: string[] = data.searchQueries || [];
+
+        const assistantMsg: ChatMessage = {
+          id: createId('assistant'),
+          sender: 'assistant',
+          text: reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          sources,
+          searchQueries,
+          webGrounded: !!data.webGrounded,
+          generatedImage: data.generatedImage,
+        };
+
+        setMessages((prev) => [...prev, assistantMsg]);
+        setLastResponse(reply);
+        speakResponse(reply);
+        return;
+      }
+
+      // REAL-TIME RESPONSE ENGINE (SSE Streaming Pipeline: Low Latency TTFR & Early Speech TTFA)
+      const assistantMsgId = createId('assistant');
+      const initialAssistantMsg: ChatMessage = {
+        id: assistantMsgId,
+        sender: 'assistant',
+        text: '',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        webGrounded: true,
+      };
+
+      setMessages((prev) => [...prev, initialAssistantMsg]);
+
+      const streamRes = await fetch('/api/rodex/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
         body: JSON.stringify({
           message: queryToSend,
-          image: imagePayload,
           history: historyPayload,
-          customInstruction,
-          liveConversation: isLiveConversationRef.current,
-          enableWebSearch: voiceSettings.webSearchEnabled !== false,
           clientFormattedTime,
           timeZone,
-          clientTime: new Date().toISOString(),
-          performanceMode: voiceSettings.performanceMode || 'ultra',
+          isLiveCall: isLiveConversationRef.current,
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
+      if (!streamRes.ok || !streamRes.body) {
+        throw new Error(`Streaming request failed (${streamRes.status})`);
       }
 
-      const data = await res.json();
-      const reply = data.reply || 'RODEX response received.';
-      const sources: WebSource[] = data.sources || [];
-      const searchQueries: string[] = data.searchQueries || [];
-      const webGrounded: boolean = !!data.webGrounded;
-      const actionStatus = data.actionStatus || data.orchestrationTrace?.actionStatus;
+      const reader = streamRes.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
+      let spokenSentencesCount = 0;
 
-      const assistantMsg: ChatMessage = {
-        id: createId('assistant'),
-        sender: 'assistant',
-        text: reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sources,
-        searchQueries,
-        webGrounded,
-        actionStatus,
-        generatedImage: data.generatedImage,
-        orchestrationTrace: data.orchestrationTrace,
-        pendingConfirmation: data.pendingConfirmation,
-      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
+        const chunkText = decoder.decode(value, { stream: true });
+        const lines = chunkText.split('\n');
 
-      if (data.spotify) {
-        if (data.spotify.playback !== undefined) {
-          setSpotifyPlayback(data.spotify.playback);
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.replace(/^data:\s*/, '').trim();
+          if (!jsonStr) continue;
+
+          try {
+            const data = JSON.parse(jsonStr);
+
+            if (data.type === 'start') {
+              setState('speaking');
+            } else if (data.type === 'token') {
+              accumulatedText += data.token;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantMsgId ? { ...m, text: accumulatedText } : m))
+              );
+            } else if (data.type === 'sentence') {
+              // EARLY SPEECH START: Speak sentence 1 immediately, queue subsequent sentences
+              const sentenceText = data.text;
+              if (sentenceText && !isMuted && voiceSettings.autoSpeak !== false) {
+                if (spokenSentencesCount === 0) {
+                  speakResponse(sentenceText);
+                } else {
+                  speakResponse(sentenceText);
+                }
+                spokenSentencesCount++;
+              }
+            } else if (data.type === 'browser_action' && data.action) {
+              handleOpenUrlInBrowser(
+                data.action.url,
+                data.action.label,
+                data.action.destinationType
+              );
+            } else if (data.type === 'done') {
+              const finalReply = data.fullText || accumulatedText;
+              setLastResponse(finalReply);
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantMsgId ? { ...m, text: finalReply } : m))
+              );
+              if (spokenSentencesCount === 0 && finalReply) {
+                speakResponse(finalReply);
+              }
+            }
+          } catch (_) {}
         }
-        if (data.spotify.device !== undefined) {
-          setSpotifyDevice(data.spotify.device);
-        }
       }
 
-      setMessages((prev) => [...prev, assistantMsg]);
-      setLastResponse(reply);
-      setLastSources(sources);
-      setLastSearchQueries(searchQueries);
-
-      // Execute browser-opening tools returned by the orchestrator
-      if (data.orchestrationTrace?.executedTools?.length > 0) {
-        for (const executedTool of data.orchestrationTrace.executedTools) {
-          if (
-            executedTool.toolName === 'open_approved_url' &&
-            executedTool.result?.success &&
-            executedTool.result?.output?.url
-          ) {
-            handleOpenUrlInBrowser(
-              executedTool.result.output.url,
-              executedTool.result.output.label,
-              executedTool.result.output.destinationType
-            );
-          }
-        }
-      }
-
-      // Reflect tool execution state if tools were executed
-      if (data.orchestrationTrace?.executedTools?.length > 0) {
-        setState('executing_tool');
-      }
-
-      // If pending confirmation is required, hold permission_required state
-      if (data.pendingConfirmation) {
-        setState('permission_required');
-        speakResponse(reply, () => {
-          setState('permission_required');
-        });
-      } else {
-        // Speak response aloud, and if in live conversation, seamlessly auto-listen for reply
-        speakResponse(reply, () => {
-          if (isLiveConversationRef.current) {
-            playToneChime('listen');
-            startListening();
-          }
-        });
+      if (isLiveConversationRef.current) {
+        playToneChime('listen');
+        startListening();
       }
     } catch (err: any) {
       // If the request was aborted by a subsequent action, silently exit without error state
@@ -1228,6 +1288,18 @@ export default function App() {
               className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400"
             >
               <Music2 className="w-4 h-4" />
+            </button>
+
+            <button
+              id="header-doctor-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsDoctorOpen(true);
+              }}
+              title="RODEX Doctor System Reliability & Diagnostic Dashboard"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400 relative"
+            >
+              <Stethoscope className="w-4 h-4 text-cyan-400 animate-pulse" />
             </button>
 
             <button
@@ -1698,6 +1770,12 @@ export default function App() {
           isOpen={isMediaStudioOpen}
           onClose={() => setIsMediaStudioOpen(false)}
           initialTab={mediaStudioTab}
+        />
+
+        {/* RODEX Doctor Master Self-Diagnostic & Reliability Dashboard Modal */}
+        <RodexDoctorModal
+          isOpen={isDoctorOpen}
+          onClose={() => setIsDoctorOpen(false)}
         />
       </main>
     </AndroidFrame>

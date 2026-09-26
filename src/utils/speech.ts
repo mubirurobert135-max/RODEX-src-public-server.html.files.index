@@ -85,6 +85,8 @@ export class SpeechSynthesizer {
     }
   ) {
     if (!this.synth) {
+      console.warn('[RODEX TTS] Web Speech API (window.speechSynthesis) is not supported or unavailable in this browser.');
+      options.onError?.({ error: 'not-supported', message: 'SpeechSynthesis unavailable' });
       options.onEnd?.();
       return;
     }
@@ -106,6 +108,7 @@ export class SpeechSynthesizer {
       .trim();
 
     if (!cleanSpokenText) {
+      console.info('[RODEX TTS] Empty spoken text after pre-filtering markdown.');
       options.onEnd?.();
       return;
     }
@@ -153,6 +156,16 @@ export class SpeechSynthesizer {
               v.name.includes('Zira'))
         ) || null;
     }
+
+    console.info('[RODEX TTS Dispatch]', {
+      textLength: cleanSpokenText.length,
+      chunksCount: chunks.length,
+      selectedVoice: selectedVoice ? `${selectedVoice.name} (${selectedVoice.lang})` : 'System Default',
+      totalAvailableVoices: voices.length,
+      rate: options.rate ?? 1.0,
+      pitch: options.pitch ?? 1.0,
+      volume: options.volume ?? 1.0,
+    });
 
     let hasTriggeredStart = false;
 
@@ -203,11 +216,17 @@ export class SpeechSynthesizer {
 
       current.onerror = (e: any) => {
         if (e?.error === 'interrupted' || e?.error === 'canceled') {
+          console.info('[RODEX TTS Interrupted/Canceled]', { error: e?.error, chunkIndex: this.queueIndex });
           this.stop();
           options.onEnd?.();
           return;
         }
-        console.warn('[RODEX TTS Chunk Error]', e);
+        console.error('[RODEX TTS Chunk Error]', {
+          error: e?.error || 'unknown_error',
+          message: e?.message || e?.type || 'SpeechSynthesisUtterance error event',
+          chunkIndex: this.queueIndex,
+          totalChunks: this.activeQueue.length,
+        });
         this.queueIndex++;
         if (this.queueIndex < this.activeQueue.length) {
           speakNextChunk();
@@ -226,6 +245,7 @@ export class SpeechSynthesizer {
       } catch (e) {
         console.error('[RODEX Speech Chunk Exception]', e);
         this.stop();
+        options.onError?.(e);
         options.onEnd?.();
       }
     };

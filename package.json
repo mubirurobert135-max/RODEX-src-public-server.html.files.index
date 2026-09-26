@@ -9,6 +9,12 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
+    "doctor": "tsx scripts/doctor.ts",
+    "doctor:watch": "tsx scripts/doctorWatch.ts",
+    "test:doctor": "tsx scripts/testDoctor.ts",
+    "test:recovery": "tsx scripts/testRecovery.ts",
+    "test:realtime": "tsx scripts/testRealTimeEngine.ts",
+    "test:action": "tsx scripts/testActionEngine.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
