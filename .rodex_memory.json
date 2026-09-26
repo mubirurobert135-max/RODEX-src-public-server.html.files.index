@@ -1,0 +1,72 @@
+[
+  {
+    "userId": "Robert",
+    "category": "profile",
+    "key": "creator_identity",
+    "value": "Mubiru Robert (Robert) is the creator, founder, and lead developer of RODEX.",
+    "confidence": 1,
+    "tags": [
+      "creator",
+      "founder",
+      "identity"
+    ],
+    "id": "mem_1790439018899_1yzff",
+    "createdAt": "2026-09-26T16:10:18.899Z",
+    "updatedAt": "2026-09-26T16:10:18.899Z"
+  },
+  {
+    "userId": "Robert",
+    "category": "preference",
+    "key": "assistant_style",
+    "value": "Prefers authoritative, articulate, and intellectually rigorous answers with real-time web facts.",
+    "confidence": 0.98,
+    "tags": [
+      "preference",
+      "tone",
+      "style"
+    ],
+    "id": "mem_1790439018900_m7sf8",
+    "createdAt": "2026-09-26T16:10:18.900Z",
+    "updatedAt": "2026-09-26T16:10:18.900Z"
+  },
+  {
+    "userId": "Robert",
+    "category": "preference",
+    "key": "preferred_programming_language",
+    "value": "TypeScript",
+    "confidence": 0.99,
+    "tags": [
+      "coding",
+      "preference"
+    ],
+    "id": "mem_1790439018956_iox9n",
+    "createdAt": "2026-09-26T16:10:18.956Z",
+    "updatedAt": "2026-09-26T16:14:34.626Z"
+  },
+  {
+    "userId": "Robert",
+    "category": "profile",
+    "key": "city_of_residence",
+    "value": "Kampala",
+    "confidence": 0.98,
+    "tags": [
+      "city_of_residence"
+    ],
+    "id": "mem_1790439018957_23xim",
+    "createdAt": "2026-09-26T16:10:18.957Z",
+    "updatedAt": "2026-09-26T16:14:34.627Z"
+  },
+  {
+    "userId": "Robert",
+    "category": "fact",
+    "key": "favorite color",
+    "value": "Cyan",
+    "confidence": 0.98,
+    "tags": [
+      "favorite color"
+    ],
+    "id": "mem_1790439171497_s6rcy",
+    "createdAt": "2026-09-26T16:12:51.497Z",
+    "updatedAt": "2026-09-26T16:12:51.497Z"
+  }
+]

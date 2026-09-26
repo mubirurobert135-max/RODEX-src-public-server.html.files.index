@@ -1,6 +1,10 @@
 import { IntentClassifier } from './orchestrator/intentClassifier';
 import { globalToolRegistry } from './orchestrator/registry';
 import { globalOrchestrator } from './orchestrator/orchestrator';
+import { ReasoningEngine } from './orchestrator/reasoningEngine';
+import { globalMemoryService } from './orchestrator/memoryService';
+import { globalUserProfile } from './orchestrator/userProfile';
+import { globalAIProvider } from './orchestrator/aiProvider';
 
 async function runTests() {
   console.log('=== RUNNING RODEX INTELLIGENCE ORCHESTRATOR & TOOL SUITE ===\n');
@@ -181,6 +185,224 @@ async function runTests() {
   });
   assert(orchYtSong.trace.intent.primaryIntent === 'open_url', 'Orchestrates YouTube Song Play intent');
   assert(orchYtSong.trace.executedTools[0].result.output.url.includes('search_query=Bohemian%20Rhapsody'), 'Executes YouTube song search action');
+
+  // --- SECTION 5: INTELLIGENT CONVERSATION, FOLLOW-UPS & CLARIFICATIONS ---
+  console.log('\n5. Testing Intelligent Conversation, Diverse Phrasings, Follow-ups & Clarifications...');
+
+  // 5a. Diverse ways of asking the same thing
+  const altYt1 = IntentClassifier.classify('Pull up YouTube');
+  assert(altYt1.primaryIntent === 'open_url', 'Diverse phrasing: "Pull up YouTube" -> open_url');
+
+  const altYt2 = IntentClassifier.classify('Take me to YouTube');
+  assert(altYt2.primaryIntent === 'open_url', 'Diverse phrasing: "Take me to YouTube" -> open_url');
+
+  const altYt3 = IntentClassifier.classify('Stream Bohemian Rhapsody on YouTube');
+  assert(altYt3.primaryIntent === 'open_url' && altYt3.extractedEntities.searchQuery === 'Bohemian Rhapsody', 'Diverse phrasing: "Stream Bohemian Rhapsody on YouTube"');
+
+  const altCreator1 = IntentClassifier.classify('Who built RODEX?');
+  assert(altCreator1.primaryIntent === 'creator_inquiry', 'Diverse phrasing: "Who built RODEX?" -> creator_inquiry');
+
+  const altCreator2 = IntentClassifier.classify('Who is the author of RODEX?');
+  assert(altCreator2.primaryIntent === 'creator_inquiry', 'Diverse phrasing: "Who is the author of RODEX?" -> creator_inquiry');
+
+  const altMath1 = IntentClassifier.classify('How much is 45 * 20?');
+  assert(altMath1.primaryIntent === 'calculate_compute', 'Diverse phrasing: "How much is 45 * 20?" -> calculate_compute');
+
+  // 5b. Incomplete requests requiring clarification
+  const incompleteYt = IntentClassifier.classify('RODEX, play on YouTube');
+  assert(incompleteYt.primaryIntent === 'clarification_needed', 'Incomplete request: "play on YouTube" flags clarification_needed');
+  assert(incompleteYt.isIncomplete === true, 'Flags isIncomplete: true');
+  assert(incompleteYt.clarificationPrompt?.includes('YouTube'), 'Returns clarification prompt asking for song/video topic');
+
+  const incompleteOpen = IntentClassifier.classify('RODEX, please open');
+  assert(incompleteOpen.primaryIntent === 'clarification_needed', 'Incomplete request: "please open" flags clarification_needed');
+  assert(incompleteOpen.clarificationPrompt?.includes('website or application'), 'Asks which website/app to open');
+
+  const incompleteCalc = IntentClassifier.classify('Calculate');
+  assert(incompleteCalc.primaryIntent === 'clarification_needed', 'Incomplete request: "Calculate" flags clarification_needed');
+
+  const incompleteVol = IntentClassifier.classify('Set volume to');
+  assert(incompleteVol.primaryIntent === 'clarification_needed', 'Incomplete request: "Set volume to" flags clarification_needed');
+
+  // Test Orchestrator response on incomplete request
+  const orchIncomplete = await globalOrchestrator.orchestrate({
+    userInput: 'RODEX, play on YouTube',
+  });
+  assert(orchIncomplete.reply.includes('YouTube') && orchIncomplete.reply.includes('search for or play'), 'Orchestrator directly asks user for clarification instead of guessing', orchIncomplete.reply);
+
+  // 5c. Follow-up answering a pending clarification
+  // User answers previous incomplete YouTube clarification with the song name
+  const clarificationAnswer = IntentClassifier.classify('Hotel California', [], 'default');
+  assert(clarificationAnswer.primaryIntent === 'open_url', 'Answers clarification: "Hotel California" -> resolves to YouTube open_url');
+  assert(clarificationAnswer.extractedEntities.searchQuery === 'Hotel California', 'Extracts answered query "Hotel California"');
+
+  // 5d. Multi-turn conversation context & pronoun resolution
+  const historyWithKingOyo = [
+    { role: 'user', text: 'Tell me about King Oyo of Tooro' },
+    { role: 'model', text: 'Omukama Oyo Nyimba Kabamba Iguru Rukidi IV was the King of Tooro Kingdom, Uganda. He passed away on August 27, 2026.' }
+  ];
+  const pronounFollowUp = IntentClassifier.classify('Who was his mother?', historyWithKingOyo);
+  assert(pronounFollowUp.isFollowUp === true, 'Detects pronoun follow-up ("his") with history context');
+  assert(pronounFollowUp.resolvedQuery?.includes('King Oyo'), 'Resolves pronoun "his" to King Oyo in context');
+
+  // 5e. Detail level directives (concise vs detailed)
+  const conciseQuery = IntentClassifier.classify('Briefly tell me what time it is in Tokyo');
+  assert(conciseQuery.detailLevel === 'concise', 'Identifies concise detail directive');
+
+  const detailedQuery = IntentClassifier.classify('Explain in detail the Tooro succession dispute');
+  assert(detailedQuery.detailLevel === 'detailed', 'Identifies detailed in-depth directive');
+
+  // 5f. Math follow-up continuation
+  const historyWithMath = [
+    { role: 'user', text: 'Calculate 25 * 4' },
+    { role: 'model', text: '25 * 4 = 100' }
+  ];
+  const mathFollowUp = IntentClassifier.classify('Times 5', historyWithMath);
+  assert(mathFollowUp.primaryIntent === 'calculate_compute', 'Resolves math follow-up "Times 5" to calculate_compute');
+  assert(mathFollowUp.extractedEntities.expression?.includes('100') && mathFollowUp.extractedEntities.expression?.includes('5'), 'Incorporates prior result 100 into continuation (100 * 5)');
+
+  // --- SECTION 6: ADVANCED AI REASONING ENGINE ---
+  console.log('\n6. Testing Advanced AI Reasoning Engine...');
+
+  const codingTask = ReasoningEngine.analyzeTask('Write a TypeScript function to debounce an async search API call');
+  assert(codingTask.taskType === 'programming', 'Identifies programming task');
+  assert(codingTask.suggestedFramework.includes('Clean Code'), 'Applies software engineering framework');
+
+  const mathTask = ReasoningEngine.analyzeTask('Solve the equation 3x + 12 = 45');
+  assert(mathTask.taskType === 'math', 'Identifies mathematical reasoning task');
+
+  const comparisonTask = ReasoningEngine.analyzeTask('Compare React and Flutter for mobile development');
+  assert(comparisonTask.taskType === 'comparative_analysis', 'Identifies comparative decision analysis');
+
+  const planningTask = ReasoningEngine.analyzeTask('Create a step by step plan to build an Android AI personal assistant');
+  assert(planningTask.taskType === 'planning', 'Identifies phased planning roadmap');
+
+  const guidance = ReasoningEngine.getPromptGuidance(codingTask);
+  assert(guidance.includes('REASONING DIRECTIVE') && guidance.includes('PROGRAMMING'), 'Builds clean prompt directive without exposing raw chain-of-thought');
+
+  // --- SECTION 7: LONG-TERM MEMORY & SECURITY FILTER ---
+  console.log('\n7. Testing Long-Term Memory & Security Boundaries...');
+
+  // 7a. Storing normal factual memory
+  const savedMem = await globalMemoryService.save({
+    userId: 'Robert',
+    category: 'preference',
+    key: 'preferred_programming_language',
+    value: 'TypeScript',
+    confidence: 0.99,
+    tags: ['coding', 'preference'],
+  });
+  assert(savedMem.id.startsWith('mem_'), 'Generates valid memory ID', savedMem.id);
+  assert(savedMem.value === 'TypeScript', 'Saves memory value correctly');
+
+  // 7b. Searching / Retrieving memory
+  const searchResults = await globalMemoryService.search('Robert', { searchTerm: 'TypeScript' });
+  assert(searchResults.length > 0 && searchResults[0].value === 'TypeScript', 'Retrieves stored memory by search term');
+
+  // 7c. Security Filter: Rejecting passwords, API keys, credentials
+  let secretBlocked = false;
+  try {
+    await globalMemoryService.save({
+      userId: 'Robert',
+      category: 'fact',
+      key: 'my_password',
+      value: 'SuperSecret123!',
+      confidence: 1.0,
+      tags: ['password'],
+    });
+  } catch (err: any) {
+    secretBlocked = true;
+  }
+  assert(secretBlocked, 'Security filter blocks saving password as memory');
+
+  let apiKeyBlocked = false;
+  try {
+    await globalMemoryService.save({
+      userId: 'Robert',
+      category: 'fact',
+      key: 'gemini_api_key',
+      value: 'sk-1234567890abcdef1234567890abcdef',
+      confidence: 1.0,
+      tags: ['api_key'],
+    });
+  } catch (err: any) {
+    apiKeyBlocked = true;
+  }
+  assert(apiKeyBlocked, 'Security filter blocks saving API key as memory');
+
+  // 7d. Memory Tool Execution via Tool Registry
+  const memToolSave = await globalToolRegistry.executeTool('manage_user_memory', {
+    action: 'save',
+    key: 'city_of_residence',
+    value: 'Kampala',
+    category: 'profile',
+  });
+  assert(memToolSave.success && memToolSave.output.value === 'Kampala', 'manage_user_memory tool saves memory');
+
+  const memToolSearch = await globalToolRegistry.executeTool('manage_user_memory', {
+    action: 'search',
+    searchTerm: 'Kampala',
+  });
+  assert(memToolSearch.success && memToolSearch.output.count > 0, 'manage_user_memory tool searches and finds memory');
+
+  // 7e. Memory Intent Classification
+  const memIntentSave = IntentClassifier.classify('RODEX, remember that my favorite framework is React');
+  assert(memIntentSave.primaryIntent === 'memory_operation', 'Classifies "remember that" as memory_operation');
+  assert(memIntentSave.extractedEntities.action === 'save', 'Extracts action: save');
+
+  const memIntentRecall = IntentClassifier.classify('What do you remember about my preferences?');
+  assert(memIntentRecall.primaryIntent === 'memory_operation', 'Classifies memory recall question as memory_operation');
+
+  // 7f. Prompt Memory Context Generation
+  const promptMemStr = await globalMemoryService.getPromptMemoryContext('Robert');
+  assert(promptMemStr.includes('LONG-TERM USER MEMORY'), 'Generates prompt memory context block');
+
+  // --- SECTION 8: WEATHER INTELLIGENCE TOOL ---
+  console.log('\n8. Testing Weather Intelligence Tool...');
+
+  const weatherRes = await globalToolRegistry.executeTool('get_weather_forecast', { location: 'Kampala' });
+  assert(weatherRes.success && weatherRes.output.location === 'Kampala', 'Queries weather for Kampala');
+  assert(weatherRes.output.temperatureC > 0, 'Returns valid temperature in Celsius');
+  assert(weatherRes.message?.includes('Kampala'), 'Generates spoken weather message');
+
+  const weatherIntent = IntentClassifier.classify('What is the weather in Kampala today?');
+  assert(weatherIntent.primaryIntent === 'weather', 'Identifies weather intent');
+  assert(weatherIntent.extractedEntities.location === 'Kampala', 'Extracts location Kampala');
+
+  // --- SECTION 9: PLATFORM BRIDGE & HOST ENVIRONMENT ---
+  console.log('\n9. Testing Platform Bridge & Android Capabilities...');
+
+  const bridgeRes = await globalToolRegistry.executeTool('platform_bridge', { queryType: 'capabilities' });
+  assert(bridgeRes.success, 'Queries platform bridge status');
+  assert(bridgeRes.output.androidStudioReady === true, 'Verifies Android Studio architecture readiness');
+  assert(bridgeRes.output.capabilities.androidReady.length > 0, 'Lists ready Android native capabilities');
+
+  const bridgeIntent = IntentClassifier.classify('Check platform capabilities and Android bridge');
+  assert(bridgeIntent.primaryIntent === 'platform_bridge', 'Identifies platform_bridge intent');
+
+  // --- SECTION 10: USER PERSONALIZATION & MODEL FLEXIBILITY ---
+  console.log('\n10. Testing Personalization Profile & Model Provider...');
+
+  const profile = globalUserProfile.getProfile();
+  assert(profile.preferredName === 'Robert', 'Personalization profile holds Robert as preferred name');
+  assert(profile.honorific === 'Mr. Robert', 'Personalization profile holds Mr. Robert');
+
+  const profileSnippet = globalUserProfile.buildPersonalizationPromptSnippet();
+  assert(profileSnippet.includes('USER PERSONALIZATION PROFILE'), 'Builds personalization prompt snippet');
+
+  const fastTiers = globalAIProvider.getModelTiers('fast');
+  assert(fastTiers.includes('gemini-2.5-flash'), 'Fast tier includes gemini-2.5-flash');
+
+  const reasoningTiers = globalAIProvider.getModelTiers('deep_reasoning');
+  assert(reasoningTiers.includes('gemini-3.1-pro-preview'), 'Deep reasoning tier includes gemini-3.1-pro-preview');
+
+  // Test full orchestration with weather
+  const orchWeather = await globalOrchestrator.orchestrate({
+    userInput: 'What is the weather in Kampala?',
+  });
+  assert(orchWeather.trace.intent.primaryIntent === 'weather', 'Orchestrates Weather query intent');
+  assert(orchWeather.trace.validationPassed, 'Validates weather execution');
+  assert(orchWeather.reply.includes('Kampala') && orchWeather.reply.includes('°C'), 'Returns spoken weather forecast');
 
   console.log(`\n=== TEST SUMMARY: ${passed} PASSED, ${failed} FAILED ===\n`);
 

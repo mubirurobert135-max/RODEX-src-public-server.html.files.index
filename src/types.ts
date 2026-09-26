@@ -73,9 +73,18 @@ export interface ChatMessage {
   sources?: WebSource[];
   searchQueries?: string[];
   webGrounded?: boolean;
+  actionStatus?: 'prepared' | 'completed' | 'failed' | 'needs_permission' | 'needs_confirmation';
   orchestrationTrace?: OrchestrationTrace;
   pendingConfirmation?: PendingActionConfirmation;
+  generatedImage?: {
+    url: string;
+    prompt: string;
+    isEdit?: boolean;
+    aspectRatio?: string;
+    model?: string;
+  };
 }
+
 
 export interface VoiceProfile {
   speakerName: string;

@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   Code2,
   Cpu,
+  Brain,
 } from 'lucide-react';
 import { VoiceSettings, ThemeAccent, AppMode } from '../types';
 import { rodexSynth } from '../utils/speech';
@@ -35,6 +36,7 @@ interface SettingsModalProps {
   onOpenVoiceProfile?: () => void;
   onOpenSpotify?: () => void;
   onOpenWebVerify?: () => void;
+  onOpenMemory?: () => void;
   onSelectMode?: (mode: AppMode) => void;
 }
 
@@ -50,6 +52,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenVoiceProfile,
   onOpenSpotify,
   onOpenWebVerify,
+  onOpenMemory,
   onSelectMode,
 }) => {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -452,6 +455,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </section>
 
+            {/* Long-Term Memory & User Personalization */}
+            <section className="bg-neutral-950 border border-neutral-900 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">
+                  <Brain className="w-4 h-4" />
+                  <span>Long-Term Memory & Personalization</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-medium">
+                  Active
+                </span>
+              </div>
+
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                RODEX stores explicit user facts, project preferences, and customized profile directives with strict secret-sanitization.
+              </p>
+
+              {onOpenMemory && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenMemory();
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-xs text-cyan-300 flex items-center justify-between transition-colors active:scale-98 cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <Brain className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Manage Memories & Personal Profile</span>
+                  </span>
+                  <span className="text-cyan-400 font-bold">&rarr;</span>
+                </button>
+              )}
+            </section>
+
             {/* Specialized Operational Modes */}
             <section className="bg-neutral-950 border border-neutral-900 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -531,38 +568,93 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </section>
 
-            {/* 3. Hardware & Permissions */}
+            {/* 3. Granular Permissions & Privacy Architecture */}
             <section className="bg-neutral-950 border border-neutral-900 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Microphone & Permissions</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-cyan-400 font-medium text-sm">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Privacy & User-Controlled Permissions</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
+                  Data Minimization Enforced
+                </span>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-900 border border-neutral-800">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      micPermissionGranted ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'
-                    }`}
-                  />
-                  <div>
-                    <div className="text-xs text-neutral-200 font-medium">
-                      {micPermissionGranted ? 'Microphone Accessible' : 'Microphone Not Granted'}
-                    </div>
-                    <div className="text-[10px] text-neutral-500">
-                      {micPermissionGranted
-                        ? 'Audio feed active for speech & visualizer'
-                        : 'Tap button to grant browser/system mic access'}
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                RODEX operates strictly under explicit user authorization. Zero secrets or passcodes are ever stored or revealed.
+              </p>
+
+              <div className="space-y-2">
+                {/* Microphone */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/80 border border-neutral-800">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        micPermissionGranted ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'
+                      }`}
+                    />
+                    <div>
+                      <div className="text-xs text-neutral-200 font-medium">Microphone & Speech</div>
+                      <div className="text-[10px] text-neutral-500">
+                        {micPermissionGranted ? 'Active • Real-time wake-word & speech' : 'Disabled • Authorization required'}
+                      </div>
                     </div>
                   </div>
+                  <button
+                    onClick={handleRequestMic}
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-cyan-500 text-black font-semibold hover:bg-cyan-400 active:scale-95 transition-all"
+                  >
+                    {micPermissionGranted ? 'Test Mic' : 'Authorize'}
+                  </button>
                 </div>
 
-                <button
-                  onClick={handleRequestMic}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-semibold hover:bg-cyan-400 active:scale-95 transition-all"
-                >
-                  {micPermissionGranted ? 'Test Mic' : 'Authorize'}
-                </button>
+                {/* Android Contacts */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/80 border border-neutral-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                    <div>
+                      <div className="text-xs text-neutral-200 font-medium">Android Contacts Access</div>
+                      <div className="text-[10px] text-neutral-500">
+                        Authorized for name search, phone lookup, and calls only
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 font-mono">
+                    Authorized
+                  </span>
+                </div>
+
+                {/* Email Service */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/80 border border-neutral-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                    <div>
+                      <div className="text-xs text-neutral-200 font-medium">Secure Email Messaging</div>
+                      <div className="text-[10px] text-neutral-500">
+                        Reads summaries, drafts replies; sending requires explicit confirmation
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 font-mono">
+                    Protected
+                  </span>
+                </div>
+
+                {/* Hardware Security Guard */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/80 border border-neutral-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+                    <div>
+                      <div className="text-xs text-neutral-200 font-medium">Passcode & Credential Vault</div>
+                      <div className="text-[10px] text-neutral-500">
+                        Zero-disclosure policy • Never revealed in chat or stored in AI memory
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-950 text-cyan-300 font-mono">
+                    Locked
+                  </span>
+                </div>
               </div>
 
               {micStatusMsg && (

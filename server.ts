@@ -17,6 +17,17 @@ import {
 import { globalOrchestrator } from "./server/orchestrator/orchestrator";
 import { globalToolRegistry } from "./server/orchestrator/registry";
 import { IntentClassifier } from "./server/orchestrator/intentClassifier";
+import { globalMemoryService } from "./server/orchestrator/memoryService";
+import { globalUserProfile } from "./server/orchestrator/userProfile";
+import { CapabilityRegistry } from "./server/orchestrator/capabilityModules";
+import { ProactiveIntelligenceEngine } from "./server/orchestrator/proactiveEngine";
+import { MediaGroundingService } from "./server/mediaService";
+import { ContextMemoryManager } from "./server/orchestrator/contextMemory";
+import {
+  getResolvedGeminiApiKey,
+  isGeminiApiKeyConfigured,
+  validateGeminiStartupConfig,
+} from "./server/geminiConfig";
 
 dotenv.config();
 
@@ -27,12 +38,12 @@ let aiClient: GoogleGenAI | null = null;
 
 function getAI(): GoogleGenAI {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getResolvedGeminiApiKey();
     if (!apiKey) {
       console.warn("[RODEX Server] Warning: GEMINI_API_KEY is not defined in environment variables.");
     }
     aiClient = new GoogleGenAI({
-      apiKey: apiKey || "",
+      apiKey,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -612,6 +623,170 @@ async function startServer() {
     }
   });
 
+  // User-Controlled Permission Center Store
+  let permissionState: Record<string, { id: string; label: string; description: string; granted: boolean; category: string; requiresHardware: boolean }> = {
+    microphone: {
+      id: 'microphone',
+      label: 'Microphone & Voice Input',
+      description: 'Required for real-time voice recognition and wake-word activation',
+      granted: true,
+      category: 'Audio',
+      requiresHardware: true,
+    },
+    contacts: {
+      id: 'contacts',
+      label: 'Android Contacts Access',
+      description: 'Used only for authorized name lookup, phone finding, and initiated calls',
+      granted: true,
+      category: 'Communication',
+      requiresHardware: false,
+    },
+    email: {
+      id: 'email',
+      label: 'Email Service & Messaging',
+      description: 'Allows reading summaries, drafting replies, and sending verified messages',
+      granted: true,
+      category: 'Communication',
+      requiresHardware: false,
+    },
+    notifications: {
+      id: 'notifications',
+      label: 'System Notifications',
+      description: 'Receive real-time alerts for security updates and task completions',
+      granted: true,
+      category: 'System',
+      requiresHardware: false,
+    },
+    camera: {
+      id: 'camera',
+      label: 'Camera & Visual Inspection',
+      description: 'Allows image analysis and visual multimodal scene understanding',
+      granted: true,
+      category: 'Vision',
+      requiresHardware: true,
+    },
+    device_security: {
+      id: 'device_security',
+      label: 'Hardware Passcode & Secret Guard',
+      description: 'Strict zero-disclosure policy enforcing non-revelation of passcodes and keys',
+      granted: true,
+      category: 'Security',
+      requiresHardware: true,
+    },
+  };
+
+  app.get("/api/rodex/permissions", (_req, res) => {
+    res.json({ status: "ok", permissions: permissionState });
+  });
+
+  app.post("/api/rodex/permissions/toggle", (req, res) => {
+    const { permissionId, granted } = req.body;
+    if (permissionState[permissionId]) {
+      permissionState[permissionId].granted = Boolean(granted);
+      return res.json({ status: "ok", updated: permissionState[permissionId], permissions: permissionState });
+    }
+    return res.status(404).json({ error: `Permission "${permissionId}" not found.` });
+  });
+
+  // API Route: Email Service Inspection & Quick Actions
+  app.get("/api/rodex/email/inbox", async (_req, res) => {
+    try {
+      const result = await globalToolRegistry.executeTool("email_service", { action: "list_summaries" });
+      res.json({ status: "ok", result });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed fetching emails" });
+    }
+  });
+
+  app.post("/api/rodex/email/action", async (req, res) => {
+    try {
+      const { action, emailId, recipient, replyContent, searchQuery, label } = req.body;
+      const result = await globalToolRegistry.executeTool(
+        "email_service",
+        { action, emailId, recipient, replyContent, searchQuery, label },
+        { userName: "Robert", hasElevatedPermission: true }
+      );
+      res.json({ status: "ok", result });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed email action" });
+    }
+  });
+
+  // API Route: Contacts Directory
+  app.get("/api/rodex/contacts", async (_req, res) => {
+    try {
+      const result = await globalToolRegistry.executeTool("contacts_service", { action: "list_recent" });
+      res.json({ status: "ok", result });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed fetching contacts" });
+    }
+  });
+
+  // API Route: Chat Streaming Endpoint (SSE)
+  app.post("/api/chat/stream", async (req, res) => {
+    const {
+      message,
+      history = [],
+      liveConversation = false,
+      clientFormattedTime,
+      timeZone,
+      performanceMode = "ultra",
+    } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required for streaming." });
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    try {
+      // 1. First run the orchestrator for intent classification and tool execution
+      const orchRes = await globalOrchestrator.orchestrate({
+        userInput: message,
+        history: Array.isArray(history) ? history : [],
+        clientFormattedTime,
+        timeZone,
+        isLiveCall: Boolean(liveConversation),
+        preferredModel: performanceMode === "deep_reasoning" ? "gemini-3.1-pro-preview" : undefined,
+      });
+
+      // Stream initial trace info
+      res.write(`data: ${JSON.stringify({ type: "trace", trace: orchRes.trace, actionStatus: orchRes.actionStatus, generatedImage: orchRes.generatedImage, pendingConfirmation: orchRes.pendingConfirmation })}\n\n`);
+
+      // If reply is already generated by fast-path (e.g. math, exact command, single tool)
+      if (orchRes.reply) {
+        // Stream out reply tokens smoothly
+        const words = orchRes.reply.split(" ");
+        for (let i = 0; i < words.length; i++) {
+          const chunk = (i === 0 ? "" : " ") + words[i];
+          res.write(`data: ${JSON.stringify({ type: "token", text: chunk })}\n\n`);
+        }
+
+        res.write(
+          `data: ${JSON.stringify({
+            type: "done",
+            reply: orchRes.reply,
+            sources: orchRes.sources || [],
+            searchQueries: orchRes.searchQueries || [],
+            webGrounded: Boolean(orchRes.webGrounded),
+            actionStatus: orchRes.actionStatus,
+            generatedImage: orchRes.generatedImage,
+            pendingConfirmation: orchRes.pendingConfirmation,
+          })}\n\n`
+        );
+        return res.end();
+      }
+
+      res.write(`data: ${JSON.stringify({ type: "done", reply: "Response generated." })}\n\n`);
+      return res.end();
+    } catch (err: any) {
+      res.write(`data: ${JSON.stringify({ type: "error", error: err?.message || "Stream error" })}\n\n`);
+      return res.end();
+    }
+  });
+
   // API Route: Approve & Execute Pending Elevated Action
   app.post("/api/rodex/confirm-action", async (req, res) => {
     try {
@@ -637,6 +812,80 @@ async function startServer() {
         error: "Failed executing approved action",
         message: err?.message,
       });
+    }
+  });
+
+  // API Route: Long-Term Memory List & Search
+  app.get("/api/rodex/memory", async (req, res) => {
+    try {
+      const searchTerm = req.query.q as string | undefined;
+      const category = req.query.category as any;
+      const memories = await globalMemoryService.search("Robert", {
+        searchTerm,
+        category,
+        limit: 50,
+      });
+      res.json({
+        status: "ok",
+        count: memories.length,
+        memories,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed retrieving memories" });
+    }
+  });
+
+  // API Route: Save New Long-Term Memory
+  app.post("/api/rodex/memory", async (req, res) => {
+    try {
+      const { key, value, category, tags } = req.body;
+      if (!key || !value) {
+        return res.status(400).json({ error: "key and value are required to save a memory." });
+      }
+
+      const saved = await globalMemoryService.save({
+        userId: "Robert",
+        key,
+        value,
+        category: category || "fact",
+        confidence: 0.98,
+        tags: Array.isArray(tags) ? tags : [key],
+      });
+
+      res.json({ status: "ok", memory: saved });
+    } catch (err: any) {
+      res.status(400).json({ error: err?.message || "Failed saving memory" });
+    }
+  });
+
+  // API Route: Delete Long-Term Memory
+  app.delete("/api/rodex/memory/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await globalMemoryService.delete(id);
+      res.json({ status: "ok", deleted, memoryId: id });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed deleting memory" });
+    }
+  });
+
+  // API Route: User Personalization Profile
+  app.get("/api/rodex/profile", (_req, res) => {
+    try {
+      const profile = globalUserProfile.getProfile();
+      res.json({ status: "ok", profile });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed fetching profile" });
+    }
+  });
+
+  // API Route: Update User Personalization Profile
+  app.post("/api/rodex/profile", (req, res) => {
+    try {
+      const updated = globalUserProfile.updateProfile(req.body);
+      res.json({ status: "ok", profile: updated });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed updating profile" });
     }
   });
 
@@ -734,15 +983,21 @@ async function startServer() {
         });
       }
 
-      // Check for Orchestrated Tool intents (open_url, youtube search, compute, time, system) in Real-time API
-      const classifiedIntent = IntentClassifier.classify(message);
+      // Check for Orchestrated Tool intents (open_url, youtube search, compute, time, system, clarification) in Real-time API
+      const classifiedIntent = IntentClassifier.classify(message, Array.isArray(history) ? history : []);
       if (
         classifiedIntent.primaryIntent === 'open_url' ||
         classifiedIntent.primaryIntent === 'calculate_compute' ||
         classifiedIntent.primaryIntent === 'datetime_timezone' ||
         classifiedIntent.primaryIntent === 'system_info' ||
         classifiedIntent.primaryIntent === 'file_inspection' ||
-        classifiedIntent.primaryIntent === 'app_action'
+        classifiedIntent.primaryIntent === 'app_action' ||
+        classifiedIntent.primaryIntent === 'clarification_needed' ||
+        classifiedIntent.primaryIntent === 'email_operation' ||
+        classifiedIntent.primaryIntent === 'contacts_operation' ||
+        classifiedIntent.primaryIntent === 'device_security' ||
+        classifiedIntent.primaryIntent === 'image_intelligence' ||
+        classifiedIntent.primaryIntent === 'exact_command'
       ) {
         const orchRes = await globalOrchestrator.orchestrate({
           userInput: message,
@@ -762,10 +1017,13 @@ async function startServer() {
           webVerified: true,
           timestamp: new Date().toISOString(),
           speaker: "Mr. Robert",
+          actionStatus: orchRes.actionStatus,
+          generatedImage: orchRes.generatedImage,
           orchestrationTrace: orchRes.trace,
           pendingConfirmation: orchRes.pendingConfirmation,
         });
       }
+
 
       if (!process.env.GEMINI_API_KEY) {
         return res.json({
@@ -938,8 +1196,8 @@ async function startServer() {
         return res.status(400).json({ error: "A message or image prompt is required." });
       }
 
-      // Check Cache for instant response if query is text-only without image
-      if (message && !image && !liveConversation) {
+      // Check Cache for instant response if query is text-only without image and has no preceding history
+      if (message && !image && !liveConversation && (!Array.isArray(history) || history.length === 0)) {
         const cacheKey = `chat:${message.trim().toLowerCase()}`;
         const cached = queryResponseCache.get(cacheKey);
         if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
@@ -953,8 +1211,24 @@ async function startServer() {
         }
       }
 
-      // Route text queries through the central Intelligence Orchestrator & Tool Suite
-      if (message && !image) {
+      // Route text and multimodal queries through the central Intelligence Orchestrator & Tool Suite
+      if (image && image.data) {
+        const mime = image.mimeType || 'image/jpeg';
+        const imgUrl = `data:${mime};base64,${image.data}`;
+        ContextMemoryManager.updateSessionState('default', {
+          lastImage: {
+            url: imgUrl,
+            prompt: message || 'Uploaded image',
+            type: 'uploaded',
+            aspectRatio: '1:1',
+            model: 'user_upload',
+            timestamp: Date.now(),
+          },
+          lastTopic: 'Uploaded image',
+        });
+      }
+
+      if (message) {
         const orchRes = await globalOrchestrator.orchestrate({
           userInput: message,
           history: Array.isArray(history) ? history : [],
@@ -984,6 +1258,8 @@ async function startServer() {
           sources: orchRes.sources || [],
           searchQueries: orchRes.searchQueries || [],
           webGrounded: Boolean(orchRes.webGrounded),
+          actionStatus: orchRes.actionStatus,
+          generatedImage: orchRes.generatedImage,
           orchestrationTrace: orchRes.trace,
           pendingConfirmation: orchRes.pendingConfirmation,
           spotify: pbData ? {
@@ -1156,7 +1432,7 @@ async function startServer() {
         return res.status(400).json({ error: "Query is required" });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
+      if (!isGeminiApiKeyConfigured()) {
         return res.json({
           results: [
             {
@@ -1259,7 +1535,7 @@ Ensure you use Google Search grounding to retrieve accurate 2026 music data.`;
     try {
       const topic = (req.query.topic as string) || "World News and Tech Innovation";
 
-      if (!process.env.GEMINI_API_KEY) {
+      if (!isGeminiApiKeyConfigured()) {
         return res.json({
           topic,
           summary: "RODEX requires a Gemini API Key to fetch real-time World Wide Web intelligence.",
@@ -1524,6 +1800,18 @@ Content: "${content}"`;
     ]
   };
 
+  app.get("/api/health/ai", (_req, res) => {
+    const diag = validateGeminiStartupConfig();
+    res.json({
+      status: diag.configured ? "healthy" : "unconfigured",
+      apiKeyConfigured: diag.configured,
+      keyPresent: diag.keyPresent,
+      provider: diag.provider,
+      clientInitialized: Boolean(getAI()),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   app.get("/api/updates/status", (_req, res) => {
     res.json(updateSystemState);
   });
@@ -1632,6 +1920,93 @@ Content: "${content}"`;
     console.log(`[RODEX Security Audit] Creator profile updated by authenticated session for ${creatorProfileState.fullName}`);
     res.json({ success: true, creatorProfileState });
   });
+
+  // RODEX Multi-Capability Subsystem & Module Endpoints
+  app.get("/api/rodex/capabilities", (_req, res) => {
+    try {
+      const overview = CapabilityRegistry.getSystemOverview();
+      res.json(overview);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to fetch capability overview' });
+    }
+  });
+
+  app.get("/api/rodex/proactive", (req, res) => {
+    try {
+      const suggestions = ProactiveIntelligenceEngine.generateSuggestions({
+        userName: 'Robert',
+      });
+      res.json({ success: true, suggestions });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to generate proactive suggestions' });
+    }
+  });
+
+  // Google Search Grounding with gemini-3.5-flash
+  app.post("/api/search/grounded", async (req, res) => {
+    try {
+      const { query } = req.body;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: 'Valid search query is required' });
+      }
+      const result = await MediaGroundingService.executeSearchGrounding(query);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Search Grounding failed' });
+    }
+  });
+
+  // Google Maps Grounding with gemini-3.5-flash
+  app.post("/api/maps/grounded", async (req, res) => {
+    try {
+      const { query } = req.body;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: 'Valid location or map query is required' });
+      }
+      const result = await MediaGroundingService.executeMapsGrounding(query);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Maps Grounding failed' });
+    }
+  });
+
+  // Veo 3 Video Generation (Text to Video & Image Animation) using veo-3.1-fast-generate-preview
+  app.post("/api/video/generate", async (req, res) => {
+    try {
+      const { prompt, image, aspectRatio } = req.body;
+      if (!prompt && (!image || !image.data)) {
+        return res.status(400).json({ error: 'Either prompt text or an image is required for video generation.' });
+      }
+      const result = await MediaGroundingService.generateVideo({
+        prompt: prompt || '',
+        image,
+        aspectRatio: aspectRatio === '9:16' ? '9:16' : '16:9',
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Video generation failed' });
+    }
+  });
+
+  // Create & Edit Images using gemini-3.1-flash-image-preview
+  app.post("/api/image/generate", async (req, res) => {
+    try {
+      const { prompt, sourceImage, aspectRatio } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ error: 'Prompt is required for image generation.' });
+      }
+      const result = await MediaGroundingService.generateOrEditImage({
+        prompt,
+        sourceImage,
+        aspectRatio: aspectRatio || '1:1',
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Image generation failed' });
+    }
+  });
+
+
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {

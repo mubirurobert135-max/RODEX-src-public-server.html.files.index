@@ -31,6 +31,12 @@ import {
   Terminal,
   Play,
   Youtube,
+  Mail,
+  Phone,
+  Lock,
+  Image as ImageIcon,
+  Wand2,
+  Paintbrush,
 } from 'lucide-react';
 import { ChatMessage, AssistantState, ChatSession } from '../types';
 import { triggerHaptic } from '../utils/haptics';
@@ -443,7 +449,234 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                         className="rounded-lg mb-2 max-h-48 object-cover border border-neutral-800"
                       />
                     )}
+                    {msg.sender === 'assistant' && msg.actionStatus && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        {msg.actionStatus === 'prepared' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-950/80 text-amber-400 border border-amber-800/60 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                            Draft Ready
+                          </span>
+                        )}
+                        {msg.actionStatus === 'completed' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5" />
+                            Action Completed
+                          </span>
+                        )}
+                        {msg.actionStatus === 'failed' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-rose-950/80 text-rose-400 border border-rose-800/60 flex items-center gap-1">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            Failed
+                          </span>
+                        )}
+                        {msg.actionStatus === 'needs_confirmation' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-950/80 text-amber-300 border border-amber-700/60 flex items-center gap-1">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            Needs Confirmation
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <p className="whitespace-pre-wrap select-text">{msg.text}</p>
+
+                    {/* Dedicated Email Execution / Draft Card */}
+                    {msg.sender === 'assistant' &&
+                      msg.orchestrationTrace?.executedTools?.some(
+                        (t) => t.toolName === 'email_service' && t.result?.success && t.result?.output
+                      ) && (
+                        <div className="mt-3 space-y-2">
+                          {msg.orchestrationTrace.executedTools
+                            .filter((t) => t.toolName === 'email_service' && t.result?.success && t.result?.output)
+                            .map((toolRec, eIdx) => {
+                              const out = toolRec.result.output;
+                              const isDraft = out.draftId || out.to;
+                              return (
+                                <div
+                                  key={`email-card-${eIdx}`}
+                                  className="p-3 rounded-xl border bg-neutral-900/90 border-cyan-500/30 space-y-2"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
+                                      <Mail className="w-4 h-4 text-cyan-400" />
+                                      <span>{isDraft ? 'Email Draft' : 'Email Intel'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-neutral-400">Encrypted</span>
+                                  </div>
+                                  {out.to && (
+                                    <div className="text-xs text-neutral-300">
+                                      <span className="text-neutral-500 font-medium">To: </span>
+                                      <span className="text-neutral-200">{out.to}</span>
+                                    </div>
+                                  )}
+                                  {out.subject && (
+                                    <div className="text-xs text-neutral-300">
+                                      <span className="text-neutral-500 font-medium">Subject: </span>
+                                      <span className="text-neutral-200">{out.subject}</span>
+                                    </div>
+                                  )}
+                                  {out.body && (
+                                    <div className="text-xs p-2 rounded-lg bg-black/50 border border-neutral-800 text-neutral-300 font-mono">
+                                      {out.body}
+                                    </div>
+                                  )}
+                                  {msg.pendingConfirmation && (
+                                    <div className="pt-1 flex items-center gap-2">
+                                      <button
+                                        onClick={async () => {
+                                          if (onConfirmAction && msg.pendingConfirmation) {
+                                            setApprovingActionId(msg.pendingConfirmation.actionId);
+                                            try {
+                                              await onConfirmAction(
+                                                msg.pendingConfirmation.actionId,
+                                                msg.pendingConfirmation.toolName,
+                                                msg.pendingConfirmation.params
+                                              );
+                                            } finally {
+                                              setApprovingActionId(null);
+                                            }
+                                          }
+                                        }}
+                                        disabled={approvingActionId === msg.pendingConfirmation.actionId}
+                                        className="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold flex items-center gap-1.5 transition-all"
+                                      >
+                                        <Send className="w-3 h-3" />
+                                        <span>Send Now</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                    {/* Dedicated Contacts Card */}
+                    {msg.sender === 'assistant' &&
+                      msg.orchestrationTrace?.executedTools?.some(
+                        (t) => t.toolName === 'contacts_service' && t.result?.success && (t.result?.output?.phone || t.result?.output?.email)
+                      ) && (
+                        <div className="mt-3 space-y-2">
+                          {msg.orchestrationTrace.executedTools
+                            .filter((t) => t.toolName === 'contacts_service' && t.result?.success && (t.result?.output?.phone || t.result?.output?.email))
+                            .map((toolRec, cIdx) => {
+                              const contact = toolRec.result.output;
+                              return (
+                                <div
+                                  key={`contact-card-${cIdx}`}
+                                  className="p-3 rounded-xl border bg-neutral-900/90 border-emerald-500/30 flex items-center justify-between gap-3"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-700/60 flex items-center justify-center text-emerald-400 shrink-0">
+                                      <Phone className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-semibold text-white truncate">
+                                        {contact.name || 'Contact'}
+                                      </p>
+                                      <span className="text-[10px] text-neutral-400 block truncate font-mono">
+                                        {contact.phone || contact.email}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {contact.phone && (
+                                    <a
+                                      href={`tel:${contact.phone}`}
+                                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-black flex items-center gap-1 transition-all active:scale-95 shrink-0"
+                                    >
+                                      <Phone className="w-3 h-3" />
+                                      <span>Call</span>
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                    {/* Dedicated Image Intelligence Card */}
+                    {(msg.generatedImage ||
+                      (msg.sender === 'assistant' &&
+                        msg.orchestrationTrace?.executedTools?.some(
+                          (t) =>
+                            t.toolName === 'image_intelligence' &&
+                            t.result?.success &&
+                            (t.result?.output?.imageUrl || t.result?.output?.url)
+                        ))) && (
+                      <div className="mt-3 p-3.5 rounded-2xl bg-neutral-900/95 border border-cyan-500/40 space-y-3 shadow-xl">
+                        {(() => {
+                          const imgObj =
+                            msg.generatedImage ||
+                            msg.orchestrationTrace?.executedTools?.find(
+                              (t) =>
+                                t.toolName === 'image_intelligence' &&
+                                t.result?.success &&
+                                (t.result?.output?.imageUrl || t.result?.output?.url)
+                            )?.result?.output;
+
+                          const finalImgUrl = imgObj?.url || imgObj?.imageUrl;
+                          if (!imgObj || !finalImgUrl) return null;
+
+                          return (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
+                                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                                  <span>{imgObj.isEdit ? 'AI Edited Image' : 'AI Generated Image'}</span>
+                                </div>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
+                                  {imgObj.aspectRatio || '1:1'}
+                                </span>
+                              </div>
+
+                              <div className="rounded-xl overflow-hidden bg-black flex items-center justify-center border border-neutral-800 relative group">
+                                <img
+                                  src={finalImgUrl}
+                                  alt={imgObj.prompt || 'Generated by RODEX'}
+                                  className="max-h-72 w-full object-contain rounded-xl"
+                                />
+                                <a
+                                  href={finalImgUrl}
+                                  download="rodex_image.png"
+                                  className="absolute bottom-2 right-2 p-2 rounded-xl bg-black/80 hover:bg-black text-white text-xs flex items-center gap-1 shadow-lg backdrop-blur-sm"
+                                  title="Download Image"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+
+                              {/* Quick Conversational Edit Chips */}
+                              <div className="space-y-1.5 pt-1 border-t border-neutral-800">
+                                <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider flex items-center gap-1">
+                                  <Wand2 className="w-3 h-3 text-cyan-400" />
+                                  <span>Conversational Quick Edits:</span>
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {[
+                                    'Remove background',
+                                    'Make the sky brighter',
+                                    'Turn this into a poster',
+                                    'Add realistic cinematic lighting',
+                                    'Remove the tree',
+                                    'Convert into an illustration',
+                                  ].map((chip) => (
+                                    <button
+                                      key={chip}
+                                      onClick={() => {
+                                        triggerHaptic('tap');
+                                        onSendMessage(chip);
+                                      }}
+                                      className="text-[11px] px-2.5 py-1 rounded-lg bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 hover:border-cyan-500/50 text-neutral-300 transition-colors cursor-pointer"
+                                    >
+                                      {chip}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
 
                     {/* Dedicated Browser Destination / YouTube Execution Card */}
                     {msg.sender === 'assistant' &&

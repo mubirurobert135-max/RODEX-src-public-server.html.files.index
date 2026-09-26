@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User profile and private subcollections
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /conversations/{convId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /memories/{memId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /creations/{creationId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /preferences/{prefId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Public community gallery for shared AI creations (videos, images)
+    match /public_creations/{creationId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+  }
+}

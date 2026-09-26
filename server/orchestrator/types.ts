@@ -52,11 +52,44 @@ export type TaskIntentCategory =
   | 'file_inspection'
   | 'calculate_compute'
   | 'datetime_timezone'
+  | 'weather'
+  | 'memory_operation'
+  | 'platform_bridge'
   | 'app_action'
+  | 'email_operation'
+  | 'contacts_operation'
+  | 'device_security'
+  | 'image_intelligence'
+  | 'exact_command'
   | 'creator_inquiry'
   | 'cultural_knowledge'
   | 'general_knowledge'
-  | 'conversational';
+  | 'conversational'
+  | 'clarification_needed';
+
+export type InteractionType =
+  | 'info_request'
+  | 'action_command'
+  | 'content_generation'
+  | 'conversation'
+  | 'confirmation_required'
+  | 'ambiguous';
+
+export type ResponseFormat =
+  | 'exact'
+  | 'yes_no'
+  | 'numeric_only'
+  | 'concise'
+  | 'detailed'
+  | 'read_only'
+  | 'normal';
+
+export type ActionStatus =
+  | 'prepared'
+  | 'completed'
+  | 'failed'
+  | 'needs_permission'
+  | 'needs_confirmation';
 
 export interface IntentClassification {
   primaryIntent: TaskIntentCategory;
@@ -65,6 +98,15 @@ export interface IntentClassification {
   suggestedTools: string[];
   requiresPlanning: boolean;
   riskLevel: ToolPermissionLevel;
+  interactionType?: InteractionType;
+  responseFormat?: ResponseFormat;
+  exactOutputRequested?: boolean;
+  exactText?: string;
+  isIncomplete?: boolean;
+  clarificationPrompt?: string;
+  isFollowUp?: boolean;
+  resolvedQuery?: string;
+  detailLevel?: 'concise' | 'normal' | 'detailed';
 }
 
 export interface PlanStep {
@@ -100,6 +142,7 @@ export interface OrchestratorTrace {
   validationPassed: boolean;
   totalLatencyMs: number;
   recoveredFromError?: boolean;
+  actionStatus?: ActionStatus;
 }
 
 export interface OrchestratorResponse {
@@ -108,6 +151,14 @@ export interface OrchestratorResponse {
   sources?: Array<{ title: string; url: string; domain?: string }>;
   searchQueries?: string[];
   webGrounded?: boolean;
+  actionStatus?: ActionStatus;
+  generatedImage?: {
+    url: string;
+    prompt: string;
+    isEdit?: boolean;
+    aspectRatio?: string;
+    model?: string;
+  };
   pendingConfirmation?: {
     actionId: string;
     toolName: string;
@@ -115,3 +166,44 @@ export interface OrchestratorResponse {
     params: any;
   };
 }
+
+
+export type CapabilityDomainId =
+  | 'image_intelligence'
+  | 'intelligence_reasoning'
+  | 'long_term_memory'
+  | 'device_interaction'
+  | 'communication_messaging'
+  | 'email_hub'
+  | 'web_global_knowledge'
+  | 'automation_multistep'
+  | 'security_permission_gate';
+
+
+export interface CapabilityDomain {
+  id: CapabilityDomainId;
+  name: string;
+  tagline: string;
+  description: string;
+  icon: string;
+  status: 'active' | 'standby' | 'restricted';
+  version: string;
+  tools: string[];
+  features: string[];
+  subsystems: Array<{ name: string; status: 'active' | 'standby' | 'healthy'; description: string }>;
+}
+
+export type ProactiveState = 'observing' | 'suggesting' | 'preparing' | 'executing';
+
+export interface ProactiveSuggestion {
+  id: string;
+  title: string;
+  category: 'workflow' | 'follow_up' | 'memory' | 'security' | 'knowledge' | 'device';
+  suggestedAction: string;
+  reason: string;
+  state: ProactiveState;
+  requiresAuth: boolean;
+  confidence: number;
+  timestamp: string;
+}
+

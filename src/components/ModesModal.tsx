@@ -20,6 +20,7 @@ import {
   Sparkles,
   Radio,
   Music2,
+  Brain,
 } from 'lucide-react';
 import { AppMode } from '../types';
 import {
@@ -35,6 +36,9 @@ interface ModesModalProps {
   onSubmitPrompt: (text: string, image?: { data: string; mimeType: string }) => void;
   currentSources?: Array<{ title: string; url: string; domain?: string }>;
   onOpenSpotify?: () => void;
+  onOpenMemory?: () => void;
+  onOpenCapabilities?: () => void;
+  onOpenMediaStudio?: (tab: 'video' | 'image' | 'maps' | 'search' | 'gallery') => void;
 }
 
 export const ModesModal: React.FC<ModesModalProps> = ({
@@ -43,6 +47,9 @@ export const ModesModal: React.FC<ModesModalProps> = ({
   onSubmitPrompt,
   currentSources = [],
   onOpenSpotify,
+  onOpenMemory,
+  onOpenCapabilities,
+  onOpenMediaStudio,
 }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imagePayload, setImagePayload] = useState<{ data: string; mimeType: string } | null>(null);
@@ -216,6 +223,36 @@ export const ModesModal: React.FC<ModesModalProps> = ({
                 </p>
               </div>
 
+              {/* Google Maps & Live Search Studio Launch */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/60 border border-neutral-800">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs text-neutral-300">Live Maps & Multimodal Studio</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenMediaStudio?.('maps');
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 hover:bg-emerald-900 border border-emerald-700/60 text-[11px] font-medium transition-colors"
+                  >
+                    Google Maps &rarr;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenMediaStudio?.('search');
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-cyan-950 text-cyan-300 hover:bg-cyan-900 border border-cyan-700/60 text-[11px] font-medium transition-colors"
+                  >
+                    Search Studio &rarr;
+                  </button>
+                </div>
+              </div>
+
               {/* Instant Search Presets */}
               <div className="space-y-1.5">
                 <span className="text-[11px] font-medium text-neutral-400">
@@ -223,6 +260,7 @@ export const ModesModal: React.FC<ModesModalProps> = ({
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {[
+                    { label: '📍 Maps: Kampala to Fort Portal', query: 'What are the road directions and route from Kampala to Fort Portal Palace, Uganda?' },
                     { label: '🇺🇬 Kingdom of Tooro', query: 'What recently happened to the Kingdom of Tooro in Uganda following the death of King Oyo?' },
                     { label: '🕒 Real-Time Clock', query: 'What is the current date and time in Uganda (EAT) and globally?' },
                     { label: 'Breaking News', query: 'What is the top breaking world news right now?' },
@@ -391,6 +429,36 @@ export const ModesModal: React.FC<ModesModalProps> = ({
           {/* IMAGE MODE */}
           {mode === 'image' && (
             <div className="space-y-4">
+              {/* Veo 3 & Image Studio Quick Launch */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/80 to-blue-950/60 border border-cyan-800/70 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-900/90 border border-cyan-700/80 flex items-center justify-center text-cyan-400 shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Veo 3 Video & Image Studio</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">
+                        VEO 3.1 & GEMINI 3.1
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Generate videos from text, animate photos into videos, or edit images.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenMediaStudio?.('video');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold shrink-0 transition-all active:scale-95 shadow-md shadow-cyan-500/20"
+                >
+                  Studio &rarr;
+                </button>
+              </div>
+
               <p className="text-xs text-neutral-400">
                 Transmit a photo or visual artifact for multimodal neural inspection by RODEX.
               </p>
@@ -552,9 +620,69 @@ export const ModesModal: React.FC<ModesModalProps> = ({
             </div>
           )}
 
-          {/* MORE MODE: Android APK & Flutter Export + Spotify PC */}
+          {/* MORE MODE: Android APK & Flutter Export + Spotify PC + Memory & Personalization */}
           {mode === 'more' && (
             <div className="space-y-4">
+              {/* RODEX Capability Hub & Multi-Domain System Quick Launch */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-neutral-900 border border-indigo-800/70 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-900/90 border border-indigo-700/80 flex items-center justify-center text-indigo-400 shrink-0">
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>RODEX Capability Hub</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 font-mono">
+                        8 AI DOMAINS
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Explore Reasoning, Memory, Device Bridge, Email, Security, and Compound Automation.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenCapabilities?.();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-black text-xs font-bold shrink-0 transition-all active:scale-95 shadow-md shadow-indigo-500/20"
+                >
+                  Explore &rarr;
+                </button>
+              </div>
+
+              {/* Long-Term Memory & Personalization Quick Launch */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/80 to-neutral-900 border border-cyan-800/70 flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-900/90 border border-cyan-700/80 flex items-center justify-center text-cyan-400 shrink-0">
+                    <Brain className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Memory & Personalization</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">
+                        LONG-TERM CORE
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Review, add, and manage your long-term memories, facts, and AI preferences.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenMemory?.();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold shrink-0 transition-all active:scale-95 shadow-md shadow-cyan-500/20"
+                >
+                  Manage &rarr;
+                </button>
+              </div>
+
               {/* Spotify PC Controller Quick Launch */}
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-neutral-900 border border-emerald-800/70 flex items-center justify-between shadow-lg">
                 <div className="flex items-center gap-3">

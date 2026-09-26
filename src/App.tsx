@@ -24,6 +24,10 @@ import {
   Play,
   Youtube,
   X,
+  Brain,
+  Cpu,
+  Film,
+  Video as VideoIcon,
 } from 'lucide-react';
 import { Orb } from './components/Orb';
 import { ActionBar } from './components/ActionBar';
@@ -37,6 +41,10 @@ import { WebMediaHubModal } from './components/WebMediaHubModal';
 import { SecurityCenterModal } from './components/SecurityCenterModal';
 import { UpdateCenterModal } from './components/UpdateCenterModal';
 import { CreatorProfileModal } from './components/CreatorProfileModal';
+import { MemoryPersonalizationModal } from './components/MemoryPersonalizationModal';
+import { CapabilityHubModal } from './components/CapabilityHubModal';
+import { MediaStudioModal } from './components/MediaStudioModal';
+import { FirebaseAuthButton } from './components/FirebaseAuthButton';
 import { SpotifyMiniBar } from './components/SpotifyMiniBar';
 import { AndroidFrame } from './components/AndroidFrame';
 import {
@@ -84,6 +92,10 @@ export default function App() {
   const [isSecurityOpen, setIsSecurityOpen] = useState(false);
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+  const [isCapabilityOpen, setIsCapabilityOpen] = useState(false);
+  const [isMediaStudioOpen, setIsMediaStudioOpen] = useState(false);
+  const [mediaStudioTab, setMediaStudioTab] = useState<'video' | 'image' | 'maps' | 'search' | 'gallery'>('video');
 
   // Live Chat Sessions & Persistence
   const [activeSession, setActiveSession] = useState<ChatSession>(() => loadActiveSession());
@@ -194,6 +206,10 @@ export default function App() {
     }, 120);
     return () => clearInterval(interval);
   }, [state]);
+
+  // Pending Request AbortController & Deduplication Ref
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
+  const lastSentQueryRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
 
   // Screen-Adaptive Responsive Orb Sizing for Full-Screen & Multi-Device Previews
   const [orbSize, setOrbSize] = useState(280);
@@ -532,6 +548,20 @@ export default function App() {
         ? crypto.randomUUID()
         : `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+    // Deduplicate rapid identical submissions within 400ms
+    const nowMs = Date.now();
+    if (lastSentQueryRef.current.text === userText.trim() && nowMs - lastSentQueryRef.current.time < 400) {
+      return;
+    }
+    lastSentQueryRef.current = { text: userText.trim(), time: nowMs };
+
+    // Abort any prior in-flight request to prioritize current user action
+    if (activeAbortControllerRef.current) {
+      activeAbortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    activeAbortControllerRef.current = abortController;
+
     // Handle conversation exit / goodbye words / explicit user instruction to end call
     if (isConversationExit(userText)) {
       const wasLive = isLiveConversationRef.current;
@@ -719,10 +749,14 @@ export default function App() {
       if (lowerQ.includes('who am i') || lowerQ.includes('who created you') || lowerQ.includes('who is your founder') || lowerQ.includes('who developed') || lowerQ.includes('who is robert') || lowerQ.includes('creator profile')) {
         setIsCreatorOpen(true);
       }
+      if (lowerQ.includes('open memory') || lowerQ.includes('show memories') || lowerQ.includes('manage memory') || lowerQ.includes('personalization') || lowerQ.includes('my memories')) {
+        setIsMemoryOpen(true);
+      }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({
           message: queryToSend,
           image: imagePayload,
@@ -746,6 +780,7 @@ export default function App() {
       const sources: WebSource[] = data.sources || [];
       const searchQueries: string[] = data.searchQueries || [];
       const webGrounded: boolean = !!data.webGrounded;
+      const actionStatus = data.actionStatus || data.orchestrationTrace?.actionStatus;
 
       const assistantMsg: ChatMessage = {
         id: createId('assistant'),
@@ -755,9 +790,12 @@ export default function App() {
         sources,
         searchQueries,
         webGrounded,
+        actionStatus,
+        generatedImage: data.generatedImage,
         orchestrationTrace: data.orchestrationTrace,
         pendingConfirmation: data.pendingConfirmation,
       };
+
 
       if (data.spotify) {
         if (data.spotify.playback !== undefined) {
@@ -811,6 +849,15 @@ export default function App() {
         });
       }
     } catch (err: any) {
+      // If the request was aborted by a subsequent action, silently exit without error state
+      if (
+        abortController.signal.aborted ||
+        err?.name === 'AbortError' ||
+        (typeof err?.message === 'string' && err.message.toLowerCase().includes('abort'))
+      ) {
+        return;
+      }
+
       console.error('[RODEX Chat error]', err);
       setState('error');
       const errorText =
@@ -831,6 +878,10 @@ export default function App() {
           }, 2000);
         }
       });
+    } finally {
+      if (activeAbortControllerRef.current === abortController) {
+        activeAbortControllerRef.current = null;
+      }
     }
   };
 
@@ -1216,6 +1267,44 @@ export default function App() {
             </button>
 
             <button
+              id="header-studio-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setMediaStudioTab('video');
+                setIsMediaStudioOpen(true);
+              }}
+              title="Veo 3 Video & Multimodal Studio"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400"
+            >
+              <Film className="w-4 h-4" />
+            </button>
+
+            <button
+              id="header-capability-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsCapabilityOpen(true);
+              }}
+              title="RODEX Multi-Capability Hub & 8 Domains"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-indigo-400 relative"
+            >
+              <Cpu className="w-4 h-4" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+            </button>
+
+            <button
+              id="header-memory-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsMemoryOpen(true);
+              }}
+              title="Long-Term Memory & Personalization"
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-purple-400"
+            >
+              <Brain className="w-4 h-4" />
+            </button>
+
+            <button
               id="header-settings-btn"
               onClick={() => setIsSettingsOpen(true)}
               title="Settings"
@@ -1223,6 +1312,9 @@ export default function App() {
             >
               <Settings className="w-4 h-4" />
             </button>
+
+            {/* Firebase Google Auth Profile & Sync Badge */}
+            <FirebaseAuthButton />
           </div>
         </header>
 
@@ -1496,6 +1588,7 @@ export default function App() {
           onOpenVoiceProfile={() => setIsVoiceProfileOpen(true)}
           onOpenSpotify={() => setIsSpotifyOpen(true)}
           onOpenWebVerify={() => setIsWebVerifyOpen(true)}
+          onOpenMemory={() => setIsMemoryOpen(true)}
           onSelectMode={(mode) => {
             if (mode === 'home') {
               setActiveMode('home');
@@ -1532,7 +1625,14 @@ export default function App() {
           onSubmitPrompt={(text, image) => handleSendMessage(text, image)}
           currentSources={lastSources}
           onOpenSpotify={() => setIsSpotifyOpen(true)}
+          onOpenMemory={() => setIsMemoryOpen(true)}
+          onOpenCapabilities={() => setIsCapabilityOpen(true)}
+          onOpenMediaStudio={(tab) => {
+            setMediaStudioTab(tab);
+            setIsMediaStudioOpen(true);
+          }}
         />
+
 
         {/* World Wide Web Verification & Real-Time API Monitor Modal */}
         <WebVerificationModal
@@ -1577,6 +1677,27 @@ export default function App() {
           isOpen={isCreatorOpen}
           onClose={() => setIsCreatorOpen(false)}
           onSpeakStatus={(text) => speakResponse(text)}
+        />
+
+        {/* Long-Term Memory & User Personalization Modal */}
+        <MemoryPersonalizationModal
+          isOpen={isMemoryOpen}
+          onClose={() => setIsMemoryOpen(false)}
+          onNotification={(msg) => speakResponse(msg)}
+        />
+
+        {/* RODEX Capability Hub & Multi-Domain System Modal */}
+        <CapabilityHubModal
+          isOpen={isCapabilityOpen}
+          onClose={() => setIsCapabilityOpen(false)}
+          onExecutePrompt={(prompt) => handleSendMessage(prompt)}
+        />
+
+        {/* RODEX Multimodal Studio (Veo 3 Video, Image Edit, Maps & Search Grounding, Firebase Gallery) */}
+        <MediaStudioModal
+          isOpen={isMediaStudioOpen}
+          onClose={() => setIsMediaStudioOpen(false)}
+          initialTab={mediaStudioTab}
         />
       </main>
     </AndroidFrame>

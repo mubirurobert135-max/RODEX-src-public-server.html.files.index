@@ -12,6 +12,13 @@ import { openUrlTool } from './tools/openUrlTool';
 import { mediaControlTool } from './tools/mediaControlTool';
 import { appActionTool } from './tools/appActionTool';
 import { webSearchTool } from './tools/webSearchTool';
+import { weatherTool } from './tools/weatherTool';
+import { memoryTool } from './tools/memoryTool';
+import { platformBridgeTool } from './tools/platformBridgeTool';
+import { emailTool } from './tools/emailTool';
+import { contactsTool } from './tools/contactsTool';
+import { deviceSecurityTool } from './tools/deviceSecurityTool';
+import { imageIntelligenceTool } from './tools/imageIntelligenceTool';
 
 export class ToolRegistry {
   private tools: Map<string, ToolDefinition> = new Map();
@@ -29,6 +36,13 @@ export class ToolRegistry {
     this.register(mediaControlTool);
     this.register(appActionTool);
     this.register(webSearchTool);
+    this.register(weatherTool);
+    this.register(memoryTool);
+    this.register(platformBridgeTool);
+    this.register(emailTool);
+    this.register(contactsTool);
+    this.register(deviceSecurityTool);
+    this.register(imageIntelligenceTool);
   }
 
   public register(tool: ToolDefinition) {
@@ -92,7 +106,7 @@ export class ToolRegistry {
     params: any,
     context: ToolExecutionContext = {}
   ): Promise<ToolExecutionResult> {
-    const tool = this.tools.get(toolName);
+    const tool = this.get(toolName);
     if (!tool) {
       return {
         success: false,
@@ -101,39 +115,25 @@ export class ToolRegistry {
       };
     }
 
-    // Parameter validation
-    const validation = this.validateParameters(tool, params);
-    if (!validation.valid) {
+    // Validate parameters
+    const { valid, error, validatedParams } = this.validateParameters(tool, params);
+    if (!valid) {
       return {
         success: false,
         output: null,
-        error: validation.error,
-      };
-    }
-
-    // Permission enforcement
-    if (tool.permissionLevel === 'high_risk' && !context.hasElevatedPermission) {
-      return {
-        success: false,
-        output: null,
-        requiresConfirmation: true,
-        confirmationPayload: {
-          actionName: tool.name,
-          description: tool.description,
-          params: validation.validatedParams,
-        },
-        message: `Tool '${tool.name}' is designated high-risk and requires operator approval before execution.`,
+        error,
       };
     }
 
     try {
-      const result = await tool.handler(validation.validatedParams, context);
+      const result = await tool.handler(validatedParams, context);
       return result;
     } catch (err: any) {
+      console.error(`[Tool Execution Error: ${toolName}]`, err);
       return {
         success: false,
         output: null,
-        error: `Unhandled error executing tool '${toolName}': ${err?.message || String(err)}`,
+        error: `Execution failure in tool '${toolName}': ${err?.message || 'Unknown error'}`,
       };
     }
   }

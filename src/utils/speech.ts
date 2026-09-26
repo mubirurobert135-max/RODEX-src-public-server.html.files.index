@@ -7,6 +7,8 @@ export class SpeechSynthesizer {
   private voices: SpeechSynthesisVoice[] = [];
   private resumeTimer: NodeJS.Timeout | null = null;
   private _isPaused: boolean = false;
+  private activeQueue: SpeechSynthesisUtterance[] = [];
+  private queueIndex: number = 0;
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -20,12 +22,16 @@ export class SpeechSynthesizer {
 
   private loadVoices() {
     if (!this.synth) return;
-    this.voices = this.synth.getVoices();
+    const v = this.synth.getVoices();
+    if (v.length > 0) {
+      this.voices = v;
+    }
   }
 
   public getVoices(): SpeechSynthesisVoice[] {
-    if (this.voices.length === 0 && this.synth) {
-      this.voices = this.synth.getVoices();
+    if (this.synth) {
+      const v = this.synth.getVoices();
+      if (v.length > 0) this.voices = v;
     }
     return this.voices;
   }
@@ -42,6 +48,26 @@ export class SpeechSynthesizer {
         }
         // Prime synthesized web audio chime context
         getToneContext();
+      } catch (_) {}
+    }
+  }
+
+  public stop() {
+    if (this.resumeTimer) {
+      clearInterval(this.resumeTimer);
+      this.resumeTimer = null;
+    }
+    this._isPaused = false;
+    this.activeQueue = [];
+    this.queueIndex = 0;
+    this.currentUtterance = null;
+
+    if (this.synth) {
+      try {
+        this.synth.cancel();
+        if (this.synth.paused) {
+          this.synth.resume();
+        }
       } catch (_) {}
     }
   }
@@ -63,14 +89,16 @@ export class SpeechSynthesizer {
       return;
     }
 
-    // Stop any ongoing speech
+    // Stop any ongoing speech and clear prior queue
     this.stop();
 
     // Clean markdown, JSON formatting, XML, emojis, and symbols for natural spoken speech
     const cleanSpokenText = text
       .replace(/```[\s\S]*?```/g, 'Code snippet provided in text.')
       .replace(/`([^`]+)`/g, '$1')
-      .replace(/[*#_~>|]/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/[*#_~>|]/g, ' ')
       .replace(/<[^>]*>/g, '')
       .replace(/\bhttps?:\/\/\S+/gi, 'link')
       .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
@@ -82,109 +110,150 @@ export class SpeechSynthesizer {
       return;
     }
 
-    // Ensure speech synthesis is unpaused before dispatching
-    if (this.synth.paused) {
-      this.synth.resume();
-      this._isPaused = false;
-    }
+    // Split long text into natural sentence chunks to eliminate Chrome 14-second cut-off & stutter
+    const sentenceMatches = cleanSpokenText.match(/[^.!?\n]+[.!?\n]+/g) || [cleanSpokenText];
+    const chunks: string[] = [];
 
-    const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
-    this.currentUtterance = utterance;
-    this._isPaused = false;
-
-    // Prevent Chrome garbage collection bug that silences ongoing speech
-    if (typeof window !== 'undefined') {
-      (window as any).__rodexActiveUtterances = (window as any).__rodexActiveUtterances || [];
-      (window as any).__rodexActiveUtterances.push(utterance);
-      if ((window as any).__rodexActiveUtterances.length > 10) {
-        (window as any).__rodexActiveUtterances.shift();
+    for (const sentence of sentenceMatches) {
+      const trimmed = sentence.trim();
+      if (!trimmed) continue;
+      // Sub-split unusually long sentences (> 200 chars) by clause punctuation
+      if (trimmed.length > 200) {
+        const clauses = trimmed.split(/(?<=[,;:])\s+/);
+        chunks.push(...clauses.map((c) => c.trim()).filter(Boolean));
+      } else {
+        chunks.push(trimmed);
       }
     }
 
-    // Pick best voice
+    if (chunks.length === 0) {
+      chunks.push(cleanSpokenText);
+    }
+
+    // Select optimal voice
     const voices = this.getVoices();
+    let selectedVoice: SpeechSynthesisVoice | null = null;
+
     if (options.voiceURI) {
-      const selected = voices.find(
-        (v) => v.voiceURI === options.voiceURI || v.name === options.voiceURI
-      );
-      if (selected) utterance.voice = selected;
-    } else {
-      // Find high quality English voice (Google US English, Samantha, Natural, etc.)
-      const preferred = voices.find(
-        (v) =>
-          v.lang.startsWith('en') &&
-          (v.name.includes('Google') ||
-            v.name.includes('Natural') ||
-            v.name.includes('Samantha') ||
-            v.name.includes('Daniel') ||
-            v.name.includes('Alex') ||
-            v.name.includes('Zira'))
-      );
-      if (preferred) utterance.voice = preferred;
+      selectedVoice =
+        voices.find((v) => v.voiceURI === options.voiceURI || v.name === options.voiceURI) ||
+        null;
     }
 
-    utterance.rate = options.rate ?? 1.0;
-    utterance.pitch = options.pitch ?? 1.0;
-    utterance.volume = options.volume ?? 1.0;
+    if (!selectedVoice) {
+      selectedVoice =
+        voices.find(
+          (v) =>
+            v.lang.startsWith('en') &&
+            (v.name.includes('Google') ||
+              v.name.includes('Natural') ||
+              v.name.includes('Samantha') ||
+              v.name.includes('Daniel') ||
+              v.name.includes('Alex') ||
+              v.name.includes('Zira'))
+        ) || null;
+    }
 
-    let hasStarted = false;
-    utterance.onstart = () => {
-      hasStarted = true;
-      this._isPaused = false;
-      options.onStart?.();
-    };
+    let hasTriggeredStart = false;
 
-    const cleanup = () => {
-      if (this.resumeTimer) {
-        clearInterval(this.resumeTimer);
-        this.resumeTimer = null;
+    // Build utterance queue
+    this.activeQueue = chunks.map((chunk) => {
+      const utt = new SpeechSynthesisUtterance(chunk);
+      if (selectedVoice) utt.voice = selectedVoice;
+      utt.rate = options.rate ?? 1.0;
+      utt.pitch = options.pitch ?? 1.0;
+      utt.volume = options.volume ?? 1.0;
+      return utt;
+    });
+
+    this.queueIndex = 0;
+
+    // Prevent GC in Chromium engines
+    if (typeof window !== 'undefined') {
+      (window as any).__rodexActiveUtterances = this.activeQueue;
+    }
+
+    const speakNextChunk = () => {
+      if (!this.synth || this.queueIndex >= this.activeQueue.length) {
+        this.stop();
+        options.onEnd?.();
+        return;
       }
-      this.currentUtterance = null;
-      this._isPaused = false;
+
+      const current = this.activeQueue[this.queueIndex];
+      this.currentUtterance = current;
+
+      current.onstart = () => {
+        this._isPaused = false;
+        if (!hasTriggeredStart) {
+          hasTriggeredStart = true;
+          options.onStart?.();
+        }
+      };
+
+      current.onend = () => {
+        this.queueIndex++;
+        if (this.queueIndex < this.activeQueue.length) {
+          speakNextChunk();
+        } else {
+          this.stop();
+          options.onEnd?.();
+        }
+      };
+
+      current.onerror = (e: any) => {
+        if (e?.error === 'interrupted' || e?.error === 'canceled') {
+          this.stop();
+          options.onEnd?.();
+          return;
+        }
+        console.warn('[RODEX TTS Chunk Error]', e);
+        this.queueIndex++;
+        if (this.queueIndex < this.activeQueue.length) {
+          speakNextChunk();
+        } else {
+          this.stop();
+          options.onError?.(e);
+          options.onEnd?.();
+        }
+      };
+
+      try {
+        if (this.synth.paused) {
+          this.synth.resume();
+        }
+        this.synth.speak(current);
+      } catch (e) {
+        console.error('[RODEX Speech Chunk Exception]', e);
+        this.stop();
+        options.onEnd?.();
+      }
     };
 
-    utterance.onend = () => {
-      cleanup();
-      options.onEnd?.();
-    };
-
-    utterance.onerror = (e) => {
-      console.warn('[RODEX TTS Error]', e);
-      cleanup();
-      options.onError?.(e);
-      options.onEnd?.();
-    };
-
-    // Watchdog interval for Chrome's 14-second long-utterance pause bug
+    // Watchdog timer to automatically resume synthesis if browser stalls
     this.resumeTimer = setInterval(() => {
-      if (this.synth && this.synth.speaking && !this._isPaused) {
-        this.synth.pause();
-        this.synth.resume();
-      } else if (!this.synth || !this.synth.speaking) {
+      if (this.synth) {
+        if (this.synth.paused) {
+          this.synth.resume();
+        }
+      } else {
         if (this.resumeTimer) {
           clearInterval(this.resumeTimer);
           this.resumeTimer = null;
         }
       }
-    }, 9000);
+    }, 3000);
 
-    try {
-      this.synth.speak(utterance);
-      if (this.synth.paused) {
-        this.synth.resume();
+    // Start speaking first chunk
+    speakNextChunk();
+
+    // Fallback if browser delays onstart event
+    setTimeout(() => {
+      if (!hasTriggeredStart && this.currentUtterance) {
+        hasTriggeredStart = true;
+        options.onStart?.();
       }
-      // If browser doesn't trigger onstart within 600ms, trigger safely
-      setTimeout(() => {
-        if (!hasStarted && this.currentUtterance === utterance) {
-          hasStarted = true;
-          options.onStart?.();
-        }
-      }, 600);
-    } catch (e) {
-      console.error('[RODEX Speech error]', e);
-      cleanup();
-      options.onEnd?.();
-    }
+    }, 500);
   }
 
   public pause() {
@@ -203,20 +272,6 @@ export class SpeechSynthesizer {
 
   public isPaused(): boolean {
     return Boolean(this._isPaused || (this.synth && this.synth.paused));
-  }
-
-  public stop() {
-    if (this.resumeTimer) {
-      clearInterval(this.resumeTimer);
-      this.resumeTimer = null;
-    }
-    this._isPaused = false;
-    if (this.synth) {
-      try {
-        this.synth.cancel();
-      } catch (_) {}
-      this.currentUtterance = null;
-    }
   }
 
   public isSpeaking(): boolean {

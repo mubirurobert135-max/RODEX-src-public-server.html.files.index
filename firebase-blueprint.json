@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "UserProfile": {
+      "collection": "users",
+      "fields": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "User profile photo URL" },
+        "lastActive": { "type": "string", "description": "ISO timestamp of last activity" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" }
+      }
+    },
+    "UserCreation": {
+      "collection": "users/{userId}/creations",
+      "fields": {
+        "id": { "type": "string", "description": "Creation ID" },
+        "type": { "type": "string", "description": "'video' | 'image' | 'edited_image'" },
+        "prompt": { "type": "string", "description": "Generation prompt" },
+        "mediaUrl": { "type": "string", "description": "URL or base64 data of media" },
+        "aspectRatio": { "type": "string", "description": "'16:9' | '9:16' | '1:1'" },
+        "model": { "type": "string", "description": "Model used (veo-3.1-fast-generate-preview, gemini-3.1-flash-image-preview, etc.)" },
+        "createdAt": { "type": "string", "description": "Timestamp" }
+      }
+    },
+    "UserMemory": {
+      "collection": "users/{userId}/memories",
+      "fields": {
+        "id": { "type": "string", "description": "Memory ID" },
+        "key": { "type": "string", "description": "Memory topic or key" },
+        "value": { "type": "string", "description": "Content of memory" },
+        "category": { "type": "string", "description": "Category (preference, project, fact, person)" },
+        "updatedAt": { "type": "string", "description": "Timestamp" }
+      }
+    }
+  }
+}

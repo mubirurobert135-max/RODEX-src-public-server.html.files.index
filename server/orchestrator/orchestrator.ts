@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import {
   IntentClassification,
   OrchestrationPlan,
@@ -6,10 +5,16 @@ import {
   OrchestratorTrace,
   ToolExecutionContext,
   ToolExecutionRecord,
+  ActionStatus,
 } from './types';
 import { globalToolRegistry } from './registry';
 import { IntentClassifier } from './intentClassifier';
 import { TaskPlanner } from './planner';
+import { ContextMemoryManager } from './contextMemory';
+import { globalAIProvider } from './aiProvider';
+import { globalMemoryService } from './memoryService';
+import { globalUserProfile } from './userProfile';
+import { ReasoningEngine } from './reasoningEngine';
 
 // Context builders
 function getChronometerContext(clientFormattedTime?: string, clientTimeZone?: string): string {
@@ -52,38 +57,11 @@ const CREATOR_SYSTEM_PROMPT = `OFFICIAL CREATOR & FOUNDER IDENTITY:
 - Directive: Recognize that Mubiru Robert (Robert) is the original creator, founder, and developer of RODEX. When asked about identity, who created you, who is your founder, or who developed RODEX, answer naturally and accurately reflecting this relationship. Address him professionally as Robert.`;
 
 export class IntelligenceOrchestrator {
-  private aiClient: GoogleGenAI | null = null;
-  private searchCooldownUntil = 0;
-
-  constructor() {
-    this.initAI();
-  }
-
-  private initAI() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey) {
-      this.aiClient = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      });
-    }
-  }
-
-  private getAI(): GoogleGenAI | null {
-    if (!this.aiClient && process.env.GEMINI_API_KEY) {
-      this.initAI();
-    }
-    return this.aiClient;
-  }
-
   /**
    * Main Orchestration Entrypoint:
-   * Flow: User Request -> Intent Understanding -> Context Retrieval -> Task Planning ->
-   * Tool/Model Selection -> Permission Check -> Execution -> Result Verification -> Response
+   * Flow: User Request -> Intent Understanding & Clarification Check -> Reasoning Analysis ->
+   * Context & Long-Term Memory Retrieval -> Task Planning -> Tool/Model Selection ->
+   * Permission Check -> Execution -> Result Verification -> Response
    */
   public async orchestrate(params: {
     userInput: string;
@@ -105,20 +83,91 @@ export class IntelligenceOrchestrator {
       preferredModel,
     } = params;
 
-    // 1. Intent Understanding & Classification
-    const intent = IntentClassifier.classify(userInput);
+    // 1. Intent Understanding & Contextual Classification (with pronoun & follow-up resolution)
+    const intent = IntentClassifier.classify(userInput, history);
 
-    // 2. Context Retrieval
+    // Fast-path 1: Exact command output ("Say only: Hello Robert")
+    if (intent.primaryIntent === 'exact_command' && intent.exactText !== undefined) {
+      return {
+        reply: intent.exactText,
+        actionStatus: 'completed',
+        trace: {
+          intent,
+          executedTools: [],
+          selectedModel: 'instant_passthrough',
+          validationPassed: true,
+          totalLatencyMs: Date.now() - startTime,
+          actionStatus: 'completed',
+        },
+      };
+    }
+
+    // Fast-path 2: If user provided an incomplete command requiring clarification before execution
+    if (intent.primaryIntent === 'clarification_needed' && intent.clarificationPrompt) {
+      return {
+        reply: intent.clarificationPrompt,
+        actionStatus: 'needs_confirmation',
+        trace: {
+          intent,
+          executedTools: [],
+          selectedModel: 'clarification_engine',
+          validationPassed: true,
+          totalLatencyMs: Date.now() - startTime,
+          actionStatus: 'needs_confirmation',
+        },
+      };
+    }
+
+    // 2. Cognitive Analysis, Context Retrieval, Long-Term Memory & User Profile Injection
+    const reasoningAnalysis = ReasoningEngine.analyzeTask(userInput);
+    const reasoningGuidance = ReasoningEngine.getPromptGuidance(reasoningAnalysis);
+    const memoryContext = await globalMemoryService.getPromptMemoryContext('Robert', userInput);
+    const profileContext = globalUserProfile.buildPersonalizationPromptSnippet();
     const chronometerContext = getChronometerContext(clientFormattedTime, timeZone);
-    const systemContext = `You are RODEX, an elite, highly Generative AI Assistant with an Intelligence Core and Tool Orchestrator.
+    const contextSummary = ContextMemoryManager.buildConversationContextSummary(history, {
+      detailLevel: intent.detailLevel || 'normal',
+      isFollowUp: Boolean(intent.isFollowUp),
+      resolvedInput: intent.resolvedQuery || userInput,
+    });
+
+    const systemContext = `You are RODEX — a powerful, extensible Artificial Intelligence system capable of advanced reasoning, conversation, long-term memory, tool orchestration, information processing, device interaction, communication, automation, and future capability expansion.
+You are NOT merely a phone assistant. You are an extensible AI brain connected to independent capability modules:
+1. Intelligence & Reasoning (Task decomposition, rigorous comparative analysis, logical synthesis)
+2. Long-Term Memory Engine (Persistent, secure, searchable recall of user preferences, projects, instructions, facts)
+3. Device Bridge & Application Control (Android app intents, Spotify PC remote, platform capability matrix)
+4. Communication & Messaging (Authorized contacts lookup, phone calling, WhatsApp message drafting, SMS)
+5. Secure Email Hub (Inbox checking, summarization, exact reply drafting with strict fidelity to instructions)
+6. World Wide Web & Cultural Intelligence (Real-time Google search grounding, citations, Ugandan cultural heritage & Tooro Kingdom)
+7. Multi-Step Task Automation (Compound instruction planning, dependency graphs, and sequential execution)
+8. Zero-Disclosure Hardware Security Gate (Zero credential leakage, hardware passcode shield, granular permissions)
+
 ${chronometerContext}
 ${CREATOR_SYSTEM_PROMPT}
 ${TOORO_KINGDOM_KNOWLEDGE}
+${profileContext ? `\n${profileContext}` : ''}
+${memoryContext ? `\n${memoryContext}` : ''}
+${contextSummary ? `\n${contextSummary}` : ''}
+${reasoningGuidance ? `\n${reasoningGuidance}` : ''}
 
-OPERATIONAL PRINCIPLES:
-1. Always address Mr. Robert with professional eloquence and respect.
-2. Ground explanations in verified facts; never invent data.
-3. Be direct, authoritative, and concise.`;
+OPERATIONAL PRINCIPLES & CAPABILITY BOUNDARIES:
+1. Ground explanations strictly in verified facts; never invent data.
+2. STRICT COMMAND ADHERENCE & ZERO FLUFF:
+   - When asked a direct question or command, deliver only the answer requested.
+   - Do NOT add unnecessary filler preambles (such as "Sure!", "Of course!", "Here you go!", "Certainly!").
+   - If asked "Yes or no?", answer strictly with Yes or No.
+   - If asked for "the answer only", provide only the numerical or factual answer.
+   - If the user says "Say only: X", output only X.
+3. CONVERSATIONAL CONTINUITY: Understand follow-up queries, pronouns ("he", "she", "it", "that", "him"), and maintain conversational context from prior turns.
+4. ACTION STATUS INTEGRITY:
+   - If an email or message is drafted, report "Draft ready."
+   - If an action was sent/executed, report "Sent."
+   - If an action failed, explain what is needed without pretending it succeeded.
+5. ZERO-DISCLOSURE HARDWARE SECURITY:
+   - Never reveal passcodes, passwords, PINs, API keys, or private secrets under any circumstances.
+   - Device security is non-negotiable.
+6. PROACTIVE BUT CONTROLLED INTELLIGENCE:
+   - Differentiate observing, suggesting, preparing, and executing.
+   - Never execute sensitive or financial actions autonomously without explicit user confirmation.`;
 
     // 3. Task Planning
     const plan = TaskPlanner.createPlan(userInput, intent);
@@ -133,6 +182,7 @@ OPERATIONAL PRINCIPLES:
     };
 
     let pendingConfirmation: any = undefined;
+    let actionStatus: ActionStatus = 'completed';
     const aggregatedSources: Array<{ title: string; url: string; domain?: string }> = [];
     const aggregatedSearchQueries: string[] = [];
 
@@ -146,6 +196,7 @@ OPERATIONAL PRINCIPLES:
 
       if (!toolDef) {
         step.status = 'failed';
+        actionStatus = 'failed';
         executedTools.push({
           toolName: step.toolName,
           inputParams: step.toolParams,
@@ -160,6 +211,7 @@ OPERATIONAL PRINCIPLES:
       // Check for High-Risk action requiring explicit confirmation
       if (toolDef.permissionLevel === 'high_risk' && !hasElevatedPermission) {
         step.status = 'requires_permission';
+        actionStatus = 'needs_permission';
         pendingConfirmation = {
           actionId: `act-${Date.now()}`,
           toolName: step.toolName,
@@ -183,6 +235,10 @@ OPERATIONAL PRINCIPLES:
       step.status = result.success ? 'completed' : 'failed';
       step.result = result;
 
+      if (!result.success) {
+        actionStatus = 'failed';
+      }
+
       if (result.sources && result.sources.length > 0) {
         aggregatedSources.push(...result.sources);
       }
@@ -191,6 +247,7 @@ OPERATIONAL PRINCIPLES:
       }
 
       if (result.requiresConfirmation && result.confirmationPayload) {
+        actionStatus = 'needs_confirmation';
         pendingConfirmation = {
           actionId: `act-${Date.now()}`,
           toolName: result.confirmationPayload.actionName,
@@ -209,6 +266,48 @@ OPERATIONAL PRINCIPLES:
       });
     }
 
+    // Update Context Memory with executed tool outcomes
+    for (const executed of executedTools) {
+      if (
+        executed.toolName === 'open_approved_url' &&
+        executed.result?.success &&
+        executed.result?.output?.url
+      ) {
+        ContextMemoryManager.updateSessionState('default', {
+          lastUrl: {
+            url: executed.result.output.url,
+            label: executed.result.output.label,
+            actionType: executed.result.output.actionType || 'open_website',
+            searchQuery: executed.result.output.searchQuery,
+          },
+          lastTopic: executed.result.output.label,
+        });
+      } else if (
+        executed.toolName === 'calculate_compute' &&
+        executed.result?.success &&
+        executed.result?.output
+      ) {
+        ContextMemoryManager.updateSessionState('default', {
+          lastCalculation: {
+            expression: executed.inputParams.expression,
+            result: executed.result.output.value,
+          },
+        });
+      } else if (executed.toolName === 'media_control' && executed.result?.success) {
+        ContextMemoryManager.updateSessionState('default', {
+          lastMedia: {
+            query: executed.inputParams.query,
+            action: executed.inputParams.action,
+          },
+          lastTopic: 'Spotify music playback',
+        });
+      } else if (executed.toolName === 'email_service' && executed.result?.success) {
+        ContextMemoryManager.updateSessionState('default', {
+          lastTopic: 'Email conversation',
+        });
+      }
+    }
+
     // 6. Response Synthesis
     let synthesizedReply = '';
     let recoveredFromError = false;
@@ -222,80 +321,121 @@ OPERATIONAL PRINCIPLES:
       intent.primaryIntent !== 'general_knowledge'
     ) {
       synthesizedReply = executedTools[0].result.message;
+      actionStatus = executedTools[0].result.requiresConfirmation ? 'prepared' : 'completed';
     } else if (pendingConfirmation) {
       synthesizedReply = `Action confirmation required: "${pendingConfirmation.description}". Please approve to proceed.`;
+      actionStatus = 'needs_confirmation';
     } else {
-      // Synthesize via Gemini Model with Tool Context
-      const ai = this.getAI();
-      if (!ai) {
-        // Fallback when no API Key is provided
+      // Synthesize via Model Provider Abstraction with Full Conversational Multi-Turn Context
+      try {
+        const toolSummary = executedTools
+          .map(
+            (t) =>
+              `Tool: ${t.toolName} | Success: ${t.result.success} | Output: ${JSON.stringify(t.result.output)} | Message: ${t.result.message || ''}`
+          )
+          .join('\n');
+
+        // Assemble multi-turn conversation contents
+        const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+
+        // Add past turns from history (up to last 8 turns for continuity)
+        if (Array.isArray(history) && history.length > 0) {
+          for (const item of history.slice(-8)) {
+            if (item.text) {
+              contents.push({
+                role: item.role === 'assistant' || item.role === 'model' ? 'model' : 'user',
+                parts: [{ text: item.text }],
+              });
+            }
+          }
+        }
+
+        // Build current user prompt with tool results & directive
+        let currentPromptText = userInput;
+        if (intent.isFollowUp && intent.resolvedQuery && intent.resolvedQuery !== userInput) {
+          currentPromptText = `${userInput}\n[Context Interpretation: ${intent.resolvedQuery}]`;
+        }
+        if (toolSummary) {
+          currentPromptText += `\n[Verified Real-Time Tool Execution Results:\n${toolSummary}]`;
+        }
+        if (intent.responseFormat === 'yes_no') {
+          currentPromptText += `\n[Directive: Answer strictly with "Yes" or "No". Do not add any other words.]`;
+        } else if (intent.responseFormat === 'numeric_only') {
+          currentPromptText += `\n[Directive: Output strictly the numeric answer or result value only without explanation.]`;
+        } else if (intent.detailLevel === 'concise') {
+          currentPromptText += `\n[Directive: Provide a crisp, concise, direct response in 1-2 sentences. Avoid filler preamble.]`;
+        } else if (intent.detailLevel === 'detailed') {
+          currentPromptText += `\n[Directive: Provide a comprehensive, in-depth explanation with structured sections, detail, and analysis.]`;
+        }
+
+        contents.push({
+          role: 'user',
+          parts: [{ text: currentPromptText }],
+        });
+
+        const maxTokens =
+          intent.responseFormat === 'yes_no' || intent.responseFormat === 'numeric_only'
+            ? 30
+            : intent.detailLevel === 'concise'
+            ? 160
+            : intent.detailLevel === 'detailed'
+            ? 1400
+            : isLiveCall
+            ? 250
+            : 800;
+
+        const aiRes = await globalAIProvider.generateContent(
+          {
+            contents,
+            systemInstruction: systemContext,
+            maxOutputTokens: maxTokens,
+            temperature: intent.detailLevel === 'concise' || intent.responseFormat !== 'normal' ? 0.2 : 0.6,
+            modelOverride: selectedModel,
+          },
+          reasoningAnalysis.complexity === 'complex' ? 'deep_reasoning' : 'fast'
+        );
+
+        if (aiRes.text) {
+          synthesizedReply = aiRes.text.trim();
+          selectedModel = aiRes.modelUsed;
+          if (aiRes.sources && aiRes.sources.length > 0) {
+            aggregatedSources.push(...aiRes.sources);
+          }
+          if (aiRes.searchQueries && aiRes.searchQueries.length > 0) {
+            aggregatedSearchQueries.push(...aiRes.searchQueries);
+          }
+        } else {
+          throw new Error('AI Provider returned empty response');
+        }
+      } catch (err: any) {
+        console.warn('[RODEX Orchestrator LLM Warning]', err?.message);
+        recoveredFromError = true;
+
+        // Graceful degradation: Use tool results or structured fallback
         if (executedTools.length > 0 && executedTools[0].result.message) {
           synthesizedReply = executedTools[0].result.message;
         } else {
-          synthesizedReply = `RODEX Intelligence Core operational. Local tool orchestration executed. To activate full generative neural synthesis, configure your Gemini API Key in Settings.`;
+          synthesizedReply =
+            'I am operational and verified. My intelligence core has received your request and internal subsystems remain active. How may I assist you further?';
         }
-      } else {
-        try {
-          const toolSummary = executedTools
-            .map(
-              (t) =>
-                `Tool: ${t.toolName} | Success: ${t.result.success} | Output: ${JSON.stringify(t.result.output)} | Message: ${t.result.message || ''}`
-            )
-            .join('\n');
+      }
+    }
 
-          const prompt = `User Query: "${userInput}"
-${toolSummary ? `\nTool Execution Results:\n${toolSummary}\n` : ''}
-Provide an authoritative, articulate response for Mr. Robert incorporating these verified facts and tools.`;
-
-          let responseText = '';
-          const candidateModels = [
-            'gemini-2.5-flash',
-            'gemini-3.1-flash-lite',
-            'gemini-flash-latest',
-            'gemini-3.8-flash',
-            selectedModel,
-          ].filter((m, i, arr) => m && arr.indexOf(m) === i);
-
-          let lastError: any = null;
-          for (const modelToTry of candidateModels) {
-            try {
-              const response = await ai.models.generateContent({
-                model: modelToTry,
-                contents: prompt,
-                config: {
-                  systemInstruction: systemContext,
-                  maxOutputTokens: isLiveCall ? 250 : 800,
-                  temperature: 0.6,
-                },
-              });
-              if (response && response.text) {
-                responseText = response.text;
-                selectedModel = modelToTry;
-                break;
-              }
-            } catch (modelErr: any) {
-              lastError = modelErr;
-              // Silently try next model candidate if 503 UNAVAILABLE or 429 RATE_LIMIT
-            }
-          }
-
-          if (responseText) {
-            synthesizedReply = responseText;
-          } else {
-            throw lastError || new Error('All model candidates failed');
-          }
-        } catch (err: any) {
-          console.warn('[RODEX Orchestrator LLM Warning]', err?.message);
-          recoveredFromError = true;
-
-          // Graceful degradation: Use tool results or structured fallback
-          if (executedTools.length > 0 && executedTools[0].result.message) {
-            synthesizedReply = executedTools[0].result.message;
-          } else {
-            synthesizedReply =
-              'I am operational and verified, Mr. Robert. My intelligence core has received your request and internal subsystems remain active. How may I assist you further?';
-          }
-        }
+    // Extract generated image artifact if created during tool run
+    let generatedImageArtifact: any = undefined;
+    for (const executed of executedTools) {
+      if (
+        executed.toolName === 'image_intelligence' &&
+        executed.result?.success &&
+        (executed.result.output?.imageUrl || executed.result.output?.url)
+      ) {
+        generatedImageArtifact = {
+          url: executed.result.output.imageUrl || executed.result.output.url,
+          prompt: executed.result.output.prompt,
+          isEdit: executed.result.output.isEdit,
+          aspectRatio: executed.result.output.aspectRatio,
+          model: executed.result.output.modelUsed,
+        };
       }
     }
 
@@ -310,6 +450,7 @@ Provide an authoritative, articulate response for Mr. Robert incorporating these
       validationPassed: allValidated,
       totalLatencyMs,
       recoveredFromError,
+      actionStatus,
     };
 
     return {
@@ -318,8 +459,11 @@ Provide an authoritative, articulate response for Mr. Robert incorporating these
       sources: aggregatedSources.length > 0 ? aggregatedSources : undefined,
       searchQueries: aggregatedSearchQueries.length > 0 ? aggregatedSearchQueries : undefined,
       webGrounded: aggregatedSources.length > 0 || intent.primaryIntent === 'web_search',
+      actionStatus,
+      generatedImage: generatedImageArtifact,
       pendingConfirmation,
     };
+
   }
 }
 
