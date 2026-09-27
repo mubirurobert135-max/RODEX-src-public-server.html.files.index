@@ -32,6 +32,11 @@ import {
 import { globalPerformanceTracker } from "./server/services/performanceTracker";
 import { globalRodexDoctor } from "./server/doctor/doctorEngine";
 import { globalRealTimeEngine } from "./server/services/realTimeEngine";
+import { globalGmailAuth } from "./server/services/gmail/gmail.auth";
+import { globalGmailService } from "./server/services/gmail/gmail.service";
+import { authMiddleware, requireAuth } from "./server/services/auth/authMiddleware";
+import { globalAuthService } from "./server/services/auth/auth.service";
+import { SYSTEM_METADATA } from "./server/systemMetadata";
 
 dotenv.config();
 
@@ -237,27 +242,24 @@ async function generateWithModelFallback(
   } else if (params.performanceMode === 'ultra') {
     // Ultra-Fast Voice & Command Mode: prioritizing lightweight flash & flash-lite
     models = [
-      "gemini-2.5-flash",
+      "gemini-3.8-flash",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
-      "gemini-3.8-flash",
     ];
   } else if (params.performanceMode === 'deep_reasoning') {
     // Deep Reasoning mode
     models = [
-      "gemini-2.5-flash",
       "gemini-3.8-flash",
+      "gemini-3.1-pro-preview",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
-      "gemini-3.1-pro-preview",
     ];
   } else {
     // Default balanced fast-path
     models = [
-      "gemini-2.5-flash",
+      "gemini-3.8-flash",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
-      "gemini-3.8-flash",
     ];
   }
 
@@ -354,6 +356,110 @@ async function startServer() {
       }
     });
     next();
+  });
+
+  app.use(authMiddleware);
+
+  // --- MULTI-USER AUTHENTICATION & SESSION ENDPOINTS ---
+  app.post("/api/auth/register", (req, res) => {
+    try {
+      const { username, email, displayName, password, securityQuestion, securityAnswer, preferredName, timezone } = req.body || {};
+      const result = globalAuthService.registerUser({
+        username,
+        email,
+        displayName,
+        password,
+        securityQuestion,
+        securityAnswer,
+        preferredName,
+        timezone,
+      });
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(400).json({ error: err?.message || "Failed to register account" });
+    }
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    try {
+      const { identifier, password } = req.body || {};
+      const result = globalAuthService.loginUser(identifier, password);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(401).json({ error: err?.message || "Invalid credentials" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    try {
+      const token = req.sessionToken;
+      if (token) {
+        globalAuthService.logoutUser(token);
+      }
+      res.json({ success: true, message: "Logged out successfully." });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed to logout" });
+    }
+  });
+
+  app.get("/api/auth/me", (req, res) => {
+    if (req.user) {
+      res.json({ success: true, user: req.user, sessionToken: req.sessionToken });
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
+    }
+  });
+
+  app.put("/api/auth/profile", (req, res) => {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const updated = globalAuthService.updateUserProfile(req.userId, req.body || {});
+      res.json({ success: true, user: updated });
+    } catch (err: any) {
+      res.status(400).json({ error: err?.message || "Failed to update profile" });
+    }
+  });
+
+  app.put("/api/auth/voice-profile", (req, res) => {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const updated = globalAuthService.updateVoiceProfile(req.userId, req.body || {});
+      res.json({ success: true, user: updated });
+    } catch (err: any) {
+      res.status(400).json({ error: err?.message || "Failed to update voice settings" });
+    }
+  });
+
+  app.post("/api/auth/recover", (req, res) => {
+    try {
+      const { identifier, securityAnswer, newPassword } = req.body || {};
+      const result = globalAuthService.recoverPassword({
+        identifier,
+        securityAnswer,
+        newPassword,
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err?.message || "Password recovery failed" });
+    }
+  });
+
+  // Protected System Attribution & Architecture Metadata (Read-only, immune to modification)
+  app.get("/api/system/about", (_req, res) => {
+    res.json({
+      status: "ok",
+      system: SYSTEM_METADATA.system,
+      creatorAttribution: {
+        name: SYSTEM_METADATA.creator.name,
+        role: SYSTEM_METADATA.creator.role,
+        project: SYSTEM_METADATA.creator.project,
+        establishedYear: SYSTEM_METADATA.creator.establishedYear,
+      },
+    });
   });
 
   // Standardized Health & Readiness Endpoints
@@ -668,6 +774,13 @@ async function startServer() {
   // API Route: Central Intelligence Orchestrator
   app.post("/api/rodex/orchestrate", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      } else if (req.body?.gmailAccessToken) {
+        globalGmailAuth.setAccessToken(req.body.gmailAccessToken);
+      }
+
       const {
         message,
         history = [],
@@ -682,6 +795,10 @@ async function startServer() {
         return res.status(400).json({ error: "Message query is required for orchestration." });
       }
 
+      const userId = req.userId || req.user?.id || 'usr_robert_1001';
+      const userDisplayName = req.user?.displayName || 'Robert';
+      const userEmail = req.user?.email;
+
       const result = await globalOrchestrator.orchestrate({
         userInput: message,
         history,
@@ -690,6 +807,10 @@ async function startServer() {
         isLiveCall,
         hasElevatedPermission,
         preferredModel,
+        gmailAccessToken: globalGmailAuth.getAccessToken() || undefined,
+        userId,
+        userDisplayName,
+        userEmail,
       });
 
       return res.json({
@@ -708,6 +829,13 @@ async function startServer() {
   // API Route: Real-Time SSE Streaming Response Engine (Low-Latency Tokens & Early Speech Sentences)
   app.post("/api/rodex/stream", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      } else if (req.body?.gmailAccessToken) {
+        globalGmailAuth.setAccessToken(req.body.gmailAccessToken);
+      }
+
       const { message, history = [], clientFormattedTime, timeZone, isLiveCall = false } = req.body || {};
 
       if (!message) {
@@ -719,6 +847,10 @@ async function startServer() {
         abortController.abort();
       });
 
+      const userId = req.userId || req.user?.id || 'usr_robert_1001';
+      const userDisplayName = req.user?.displayName || 'Robert';
+      const userEmail = req.user?.email;
+
       await globalRealTimeEngine.handleStreamRequest(
         {
           userInput: message,
@@ -726,6 +858,9 @@ async function startServer() {
           clientFormattedTime,
           timeZone,
           isLiveCall,
+          userId,
+          userDisplayName,
+          userEmail,
         },
         res,
         abortController.signal
@@ -837,6 +972,119 @@ async function startServer() {
     }
   });
 
+  // --- GMAIL INTEGRATION API ROUTES ---
+  app.get("/api/gmail/status", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      }
+      const status = await globalGmailService.getGmailConnectionStatus();
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed checking Gmail status" });
+    }
+  });
+
+  app.post("/api/gmail/connect", async (req, res) => {
+    try {
+      const { accessToken, userEmail, userName } = req.body || {};
+      const token = accessToken || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+      if (!token) {
+        return res.status(400).json({ error: "Access token required to connect Gmail." });
+      }
+      globalGmailAuth.setAccessToken(token, { email: userEmail, name: userName });
+      const status = await globalGmailService.getGmailConnectionStatus();
+      res.json({ success: true, status });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed connecting Gmail" });
+    }
+  });
+
+  app.post("/api/gmail/disconnect", (_req, res) => {
+    globalGmailService.disconnectGmail();
+    res.json({ success: true, message: "Gmail disconnected successfully." });
+  });
+
+  app.post("/api/gmail/check", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      } else if (req.body?.accessToken) {
+        globalGmailAuth.setAccessToken(req.body.accessToken);
+      }
+      const result = await globalGmailService.checkNewEmails(req.body);
+      res.json({ success: true, result });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed checking new emails" });
+    }
+  });
+
+  app.get("/api/gmail/messages", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      }
+      const maxResults = req.query.maxResults ? parseInt(req.query.maxResults as string, 10) : 10;
+      const query = req.query.q as string | undefined;
+      const emails = await globalGmailService.listEmails({ maxResults, query });
+      res.json({ success: true, count: emails.length, emails });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed listing messages" });
+    }
+  });
+
+  app.get("/api/gmail/messages/:id", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      }
+      const email = await globalGmailService.getEmail(req.params.id);
+      res.json({ success: true, email });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed fetching message" });
+    }
+  });
+
+  app.post("/api/gmail/draft-reply", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      } else if (req.body?.accessToken) {
+        globalGmailAuth.setAccessToken(req.body.accessToken);
+      }
+      const draft = await globalGmailService.draftReply(req.body);
+      res.json({ success: true, draft });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed creating draft reply" });
+    }
+  });
+
+  app.post("/api/gmail/send", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        globalGmailAuth.setAccessToken(authHeader.slice(7));
+      } else if (req.body?.accessToken) {
+        globalGmailAuth.setAccessToken(req.body.accessToken);
+      }
+      const { recipient, subject, body, emailId, replyContent } = req.body;
+      let result;
+      if (replyContent) {
+        result = await globalGmailService.sendReply({ emailId, replyContent, explicitConfirmation: true });
+      } else {
+        result = await globalGmailService.sendEmail({ recipient, subject, body, explicitConfirmation: true });
+      }
+      res.json({ success: true, result });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Failed sending email" });
+    }
+  });
+
   // API Route: Action Journal query
   app.get("/api/rodex/action/journal", (_req, res) => {
     res.json({
@@ -865,6 +1113,10 @@ async function startServer() {
     res.setHeader("Connection", "keep-alive");
 
     try {
+      const userId = req.userId || req.user?.id || 'usr_robert_1001';
+      const userDisplayName = req.user?.displayName || 'Robert';
+      const userEmail = req.user?.email;
+
       // 1. First run the orchestrator for intent classification and tool execution
       const orchRes = await globalOrchestrator.orchestrate({
         userInput: message,
@@ -873,6 +1125,9 @@ async function startServer() {
         timeZone,
         isLiveCall: Boolean(liveConversation),
         preferredModel: performanceMode === "deep_reasoning" ? "gemini-3.1-pro-preview" : undefined,
+        userId,
+        userDisplayName,
+        userEmail,
       });
 
       // Stream initial trace info
@@ -913,6 +1168,16 @@ async function startServer() {
   // API Route: Approve & Execute Pending Elevated Action
   app.post("/api/rodex/confirm-action", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization;
+      let token: string | undefined;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.slice(7);
+        globalGmailAuth.setAccessToken(token);
+      } else if (req.body?.gmailAccessToken) {
+        token = req.body.gmailAccessToken;
+        globalGmailAuth.setAccessToken(token);
+      }
+
       const { toolName, params, actionId } = req.body;
       if (!toolName) {
         return res.status(400).json({ error: "toolName is required." });
@@ -921,6 +1186,7 @@ async function startServer() {
       const result = await globalToolRegistry.executeTool(toolName, params, {
         userName: "Robert",
         hasElevatedPermission: true,
+        gmailAccessToken: token || globalGmailAuth.getAccessToken() || undefined,
       });
 
       return res.json({
@@ -943,7 +1209,8 @@ async function startServer() {
     try {
       const searchTerm = req.query.q as string | undefined;
       const category = req.query.category as any;
-      const memories = await globalMemoryService.search("Robert", {
+      const targetUserId = req.userId || req.user?.id || "usr_robert_1001";
+      const memories = await globalMemoryService.search(targetUserId, {
         searchTerm,
         category,
         limit: 50,
@@ -966,8 +1233,9 @@ async function startServer() {
         return res.status(400).json({ error: "key and value are required to save a memory." });
       }
 
+      const targetUserId = req.userId || req.user?.id || "usr_robert_1001";
       const saved = await globalMemoryService.save({
-        userId: "Robert",
+        userId: targetUserId,
         key,
         value,
         category: category || "fact",
@@ -985,7 +1253,8 @@ async function startServer() {
   app.delete("/api/rodex/memory/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const deleted = await globalMemoryService.delete(id);
+      const targetUserId = req.userId || req.user?.id;
+      const deleted = await globalMemoryService.delete(id, targetUserId);
       res.json({ status: "ok", deleted, memoryId: id });
     } catch (err: any) {
       res.status(500).json({ error: err?.message || "Failed deleting memory" });
@@ -2014,39 +2283,6 @@ Content: "${content}"`;
       updateSystemState.autoApplyLowRisk = Boolean(autoApplyLowRisk);
     }
     res.json({ success: true, updateSystemState });
-  });
-
-  // Creator Identity & Authorization System
-  let creatorProfileState = {
-    fullName: 'Mubiru Robert',
-    preferredName: 'Robert',
-    roles: ['Creator', 'Founder', 'Developer'],
-    project: 'RODEX AI',
-    relationship: 'Original creator and developer of RODEX',
-    recognitionStatus: 'Verified (Secure Server Token)',
-    authenticationStatus: 'Authenticated Creator',
-    permissions: [
-      'Core Architecture Modification',
-      'API Key & Secret Configuration',
-      'Security Settings Governance',
-      'Automated & Manual Deployment',
-      'Creator Privilege Management'
-    ],
-    memoryStatus: 'Protected Persistent Core Storage'
-  };
-
-  app.get("/api/creator/profile", (_req, res) => {
-    res.json(creatorProfileState);
-  });
-
-  app.post("/api/creator/profile", async (req, res) => {
-    const { preferredName, roles } = req.body;
-    if (preferredName) creatorProfileState.preferredName = preferredName;
-    if (roles && Array.isArray(roles)) creatorProfileState.roles = roles;
-    
-    // Audit log
-    console.log(`[RODEX Security Audit] Creator profile updated by authenticated session for ${creatorProfileState.fullName}`);
-    res.json({ success: true, creatorProfileState });
   });
 
   // RODEX Multi-Capability Subsystem & Module Endpoints

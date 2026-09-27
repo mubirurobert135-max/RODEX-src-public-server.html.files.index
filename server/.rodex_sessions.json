@@ -1,0 +1,79 @@
+[
+  {
+    "token": "session_robert_default_initial_key",
+    "userId": "usr_robert_1001",
+    "createdAt": "2026-09-27T10:02:48.279Z",
+    "expiresAt": "2027-09-27T10:02:48.280Z",
+    "lastActive": "2026-09-27T10:02:48.279Z"
+  },
+  {
+    "token": "session_36e94728ec96a8db1d794ce428118d447b24612b902d6fe65e81075bc1eee04e",
+    "userId": "usr_1790503368438_0439c1ac",
+    "createdAt": "2026-09-27T10:02:48.438Z",
+    "expiresAt": "2026-10-27T10:02:48.438Z",
+    "lastActive": "2026-09-27T10:02:48.438Z"
+  },
+  {
+    "token": "session_6d1106ff1ab479ef5b057e1137f78520f11101be0b0da0bdf3841687cbe1ae36",
+    "userId": "usr_1790503368443_07794f30",
+    "createdAt": "2026-09-27T10:02:48.443Z",
+    "expiresAt": "2026-10-27T10:02:48.443Z",
+    "lastActive": "2026-09-27T10:02:48.443Z"
+  },
+  {
+    "token": "session_7203b480d6e44cea0efa1201c4ec5b2d27df6be79d507ba7b13c5720152e25f0",
+    "userId": "usr_1790503456078_62f73c0c",
+    "createdAt": "2026-09-27T10:04:16.078Z",
+    "expiresAt": "2026-10-27T10:04:16.078Z",
+    "lastActive": "2026-09-27T10:04:16.078Z"
+  },
+  {
+    "token": "session_a2b25ae346e0a2614ee5f296f4d983f89d0f0a62ec0107f452df4be012b5f6af",
+    "userId": "usr_1790503456082_50dbd3fe",
+    "createdAt": "2026-09-27T10:04:16.082Z",
+    "expiresAt": "2026-10-27T10:04:16.083Z",
+    "lastActive": "2026-09-27T10:04:16.082Z"
+  },
+  {
+    "token": "session_3763432bf70b2ec8b04803eadf53576a78d3ab79e733382970551d394db43873",
+    "userId": "usr_1790503976349_3c040cda",
+    "createdAt": "2026-09-27T10:12:56.349Z",
+    "expiresAt": "2026-10-27T10:12:56.350Z",
+    "lastActive": "2026-09-27T10:12:56.349Z"
+  },
+  {
+    "token": "session_21f11ef4ad7a4581c0e95cd0370c50e603d27ac3a79b80e3e6991bd11ca7b310",
+    "userId": "usr_1790503976354_8732f26d",
+    "createdAt": "2026-09-27T10:12:56.354Z",
+    "expiresAt": "2026-10-27T10:12:56.354Z",
+    "lastActive": "2026-09-27T10:12:56.354Z"
+  },
+  {
+    "token": "session_16e1ebce68e99634f77b37349f83c49abf95ade6de25a6e90a53f42643a0fad8",
+    "userId": "usr_1790507478331_9d9149a7",
+    "createdAt": "2026-09-27T11:11:18.331Z",
+    "expiresAt": "2026-10-27T11:11:18.332Z",
+    "lastActive": "2026-09-27T11:11:18.331Z"
+  },
+  {
+    "token": "session_8f466d3ead83749381e86b3659f47360c88309dd085ad129543e828bfee4e21c",
+    "userId": "usr_1790507478336_e981025f",
+    "createdAt": "2026-09-27T11:11:18.336Z",
+    "expiresAt": "2026-10-27T11:11:18.336Z",
+    "lastActive": "2026-09-27T11:11:18.336Z"
+  },
+  {
+    "token": "session_cd93e2857b2fd644c5322c2d5a3d826e9ea90816532a7a19b8afb157f6839c1d",
+    "userId": "usr_1790507908853_5a02c1ac",
+    "createdAt": "2026-09-27T11:18:28.853Z",
+    "expiresAt": "2026-10-27T11:18:28.853Z",
+    "lastActive": "2026-09-27T11:18:28.853Z"
+  },
+  {
+    "token": "session_47076e9098ed4d2b8752168594e07a44cdd0e3fd9672dfd9615de1624e3b5500",
+    "userId": "usr_1790507908858_c1151387",
+    "createdAt": "2026-09-27T11:18:28.858Z",
+    "expiresAt": "2026-10-27T11:18:28.858Z",
+    "lastActive": "2026-09-27T11:18:28.858Z"
+  }
+]

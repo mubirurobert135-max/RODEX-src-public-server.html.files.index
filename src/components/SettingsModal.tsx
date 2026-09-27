@@ -37,6 +37,7 @@ interface SettingsModalProps {
   onOpenSpotify?: () => void;
   onOpenWebVerify?: () => void;
   onOpenMemory?: () => void;
+  onOpenGmail?: () => void;
   onSelectMode?: (mode: AppMode) => void;
 }
 
@@ -53,6 +54,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenSpotify,
   onOpenWebVerify,
   onOpenMemory,
+  onOpenGmail,
   onSelectMode,
 }) => {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -629,15 +631,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="flex items-center gap-2.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
                     <div>
-                      <div className="text-xs text-neutral-200 font-medium">Secure Email Messaging</div>
+                      <div className="text-xs text-neutral-200 font-medium">Official Gmail Integration</div>
                       <div className="text-[10px] text-neutral-500">
-                        Reads summaries, drafts replies; sending requires explicit confirmation
+                        OAuth 2.0 authorized: read emails, draft replies, check unread mail
                       </div>
                     </div>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 font-mono">
-                    Protected
-                  </span>
+                  {onOpenGmail ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenGmail();
+                      }}
+                      className="text-[10px] px-2.5 py-1 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 font-medium cursor-pointer transition-all active:scale-95"
+                    >
+                      Open Hub
+                    </button>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 font-mono">
+                      Protected
+                    </span>
+                  )}
                 </div>
 
                 {/* Hardware Security Guard */}

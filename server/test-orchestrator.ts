@@ -391,7 +391,7 @@ async function runTests() {
   assert(profileSnippet.includes('USER PERSONALIZATION PROFILE'), 'Builds personalization prompt snippet');
 
   const fastTiers = globalAIProvider.getModelTiers('fast');
-  assert(fastTiers.includes('gemini-2.5-flash'), 'Fast tier includes gemini-2.5-flash');
+  assert(fastTiers.includes('gemini-3.8-flash'), 'Fast tier includes gemini-3.8-flash');
 
   const reasoningTiers = globalAIProvider.getModelTiers('deep_reasoning');
   assert(reasoningTiers.includes('gemini-3.1-pro-preview'), 'Deep reasoning tier includes gemini-3.1-pro-preview');

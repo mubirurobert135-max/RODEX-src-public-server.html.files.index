@@ -21,6 +21,13 @@ import {
   Radio,
   Music2,
   Brain,
+  Shield,
+  Mail,
+  Stethoscope,
+  RefreshCw,
+  User,
+  Settings,
+  Mic,
 } from 'lucide-react';
 import { AppMode } from '../types';
 import {
@@ -39,6 +46,13 @@ interface ModesModalProps {
   onOpenMemory?: () => void;
   onOpenCapabilities?: () => void;
   onOpenMediaStudio?: (tab: 'video' | 'image' | 'maps' | 'search' | 'gallery') => void;
+  onOpenSecurity?: () => void;
+  onOpenGmail?: () => void;
+  onOpenDoctor?: () => void;
+  onOpenUpdate?: () => void;
+  onOpenUserProfile?: () => void;
+  onOpenSettings?: () => void;
+  onOpenVoiceProfile?: () => void;
 }
 
 export const ModesModal: React.FC<ModesModalProps> = ({
@@ -50,6 +64,13 @@ export const ModesModal: React.FC<ModesModalProps> = ({
   onOpenMemory,
   onOpenCapabilities,
   onOpenMediaStudio,
+  onOpenSecurity,
+  onOpenGmail,
+  onOpenDoctor,
+  onOpenUpdate,
+  onOpenUserProfile,
+  onOpenSettings,
+  onOpenVoiceProfile,
 }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imagePayload, setImagePayload] = useState<{ data: string; mimeType: string } | null>(null);
@@ -620,10 +641,202 @@ export const ModesModal: React.FC<ModesModalProps> = ({
             </div>
           )}
 
-          {/* MORE MODE: Android APK & Flutter Export + Spotify PC + Memory & Personalization */}
+          {/* MORE MODE: SYSTEM & PERSONAL NAVIGATION HUBS */}
           {mode === 'more' && (
-            <div className="space-y-4">
-              {/* RODEX Capability Hub & Multi-Domain System Quick Launch */}
+            <div className="space-y-6">
+              {/* SYSTEM CAPABILITIES SECTION */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-neutral-900 pb-2">
+                  <Cpu className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-xs font-bold tracking-wider text-cyan-400 uppercase">
+                    System Operations & Diagnostics
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Security Center */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenSecurity?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-amber-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-950/60 border border-amber-800/60 flex items-center justify-center text-amber-400">
+                        <Shield className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">Security</div>
+                        <div className="text-[10px] text-neutral-400">Audits & Permissions</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-amber-400 font-mono font-bold">Launch &rarr;</span>
+                  </button>
+
+                  {/* Email Integrations */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenGmail?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-red-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-red-950/60 border border-red-800/60 flex items-center justify-center text-red-400">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">Email Integrations</div>
+                        <div className="text-[10px] text-neutral-400">Gmail Sync & Drafts</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-red-400 font-mono font-bold">Launch &rarr;</span>
+                  </button>
+
+                  {/* RODEX Doctor */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenDoctor?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-emerald-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-950/60 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
+                        <Stethoscope className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">RODEX Doctor</div>
+                        <div className="text-[10px] text-neutral-400">Self-Healing Diagnostics</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-mono font-bold">Launch &rarr;</span>
+                  </button>
+
+                  {/* Autonomous Updates */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenUpdate?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-cyan-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-cyan-950/60 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+                        <RefreshCw className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">Autonomous Updates</div>
+                        <div className="text-[10px] text-neutral-400">Hot-Fix & Version Center</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-cyan-400 font-mono font-bold">Launch &rarr;</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* PERSONAL SECTION */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-neutral-900 pb-2">
+                  <User className="w-4 h-4 text-violet-400" />
+                  <h3 className="text-xs font-bold tracking-wider text-violet-400 uppercase">
+                    Personal & User Account
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* User Profile */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenUserProfile?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-violet-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-violet-950/60 border border-violet-800/60 flex items-center justify-center text-violet-400">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">User Account</div>
+                        <div className="text-[10px] text-neutral-400">Identity & Preferences</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-violet-400 font-mono font-bold">Open &rarr;</span>
+                  </button>
+
+                  {/* Settings */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenSettings?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-cyan-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-cyan-950/60 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+                        <Settings className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">Settings</div>
+                        <div className="text-[10px] text-neutral-400">Voice, Theme & Mic</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-cyan-400 font-mono font-bold">Open &rarr;</span>
+                  </button>
+
+                  {/* Long-Term Memory */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenMemory?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-purple-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-purple-950/60 border border-purple-800/60 flex items-center justify-center text-purple-400">
+                        <Brain className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">Long-Term Memory</div>
+                        <div className="text-[10px] text-neutral-400">Personal Memory Bank</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-purple-400 font-mono font-bold">Open &rarr;</span>
+                  </button>
+
+                  {/* Voice Profile */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenVoiceProfile?.();
+                    }}
+                    className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 hover:border-rose-500/50 flex items-center justify-between text-left transition-all active:scale-98"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-rose-950/60 border border-rose-800/60 flex items-center justify-center text-rose-400">
+                        <Mic className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-white">Voice Profile</div>
+                        <div className="text-[10px] text-neutral-400">Acoustic Calibration</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-rose-400 font-mono font-bold">Open &rarr;</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* RODEX Capability Hub Quick Launch */}
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-neutral-900 border border-indigo-800/70 flex items-center justify-between shadow-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-900/90 border border-indigo-700/80 flex items-center justify-center text-indigo-400 shrink-0">
@@ -650,36 +863,6 @@ export const ModesModal: React.FC<ModesModalProps> = ({
                   className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-black text-xs font-bold shrink-0 transition-all active:scale-95 shadow-md shadow-indigo-500/20"
                 >
                   Explore &rarr;
-                </button>
-              </div>
-
-              {/* Long-Term Memory & Personalization Quick Launch */}
-              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/80 to-neutral-900 border border-cyan-800/70 flex items-center justify-between shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-cyan-900/90 border border-cyan-700/80 flex items-center justify-center text-cyan-400 shrink-0">
-                    <Brain className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>Memory & Personalization</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">
-                        LONG-TERM CORE
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-400 mt-0.5">
-                      Review, add, and manage your long-term memories, facts, and AI preferences.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenMemory?.();
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold shrink-0 transition-all active:scale-95 shadow-md shadow-cyan-500/20"
-                >
-                  Manage &rarr;
                 </button>
               </div>
 

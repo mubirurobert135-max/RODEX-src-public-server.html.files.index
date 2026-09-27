@@ -82,7 +82,7 @@ export class SpeechSynthesizer {
       onStart?: () => void;
       onEnd?: () => void;
       onError?: (err: any) => void;
-    }
+    } = {}
   ) {
     if (!this.synth) {
       console.warn('[RODEX TTS] Web Speech API (window.speechSynthesis) is not supported or unavailable in this browser.');
@@ -444,26 +444,26 @@ export class AudioMeter {
   }
 }
 
-// Helpers for "Hey RODEX" wake-call & speaker identification
+// Helpers for "Hello/Hey/Hi/Okay RODEX" wake-call & speaker identification
 export function isHeyRodexCall(text: string): boolean {
   if (!text) return false;
   const clean = text.trim().toLowerCase().replace(/[.,!?;:]/g, '');
   return (
-    /^(hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hi\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hello\s+(rodex|roddex|rodix|roadex|rotex|rolex)|(rodex|roddex|rodix|roadex|rotex)|ok\s+(rodex|roddex|rodix|roadex|rotex|rolex)|call\s+hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|call\s+(rodex|roddex|rodix|roadex|rotex)|live\s+call(\s+(with\s+)?(rodex|wake\s+word))?|start\s+(a\s+)?(live\s+)?call(\s+with\s+rodex)?|voice\s+call|start\s+voice\s+call|hlo\s+(rodex|roddex|rodix|roadex|rotex|rolex)|yo\s+(rodex|roddex|rodix|roadex|rotex|rolex)|wake\s+up\s+(rodex|roddex|rodix|roadex|rotex)|wake\s+up|are\s+you\s+there(\s+rodex)?|can\s+you\s+hear\s+me(\s+rodex)?|talk\s+to\s+me(\s+rodex)?)$/i.test(
+    /^(hey\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|hi\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|hello\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex)|ok\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|okay\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|good\s+(morning|afternoon|evening)\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|call\s+hey\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|call\s+(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex)|live\s+call(\s+(with\s+)?(rodex|wake\s+word))?|start\s+(a\s+)?(live\s+)?call(\s+with\s+rodex)?|voice\s+call|start\s+voice\s+call|hlo\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|yo\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|wake\s+up\s+(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex)|wake\s+up|are\s+you\s+there(\s+rodex)?|can\s+you\s+hear\s+me(\s+rodex)?|talk\s+to\s+me(\s+rodex)?)$/i.test(
       clean
     )
   );
 }
 
-// Siri-style ambient hotword detector: checks if speech contains "Hey RODEX" or direct wake call
+// Ambient hotword detector: checks if speech contains "Hello RODEX", "Hey RODEX", "Hi RODEX", "RODEX", or "OK RODEX"
 export function containsHeyRodexWakeWord(text: string): boolean {
   if (!text) return false;
   const clean = text.trim().toLowerCase();
   return (
-    /\b(hey|hi|hello|ok|call\s+hey|call|live\s+call|start\s+call|hlo|yo)\s+(rodex|roddex|rodix|roadex|rotex|rolex)\b/i.test(clean) ||
-    /^(rodex|roddex|rodix|roadex|rotex)[,\s]+/i.test(clean) ||
-    /^(rodex|roddex|rodix|roadex|rotex|live\s+call|start\s+live\s+call)$/i.test(clean) ||
-    /\b(wake\s+up|talk\s+to\s+me|are\s+you\s+there)\s+(rodex|roddex|rodix|roadex|rotex)\b/i.test(clean)
+    /\b(hey|hi|hello|ok|okay|good\s+morning|good\s+afternoon|good\s+evening|call\s+hey|call|live\s+call|start\s+call|hlo|yo)\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)\b/i.test(clean) ||
+    /^(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex)[,\s]+/i.test(clean) ||
+    /^(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex|live\s+call|start\s+live\s+call)$/i.test(clean) ||
+    /\b(wake\s+up|talk\s+to\s+me|are\s+you\s+there)\s+(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex)\b/i.test(clean)
   );
 }
 
@@ -471,20 +471,20 @@ export function extractHeyRodexCommand(text: string): { isCall: boolean; command
   if (!text) return { isCall: false, command: '' };
   const clean = text.trim();
   const wakePattern =
-    /^(hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hi\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hello\s+(rodex|roddex|rodix|roadex|rotex|rolex)|(rodex|roddex|rodix|roadex|rotex)|ok\s+(rodex|roddex|rodix|roadex|rotex|rolex)|call\s+hey\s+(rodex|roddex|rodix|roadex|rotex|rolex)|hlo\s+(rodex|roddex|rodix|roadex|rotex|rolex)|yo\s+(rodex|roddex|rodix|roadex|rotex|rolex))[,\s]*/i;
+    /^(hey\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|hi\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|hello\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex)|ok\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|okay\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|good\s+(morning|afternoon|evening)\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|call\s+hey\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|hlo\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)|yo\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex))[,\s]*/i;
   if (wakePattern.test(clean)) {
     const command = clean.replace(wakePattern, '').trim();
     return { isCall: true, command };
   }
   // Also check if "Hey RODEX" or "RODEX" is embedded anywhere
   const embeddedPattern =
-    /\b(hey|hi|hello|ok|hlo|yo)\s+(rodex|roddex|rodix|roadex|rotex|rolex)\b[,\s]*/i;
+    /\b(hey|hi|hello|ok|okay|hlo|yo)\s+(rodex|roddex|rodix|roadex|rotex|rolex|radex|rodek|rhodex)\b[,\s]*/i;
   if (embeddedPattern.test(clean)) {
     const command = clean.replace(embeddedPattern, '').trim();
     return { isCall: true, command };
   }
   // Check if RODEX is addressed directly at the end: e.g. "What time is it RODEX"
-  const endPattern = /[,\s]+(rodex|roddex|rodix|roadex|rotex)[.!?]*$/i;
+  const endPattern = /[,\s]+(rodex|roddex|rodix|roadex|rotex|radex|rodek|rhodex)[.!?]*$/i;
   if (endPattern.test(clean)) {
     const command = clean.replace(endPattern, '').trim();
     return { isCall: true, command };

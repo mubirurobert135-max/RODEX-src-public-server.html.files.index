@@ -291,7 +291,9 @@ export const Orb: React.FC<OrbProps> = ({
 
       // Calculate dynamic orb scale
       let currentOrbScale = 1.0;
-      if (isListening) {
+      if (currentState === 'wake_detected') {
+        currentOrbScale = 1.08 + Math.sin(elapsed * 18) * 0.06;
+      } else if (isListening) {
         currentOrbScale = 1.0 + smoothedLevel * 0.22;
       } else if (isSpeaking) {
         currentOrbScale = 1.0 + Math.sin(elapsed * 7) * 0.06 + smoothedLevel * 0.14;
@@ -653,6 +655,8 @@ export const Orb: React.FC<OrbProps> = ({
   // Calculate dynamic scale based on state and audio level
   const dynamicScale = useMemo(() => {
     switch (state) {
+      case 'wake_detected':
+        return 1.12;
       case 'listening':
         return 1.0 + audioLevel * 0.22;
       case 'thinking':
@@ -668,10 +672,12 @@ export const Orb: React.FC<OrbProps> = ({
   return (
     <div
       id="rodex-orb-container"
-      className="relative flex items-center justify-center cursor-pointer select-none transition-transform duration-300"
+      className="relative flex items-center justify-center cursor-pointer select-none transition-transform duration-300 aspect-square rounded-full shrink-0 overflow-visible"
       style={{
         width: size,
         height: size,
+        aspectRatio: '1 / 1',
+        borderRadius: '50%',
         perspective: 900,
       }}
       onClick={onClick}
@@ -801,6 +807,20 @@ export const Orb: React.FC<OrbProps> = ({
         }}
       />
 
+      {/* Wake Detected Instantaneous Rhythmic Pulse Aura Ring */}
+      {state === 'wake_detected' && (
+        <>
+          <div
+            className="absolute inset-[-22px] rounded-full border-2 animate-ping pointer-events-none transition-colors duration-200"
+            style={{ borderColor: activeTheme.ringBorderColor, animationDuration: '0.6s' }}
+          />
+          <div
+            className="absolute inset-[-10px] rounded-full border-2 animate-pulse pointer-events-none shadow-[0_0_35px_rgba(34,211,238,0.95)]"
+            style={{ borderColor: activeTheme.ringBorderColor, animationDuration: '0.4s' }}
+          />
+        </>
+      )}
+
       {/* Listening State Expansion Ripples */}
       {state === 'listening' && (
         <>
@@ -906,14 +926,39 @@ export const Orb: React.FC<OrbProps> = ({
           transformStyle: 'preserve-3d',
         }}
       >
-        {/* Layer 1: Core Iridescent Nebula - Theme aware */}
+        {/* Layer 1: Core Iridescent Nebula with embedded rotating greeting text */}
         <div
-          className="absolute inset-0 rounded-full animate-orb-spin-slow transition-all duration-700"
+          className="absolute inset-0 rounded-full animate-orb-spin-slow transition-all duration-700 flex flex-col items-center justify-center p-4 text-center select-none pointer-events-none overflow-hidden"
           style={{
             background: activeTheme.coreGradient,
             filter: 'contrast(1.18) brightness(1.06)',
           }}
-        />
+        >
+          {/* Integrated Typography rotating synchronously with Layer 1 */}
+          <div className="flex flex-col items-center justify-center text-center px-4 w-full z-10 transform-gpu">
+            <span
+              className="font-extrabold tracking-[0.24em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] leading-tight"
+              style={{
+                fontSize: `${Math.max(13, Math.min(22, size * 0.075))}px`,
+                letterSpacing: '0.22em',
+                textShadow: '0 0 12px rgba(255,255,255,0.9), 0 0 20px rgba(6,182,212,0.7)',
+              }}
+            >
+              I AM RODEX
+            </span>
+
+            <span
+              className="mt-1.5 font-bold tracking-[0.18em] text-cyan-200 uppercase drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] leading-tight opacity-95"
+              style={{
+                fontSize: `${Math.max(8, Math.min(11, size * 0.04))}px`,
+                letterSpacing: '0.15em',
+                textShadow: '0 0 8px rgba(6,182,212,0.8)',
+              }}
+            >
+              SAY HELLO RODEX TO SPEAK
+            </span>
+          </div>
+        </div>
 
         {/* Layer 2: Swirling Siri Fluid Nebula Mesh - Theme aware */}
         <div

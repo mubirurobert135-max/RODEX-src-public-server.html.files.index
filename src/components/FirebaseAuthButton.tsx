@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { LogIn, LogOut, User as UserIcon, Cloud, ShieldCheck } from 'lucide-react';
 import { auth, signInWithGoogle, signOutUser, subscribeToAuthChanges } from '../services/firebase';
+import { globalAuthClient } from '../services/authClient';
 import { triggerHaptic } from '../utils/haptics';
 
 export const FirebaseAuthButton: React.FC = () => {
@@ -12,6 +13,9 @@ export const FirebaseAuthButton: React.FC = () => {
   useEffect(() => {
     const unsubscribe = subscribeToAuthChanges((currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        globalAuthClient.setFirebaseUser(currentUser);
+      }
     });
     return () => unsubscribe();
   }, []);

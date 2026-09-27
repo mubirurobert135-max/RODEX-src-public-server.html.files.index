@@ -1,37 +1,139 @@
 {
   "entities": {
     "UserProfile": {
-      "collection": "users",
-      "fields": {
-        "uid": { "type": "string", "description": "Firebase Auth UID" },
-        "email": { "type": "string", "description": "User email address" },
-        "displayName": { "type": "string", "description": "User display name" },
-        "photoURL": { "type": "string", "description": "User profile photo URL" },
-        "lastActive": { "type": "string", "description": "ISO timestamp of last activity" },
-        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" }
+      "title": "UserProfile",
+      "description": "Authenticated user profile and metadata",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 150 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "User conversation thread",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "activeMode": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "createdAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Message within a conversation",
+      "type": "object",
+      "properties": {
+        "sender": { "type": "string", "maxLength": 20 },
+        "text": { "type": "string", "maxLength": 10000 },
+        "timestamp": { "type": "string" },
+        "toolCalls": { "type": "string", "maxLength": 5000 }
+      },
+      "required": ["sender", "text", "timestamp"]
+    },
+    "MemoryItem": {
+      "title": "MemoryItem",
+      "description": "Long-term user memory entry",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "maxLength": 50 },
+        "key": { "type": "string", "maxLength": 100 },
+        "value": { "type": "string", "maxLength": 2000 },
+        "confidence": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["key", "value", "createdAt"]
+    },
+    "ScheduleItem": {
+      "title": "ScheduleItem",
+      "description": "Scheduled task or reminder",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "datetime": { "type": "string" },
+        "status": { "type": "string", "maxLength": 20 },
+        "priority": { "type": "string", "maxLength": 20 },
+        "recurrence": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "datetime", "status", "createdAt"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preferences and system configuration",
+      "type": "object",
+      "properties": {
+        "theme": { "type": "string", "maxLength": 30 },
+        "voiceVolume": { "type": "number" },
+        "autoSpeak": { "type": "boolean" },
+        "autoListen": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
       }
     },
-    "UserCreation": {
-      "collection": "users/{userId}/creations",
-      "fields": {
-        "id": { "type": "string", "description": "Creation ID" },
-        "type": { "type": "string", "description": "'video' | 'image' | 'edited_image'" },
-        "prompt": { "type": "string", "description": "Generation prompt" },
-        "mediaUrl": { "type": "string", "description": "URL or base64 data of media" },
-        "aspectRatio": { "type": "string", "description": "'16:9' | '9:16' | '1:1'" },
-        "model": { "type": "string", "description": "Model used (veo-3.1-fast-generate-preview, gemini-3.1-flash-image-preview, etc.)" },
-        "createdAt": { "type": "string", "description": "Timestamp" }
+    "VoiceProfile": {
+      "title": "VoiceProfile",
+      "description": "User-specific voice synthesis profile",
+      "type": "object",
+      "properties": {
+        "voiceId": { "type": "string", "maxLength": 100 },
+        "pitch": { "type": "number" },
+        "rate": { "type": "number" },
+        "accent": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string" }
       }
     },
-    "UserMemory": {
-      "collection": "users/{userId}/memories",
-      "fields": {
-        "id": { "type": "string", "description": "Memory ID" },
-        "key": { "type": "string", "description": "Memory topic or key" },
-        "value": { "type": "string", "description": "Content of memory" },
-        "category": { "type": "string", "description": "Category (preference, project, fact, person)" },
-        "updatedAt": { "type": "string", "description": "Timestamp" }
-      }
+    "Integration": {
+      "title": "Integration",
+      "description": "Connected third-party service integration",
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string", "maxLength": 50 },
+        "connected": { "type": "boolean" },
+        "email": { "type": "string", "maxLength": 150 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["provider", "connected", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document"
+    },
+    "/users/{userId}/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "User conversation thread"
+    },
+    "/users/{userId}/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "User message within conversation"
+    },
+    "/users/{userId}/memory/{memoryId}": {
+      "schema": "MemoryItem",
+      "description": "User long-term memory entry"
+    },
+    "/users/{userId}/schedules/{scheduleId}": {
+      "schema": "ScheduleItem",
+      "description": "User scheduled item"
+    },
+    "/users/{userId}/settings/{settingDoc}": {
+      "schema": "UserSettings",
+      "description": "User settings document"
+    },
+    "/users/{userId}/voice/{voiceDoc}": {
+      "schema": "VoiceProfile",
+      "description": "User voice profile settings"
+    },
+    "/users/{userId}/integrations/{integrationId}": {
+      "schema": "Integration",
+      "description": "User connected integration"
     }
   }
 }

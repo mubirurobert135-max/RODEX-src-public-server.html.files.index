@@ -3,9 +3,9 @@ import {
   Radio,
   MessageSquare,
   Image as ImageIcon,
-  Code2,
+  Calendar,
+  Puzzle,
   MoreHorizontal,
-  Globe,
 } from 'lucide-react';
 import { AppMode } from '../types';
 import { triggerHaptic } from '../utils/haptics';
@@ -32,25 +32,23 @@ export const ActionBar: React.FC<ActionBarProps> = ({
     badge?: number | string;
     hasDot?: boolean;
   }> = [
-    { id: 'home', label: 'Voice Orb', icon: Radio, hasDot: isLive },
     {
       id: 'chat',
-      label: isLive ? 'Live Chat' : 'Chat',
+      label: 'Chat',
       icon: MessageSquare,
       badge: messageCount > 0 ? messageCount : undefined,
       hasDot: isLive,
     },
-    { id: 'web', label: 'Web Intel', icon: Globe, hasDot: hasWebIntel },
-    { id: 'image', label: 'Vision', icon: ImageIcon },
-    { id: 'code', label: 'Code', icon: Code2 },
-    { id: 'more', label: 'More', icon: MoreHorizontal },
+    { id: 'image', label: 'Image', icon: ImageIcon },
+    { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'plugins', label: 'Plugins', icon: Puzzle },
   ];
 
   return (
     <nav
       id="rodex-action-bar"
       aria-label="Bottom Navigation"
-      className="w-full max-w-md mx-auto px-2 py-1.5 flex items-center justify-between bg-black/80 backdrop-blur-xl border-t border-neutral-900/80 z-20 select-none"
+      className="w-full max-w-md mx-auto px-3 py-2 flex items-center justify-between bg-neutral-950/90 backdrop-blur-2xl border-t border-neutral-900/80 z-20 select-none pb-[env(safe-area-inset-bottom)]"
     >
       {actions.map((item) => {
         const Icon = item.icon;

@@ -7,7 +7,9 @@ export type HapticType =
   | 'listen'      // Light impulse when microphone listening activates (25ms)
   | 'end'         // Gentle trailing confirmation when call ends ([40, 30, 20]ms)
   | 'interrupt'   // Sharp double-pulse on barge-in ([25, 30, 25]ms)
-  | 'success';    // Satisfying multi-pulse for action completion ([30, 40, 30]ms)
+  | 'success'     // Satisfying multi-pulse for action completion ([30, 40, 30]ms)
+  | 'error'       // Quick alert vibration on error ([40, 40, 40]ms)
+  | 'warning';    // Notice vibration (30ms)
 
 let hapticsEnabledState = true;
 
@@ -51,6 +53,12 @@ export function triggerHaptic(type: HapticType = 'tap'): boolean {
 
       case 'success':
         return navigator.vibrate([30, 40, 30]);
+
+      case 'error':
+        return navigator.vibrate([40, 40, 40]);
+
+      case 'warning':
+        return navigator.vibrate(30);
 
       default:
         return navigator.vibrate(20);

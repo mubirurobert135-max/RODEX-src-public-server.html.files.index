@@ -95,6 +95,52 @@ async function runActionEngineSelfTest() {
 
   assert(resultAbort.success === false && resultAbort.error?.includes('cancelled'), 'Executions can be aborted on demand');
 
+  // TEST 6: Native Desktop Application Launcher
+  console.log('\n6. Testing Desktop Application Launcher (Graceful Unavailable Fallback)...');
+  const resultLaunchApp = await globalActionEngine.executeAction(
+    'desktop_launcher',
+    { appName: 'spotify' },
+    { hasElevatedPermission: true }
+  );
+  // It should gracefully report unavailable (as it's a server environment) but return the correct fallback web URL
+  assert(
+    resultLaunchApp.success === false || resultLaunchApp.output?.status === 'launched_and_verified',
+    'Desktop launcher runs safely without throwing unhandled exceptions'
+  );
+  if (!resultLaunchApp.success) {
+    assert(
+      resultLaunchApp.output?.fallbackUrl === 'https://open.spotify.com',
+      'Provides safe web fallback URL if application is not installed locally'
+    );
+  }
+
+  // TEST 7: Smart Context Resolution (YouTube continuation)
+  console.log('\n7. Testing Smart Context Resolution (Follow-up Search)...');
+  const { ContextMemoryManager } = await import('../server/orchestrator/contextMemory');
+  const mockHistory = [
+    { role: 'user', text: 'Open YouTube' },
+    { role: 'assistant', text: 'Opening YouTube now.' },
+  ];
+  const resolution = ContextMemoryManager.resolveContext('search for Python tutorials', mockHistory);
+  console.log('DEBUG Test 7 resolution:', JSON.stringify(resolution, null, 2));
+  assert(
+    resolution.isFollowUp && resolution.resolvedInput.includes('search youtube for python tutorials'),
+    'Correctly infers that follow-up search refers to the active YouTube portal'
+  );
+
+  // TEST 8: Open First Result Continuation
+  console.log('\n8. Testing Context Continuation (Open first result)...');
+  const mockHistoryWithSearch = [
+    { role: 'user', text: 'search youtube for Afrobeats' },
+    { role: 'assistant', text: 'Searching YouTube for "Afrobeats" now.' },
+  ];
+  const resolutionFirst = ContextMemoryManager.resolveContext('open the first result', mockHistoryWithSearch);
+  console.log('DEBUG Test 8 resolution:', JSON.stringify(resolutionFirst, null, 2));
+  assert(
+    resolutionFirst.isFollowUp && resolutionFirst.resolvedInput.toLowerCase().includes('play first youtube video of afrobeats'),
+    'Correctly infers "open the first result" maps to the last searched term'
+  );
+
   console.log('\n========================================================');
   console.log(` SUMMARY: ${passed} PASS | ${failed} FAIL`);
   if (failed === 0) {

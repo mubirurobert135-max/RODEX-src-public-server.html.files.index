@@ -84,15 +84,7 @@ export class MemoryService implements IMemoryRepository {
   private seedDefaultMemories(): void {
     const defaultEntries: Array<Omit<MemoryEntry, 'id' | 'createdAt' | 'updatedAt'>> = [
       {
-        userId: 'Robert',
-        category: 'profile',
-        key: 'creator_identity',
-        value: 'Mubiru Robert (Robert) is the creator, founder, and lead developer of RODEX.',
-        confidence: 1.0,
-        tags: ['creator', 'founder', 'identity'],
-      },
-      {
-        userId: 'Robert',
+        userId: 'usr_robert_1001',
         category: 'preference',
         key: 'assistant_style',
         value: 'Prefers authoritative, articulate, and intellectually rigorous answers with real-time web facts.',
@@ -228,7 +220,12 @@ export class MemoryService implements IMemoryRepository {
     return existing;
   }
 
-  public async delete(id: string): Promise<boolean> {
+  public async delete(id: string, userId?: string): Promise<boolean> {
+    const existing = this.memoryCache.get(id);
+    if (!existing) return false;
+    if (userId && existing.userId && existing.userId.toLowerCase() !== userId.toLowerCase()) {
+      throw new Error('Access denied: Cannot delete memory belonging to another user.');
+    }
     const existed = this.memoryCache.delete(id);
     if (existed) {
       this.saveToDisk();

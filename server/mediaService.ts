@@ -108,24 +108,24 @@ export class MediaGroundingService {
       console.error('[Search Grounding Error]', err);
       // Fallback to standard fast generation
       const fallbackRes = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: query,
       });
       return {
         text: fallbackRes.text || 'Search grounding unavailable at this moment.',
         sources: [],
         searchQueries: [query],
-        modelUsed: 'gemini-2.5-flash (fallback)',
+        modelUsed: 'gemini-3.8-flash (fallback)',
       };
     }
   }
 
   /**
-   * Google Maps Grounding with gemini-3.5-flash
+   * Google Maps Grounding with gemini-3.8-flash
    */
   public static async executeMapsGrounding(query: string): Promise<GroundedMapsResult> {
     const ai = this.getClient();
-    const model = 'gemini-3.5-flash';
+    const model = 'gemini-3.8-flash';
 
     try {
       const response = await ai.models.generateContent({
@@ -165,14 +165,14 @@ export class MediaGroundingService {
     } catch (err: any) {
       console.error('[Maps Grounding Error]', err);
       const fallbackRes = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: `Provide location and mapping details for: ${query}`,
       });
       return {
         text: fallbackRes.text || 'Location query could not be completed.',
         sources: [],
         places: [],
-        modelUsed: 'gemini-2.5-flash (fallback)',
+        modelUsed: 'gemini-3.8-flash (fallback)',
       };
     }
   }

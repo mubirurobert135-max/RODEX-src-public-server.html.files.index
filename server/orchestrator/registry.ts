@@ -19,6 +19,19 @@ import { emailTool } from './tools/emailTool';
 import { contactsTool } from './tools/contactsTool';
 import { deviceSecurityTool } from './tools/deviceSecurityTool';
 import { imageIntelligenceTool } from './tools/imageIntelligenceTool';
+import { desktopLauncherTool } from './tools/desktopLauncherTool';
+import { scheduleTool } from './tools/scheduleTool';
+import { doctorTool } from './tools/doctorTool';
+import { updateTool } from './tools/updateTool';
+import {
+  gmailCheckNewTool,
+  gmailListTool,
+  gmailReadTool,
+  gmailSearchTool,
+  gmailDraftReplyTool,
+  gmailSendReplyTool,
+  gmailSendTool,
+} from '../services/gmail/gmail.tools';
 
 export class ToolRegistry {
   private tools: Map<string, ToolDefinition> = new Map();
@@ -43,6 +56,17 @@ export class ToolRegistry {
     this.register(contactsTool);
     this.register(deviceSecurityTool);
     this.register(imageIntelligenceTool);
+    this.register(desktopLauncherTool);
+    this.register(scheduleTool);
+    this.register(doctorTool);
+    this.register(updateTool);
+    this.register(gmailCheckNewTool);
+    this.register(gmailListTool);
+    this.register(gmailReadTool);
+    this.register(gmailSearchTool);
+    this.register(gmailDraftReplyTool);
+    this.register(gmailSendReplyTool);
+    this.register(gmailSendTool);
   }
 
   public register(tool: ToolDefinition) {

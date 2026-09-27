@@ -7,6 +7,8 @@ import { globalUserProfile } from '../orchestrator/userProfile';
 import { globalPerformanceTracker } from './performanceTracker';
 import { globalServiceRegistry } from '../doctor/serviceRegistry';
 import { getResolvedGeminiApiKey } from '../geminiConfig';
+import { globalOrchestrator } from '../orchestrator/orchestrator';
+import { CREATOR_ATTRIBUTION_RESPONSE } from '../systemMetadata';
 
 export interface StreamRequestParams {
   userInput: string;
@@ -14,6 +16,9 @@ export interface StreamRequestParams {
   clientFormattedTime?: string;
   timeZone?: string;
   isLiveCall?: boolean;
+  userId?: string;
+  userDisplayName?: string;
+  userEmail?: string;
 }
 
 export class RealTimeResponseEngine {
@@ -61,7 +66,16 @@ export class RealTimeResponseEngine {
     abortSignal?: AbortSignal
   ): Promise<void> {
     const startTime = Date.now();
-    const { userInput, history = [], clientFormattedTime, timeZone, isLiveCall = false } = params;
+    const {
+      userInput,
+      history = [],
+      clientFormattedTime,
+      timeZone,
+      isLiveCall = false,
+      userId = 'usr_robert_1001',
+      userDisplayName = 'Robert',
+      userEmail,
+    } = params;
 
     // Set Server-Sent Events headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -116,9 +130,26 @@ export class RealTimeResponseEngine {
     }
 
     if (intent.primaryIntent === 'creator_inquiry') {
-      const text = 'RODEX AI was designed, built, and developed by Mubiru Robert (Robert). He is the creator and founder of RODEX AI.';
+      const text = CREATOR_ATTRIBUTION_RESPONSE;
       const ttfrMs = Date.now() - startTime;
       this.sendSSEEvent(res, { type: 'start', path: 'fast_path_creator', ttfrMs });
+      this.sendSSEEvent(res, { type: 'token', token: text });
+      this.sendSSEEvent(res, { type: 'sentence', text, index: 0 });
+      this.sendSSEEvent(res, {
+        type: 'done',
+        fullText: text,
+        totalLatencyMs: Date.now() - startTime,
+        ttfrMs,
+        ttfaMs: ttfrMs,
+      });
+      res.end();
+      return;
+    }
+
+    if (intent.primaryIntent === 'user_identity_inquiry') {
+      const text = `You are currently logged in as ${userDisplayName}${userEmail ? ` (${userEmail})` : ''}. Your RODEX account and private session are active.`;
+      const ttfrMs = Date.now() - startTime;
+      this.sendSSEEvent(res, { type: 'start', path: 'fast_path_user_identity', ttfrMs });
       this.sendSSEEvent(res, { type: 'token', token: text });
       this.sendSSEEvent(res, { type: 'sentence', text, index: 0 });
       this.sendSSEEvent(res, {
@@ -188,6 +219,49 @@ export class RealTimeResponseEngine {
       return;
     }
 
+    // FAST PATH C: Action & Capability Tool Execution (Email, Compute, Memory, Contacts, Apps)
+    if (intent.suggestedTools && intent.suggestedTools.length > 0) {
+      try {
+        const orchRes = await globalOrchestrator.orchestrate({
+          userInput,
+          history,
+          clientFormattedTime,
+          timeZone,
+          isLiveCall,
+          userId,
+          userDisplayName,
+          userEmail,
+        });
+
+        const ttfrMs = Date.now() - startTime;
+        this.sendSSEEvent(res, { type: 'start', path: 'tool_orchestration_path', ttfrMs });
+        this.sendSSEEvent(res, { type: 'token', token: orchRes.reply });
+        this.sendSSEEvent(res, { type: 'sentence', text: orchRes.reply, index: 0 });
+        if (orchRes.openUrl) {
+          this.sendSSEEvent(res, {
+            type: 'browser_action',
+            action: {
+              url: orchRes.openUrl,
+              label: 'Open Action Target',
+              destinationType: orchRes.openUrl.includes('youtube') ? 'youtube' : 'web',
+              status: 'opened',
+            },
+          });
+        }
+        this.sendSSEEvent(res, {
+          type: 'done',
+          fullText: orchRes.reply,
+          totalLatencyMs: Date.now() - startTime,
+          ttfrMs,
+          ttfaMs: ttfrMs,
+        });
+        res.end();
+        return;
+      } catch (err: any) {
+        console.warn('[RealTimeEngine] Tool orchestration fallback to stream:', err?.message || err);
+      }
+    }
+
     // 2. LIGHT PATH STREAMING via Google Gemini SDK (@google/genai)
     const apiKey = getResolvedGeminiApiKey();
     if (!apiKey) {
@@ -241,7 +315,7 @@ export class RealTimeResponseEngine {
       });
 
       // Stream generation from Gemini model
-      const modelName = 'gemini-2.5-flash';
+      const modelName = 'gemini-3.8-flash';
       const streamResult = await ai.models.generateContentStream({
         model: modelName,
         contents: formattedContents,

@@ -6,7 +6,8 @@ export type AssistantState =
   | 'executing_tool'
   | 'speaking'
   | 'error'
-  | 'permission_required';
+  | 'permission_required'
+  | 'wake_detected';
 
 export interface WebSource {
   title: string;
@@ -117,7 +118,7 @@ export interface CustomWakeWordConfig {
   samples?: CustomWakeWordSample[];
 }
 
-export type AppMode = 'home' | 'chat' | 'image' | 'file' | 'code' | 'web' | 'spotify' | 'more';
+export type AppMode = 'home' | 'chat' | 'image' | 'schedule' | 'plugins' | 'file' | 'code' | 'web' | 'spotify' | 'more';
 
 export interface SpotifyDevice {
   id: string;

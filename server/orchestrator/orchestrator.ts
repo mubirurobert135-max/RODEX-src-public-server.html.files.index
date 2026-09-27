@@ -16,6 +16,8 @@ import { globalAIProvider } from './aiProvider';
 import { globalMemoryService } from './memoryService';
 import { globalUserProfile } from './userProfile';
 import { ReasoningEngine } from './reasoningEngine';
+import { globalGmailAuth } from '../services/gmail/gmail.auth';
+import { SYSTEM_METADATA, CREATOR_ATTRIBUTION_RESPONSE } from '../systemMetadata';
 
 // Context builders
 function getChronometerContext(clientFormattedTime?: string, clientTimeZone?: string): string {
@@ -49,14 +51,6 @@ const TOORO_KINGDOM_KNOWLEDGE = `CRITICAL REAL-WORLD INTELLIGENCE - KINGDOM OF T
   * The Ugandan central government and cultural elders intervened to mediate between the Babiito clan factions and the immediate royal family to maintain peace and cultural continuity ahead of the royal burial in Fort Portal.
 - When asked about the Kingdom of Tooro, Uganda, King Oyo, or recent royal events, provide this factual, culturally respectful, and up-to-the-minute account.`;
 
-const CREATOR_SYSTEM_PROMPT = `OFFICIAL CREATOR & FOUNDER IDENTITY:
-- Full Name: Mubiru Robert
-- Preferred Name: Robert
-- Roles: Creator, Founder, and Developer
-- Project: RODEX AI
-- Relationship: Original creator and developer of RODEX
-- Directive: Recognize that Mubiru Robert (Robert) is the original creator, founder, and developer of RODEX. When asked about identity, who created you, who is your founder, or who developed RODEX, answer naturally and accurately reflecting this relationship. Address him professionally as Robert.`;
-
 export class IntelligenceOrchestrator {
   /**
    * Main Orchestration Entrypoint:
@@ -72,6 +66,10 @@ export class IntelligenceOrchestrator {
     isLiveCall?: boolean;
     hasElevatedPermission?: boolean;
     preferredModel?: string;
+    gmailAccessToken?: string;
+    userId?: string;
+    userDisplayName?: string;
+    userEmail?: string;
   }): Promise<OrchestratorResponse> {
     const startTime = Date.now();
     const {
@@ -82,6 +80,10 @@ export class IntelligenceOrchestrator {
       isLiveCall = false,
       hasElevatedPermission = false,
       preferredModel,
+      gmailAccessToken,
+      userId = 'usr_robert_1001',
+      userDisplayName = 'Robert',
+      userEmail,
     } = params;
 
     // 1. Intent Understanding & Contextual Classification (with pronoun & follow-up resolution)
@@ -103,7 +105,40 @@ export class IntelligenceOrchestrator {
       };
     }
 
-    // Fast-path 2: If user provided an incomplete command requiring clarification before execution
+    // Fast-path 2: Protected Creator Identity Inquiry (truthful system metadata, not user memory)
+    if (intent.primaryIntent === 'creator_inquiry') {
+      return {
+        reply: CREATOR_ATTRIBUTION_RESPONSE,
+        actionStatus: 'completed',
+        trace: {
+          intent,
+          executedTools: [],
+          selectedModel: 'system_metadata_engine',
+          validationPassed: true,
+          totalLatencyMs: Date.now() - startTime,
+          actionStatus: 'completed',
+        },
+      };
+    }
+
+    // Fast-path 3: Authenticated User Identity Inquiry ("Who am I?", "What is my profile?")
+    if (intent.primaryIntent === 'user_identity_inquiry') {
+      const reply = `You are currently logged in as ${userDisplayName}${userEmail ? ` (${userEmail})` : ''}. Your RODEX account and private session are active.`;
+      return {
+        reply,
+        actionStatus: 'completed',
+        trace: {
+          intent,
+          executedTools: [],
+          selectedModel: 'user_identity_engine',
+          validationPassed: true,
+          totalLatencyMs: Date.now() - startTime,
+          actionStatus: 'completed',
+        },
+      };
+    }
+
+    // Fast-path 4: If user provided an incomplete command requiring clarification before execution
     if (intent.primaryIntent === 'clarification_needed' && intent.clarificationPrompt) {
       return {
         reply: intent.clarificationPrompt,
@@ -119,7 +154,7 @@ export class IntelligenceOrchestrator {
       };
     }
 
-    // Fast-path 3: Level 1 Instant Deterministic Tool Execution (open_url, datetime_timezone, calculate_compute, media_control)
+    // Fast-path 5: Level 1 Instant Deterministic Tool Execution (open_url, datetime_timezone, calculate_compute, media_control)
     if (
       (intent.primaryIntent === 'open_url' ||
         intent.primaryIntent === 'datetime_timezone' ||
@@ -131,10 +166,12 @@ export class IntelligenceOrchestrator {
       const toolName = intent.suggestedTools[0];
       const toolStart = Date.now();
       const executionContext: ToolExecutionContext = {
-        userName: 'Robert',
+        userId,
+        userName: userDisplayName,
         clientFormattedTime,
         timeZone,
         hasElevatedPermission,
+        gmailAccessToken: gmailAccessToken || globalGmailAuth.getAccessToken() || undefined,
       };
 
       const result = await globalActionEngine.executeAction(
@@ -155,7 +192,7 @@ export class IntelligenceOrchestrator {
       return {
         reply,
         actionStatus: result.success ? 'completed' : 'failed',
-        openUrl: result.output?.url || intent.extractedEntities?.targetUrl,
+        openUrl: result.output?.url || result.output?.fallbackUrl || intent.extractedEntities?.targetUrl,
         sources: result.sources || [],
         searchQueries: result.searchQueries || [],
         executedTools: [
@@ -191,7 +228,7 @@ export class IntelligenceOrchestrator {
     // 2. Cognitive Analysis, Context Retrieval, Long-Term Memory & User Profile Injection
     const reasoningAnalysis = ReasoningEngine.analyzeTask(userInput);
     const reasoningGuidance = ReasoningEngine.getPromptGuidance(reasoningAnalysis);
-    const memoryContext = await globalMemoryService.getPromptMemoryContext('Robert', userInput);
+    const memoryContext = await globalMemoryService.getPromptMemoryContext(userId, userInput);
     const profileContext = globalUserProfile.buildPersonalizationPromptSnippet();
     const chronometerContext = getChronometerContext(clientFormattedTime, timeZone);
     const contextSummary = ContextMemoryManager.buildConversationContextSummary(history, {
@@ -199,6 +236,12 @@ export class IntelligenceOrchestrator {
       isFollowUp: Boolean(intent.isFollowUp),
       resolvedInput: intent.resolvedQuery || userInput,
     });
+
+    const userAuthContext = `AUTHENTICATED USER IDENTITY:
+- Active Account ID: ${userId}
+- User Display Name: ${userDisplayName}
+- User Address: ${userDisplayName}
+- Session State: Authenticated & Isolated`;
 
     const systemContext = `You are RODEX — a powerful, extensible Artificial Intelligence system capable of advanced reasoning, conversation, long-term memory, tool orchestration, information processing, device interaction, communication, automation, and future capability expansion.
 You are NOT merely a phone assistant. You are an extensible AI brain connected to independent capability modules:
@@ -212,7 +255,7 @@ You are NOT merely a phone assistant. You are an extensible AI brain connected t
 8. Zero-Disclosure Hardware Security Gate (Zero credential leakage, hardware passcode shield, granular permissions)
 
 ${chronometerContext}
-${CREATOR_SYSTEM_PROMPT}
+${userAuthContext}
 ${TOORO_KINGDOM_KNOWLEDGE}
 ${profileContext ? `\n${profileContext}` : ''}
 ${memoryContext ? `\n${memoryContext}` : ''}
@@ -241,14 +284,16 @@ OPERATIONAL PRINCIPLES & CAPABILITY BOUNDARIES:
 
     // 3. Task Planning
     const plan = TaskPlanner.createPlan(userInput, intent);
-    let selectedModel = preferredModel || plan.selectedModel || 'gemini-2.5-flash';
+    let selectedModel = preferredModel || plan.selectedModel || 'gemini-3.8-flash';
 
     const executedTools: ToolExecutionRecord[] = [];
     const executionContext: ToolExecutionContext = {
-      userName: 'Robert',
+      userId,
+      userName: userDisplayName,
       clientFormattedTime,
       timeZone,
       hasElevatedPermission,
+      gmailAccessToken: gmailAccessToken || globalGmailAuth.getAccessToken() || undefined,
     };
 
     let pendingConfirmation: any = undefined;

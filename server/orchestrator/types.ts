@@ -26,6 +26,7 @@ export interface ToolExecutionContext {
   timeZone?: string;
   sessionContext?: Record<string, any>;
   hasElevatedPermission?: boolean;
+  gmailAccessToken?: string;
 }
 
 export interface ToolExecutionResult {
@@ -61,7 +62,11 @@ export type TaskIntentCategory =
   | 'device_security'
   | 'image_intelligence'
   | 'exact_command'
+  | 'schedule_operation'
+  | 'doctor_diagnostics'
+  | 'system_updates'
   | 'creator_inquiry'
+  | 'user_identity_inquiry'
   | 'cultural_knowledge'
   | 'general_knowledge'
   | 'conversational'

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion } from 'motion/react';
 import {
   Mic,
   MicOff,
@@ -29,9 +30,12 @@ import {
   Film,
   Video as VideoIcon,
   Stethoscope,
+  Mail,
+  Menu,
 } from 'lucide-react';
 import { Orb } from './components/Orb';
 import { ActionBar } from './components/ActionBar';
+import { MoreMenu } from './components/MoreMenu';
 import { ChatSheet } from './components/ChatSheet';
 import { SettingsModal } from './components/SettingsModal';
 import { ModesModal } from './components/ModesModal';
@@ -41,14 +45,19 @@ import { SpotifyPlayerModal } from './components/SpotifyPlayerModal';
 import { WebMediaHubModal } from './components/WebMediaHubModal';
 import { SecurityCenterModal } from './components/SecurityCenterModal';
 import { UpdateCenterModal } from './components/UpdateCenterModal';
-import { CreatorProfileModal } from './components/CreatorProfileModal';
+import { AuthModal } from './components/AuthModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { MemoryPersonalizationModal } from './components/MemoryPersonalizationModal';
 import { CapabilityHubModal } from './components/CapabilityHubModal';
 import { MediaStudioModal } from './components/MediaStudioModal';
 import { RodexDoctorModal } from './components/RodexDoctorModal';
+import { GmailHubModal } from './components/GmailHubModal';
+import { ScheduleModal } from './components/ScheduleModal';
 import { FirebaseAuthButton } from './components/FirebaseAuthButton';
 import { SpotifyMiniBar } from './components/SpotifyMiniBar';
 import { AndroidFrame } from './components/AndroidFrame';
+import { getCachedGmailAccessToken } from './services/firebase';
+import { globalAuthClient, AuthenticatedUser } from './services/authClient';
 import {
   AssistantState,
   ChatMessage,
@@ -93,11 +102,17 @@ export default function App() {
   const [isMediaHubOpen, setIsMediaHubOpen] = useState(false);
   const [isSecurityOpen, setIsSecurityOpen] = useState(false);
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
-  const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'signin' | 'register' | 'recover'>('signin');
+  const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(() => globalAuthClient.getCurrentUser());
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isCapabilityOpen, setIsCapabilityOpen] = useState(false);
   const [isMediaStudioOpen, setIsMediaStudioOpen] = useState(false);
   const [isDoctorOpen, setIsDoctorOpen] = useState(false);
+  const [isGmailOpen, setIsGmailOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [mediaStudioTab, setMediaStudioTab] = useState<'video' | 'image' | 'maps' | 'search' | 'gallery'>('video');
 
   // Live Chat Sessions & Persistence
@@ -126,6 +141,31 @@ export default function App() {
     return () => clearInterval(interval);
   }, [refreshSpotifyStatus]);
 
+  // Multi-user authentication synchronization
+  useEffect(() => {
+    globalAuthClient.getMe().then((user) => {
+      if (user) {
+        setCurrentUser(user);
+        setVoiceProfile((prev) => ({
+          ...prev,
+          speakerName: user.displayName || user.profile?.preferredName || 'Robert',
+        }));
+      }
+    });
+
+    const unsubscribe = globalAuthClient.subscribe((user) => {
+      setCurrentUser(user);
+      if (user) {
+        setVoiceProfile((prev) => ({
+          ...prev,
+          speakerName: user.displayName || user.profile?.preferredName || 'Robert',
+        }));
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Real-time Two-Way Live Conversation State
   const [isLiveConversation, setIsLiveConversation] = useState(false);
   const isLiveConversationRef = useRef(false);
@@ -147,7 +187,7 @@ export default function App() {
   const [pitchHz, setPitchHz] = useState<number>(124);
   const [transcript, setTranscript] = useState('');
   const [lastResponse, setLastResponse] = useState<string>(
-    'Greetings. I am RODEX. Say "Hey RODEX" or tap the orb to speak.'
+    'Greetings. I am RODEX. Say "Hello RODEX" to speak.'
   );
   const [isMuted, setIsMuted] = useState(false);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
@@ -360,6 +400,32 @@ export default function App() {
   const wakeWordTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const speakIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Auto-Probe Microphone Permission on Boot & Account Login
+  const probeMicPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        if (permissionStatus.state === 'granted') {
+          setMicPermissionGranted(true);
+          return true;
+        }
+      }
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        setMicPermissionGranted(true);
+        return true;
+      }
+    } catch (_) {
+      // Permission not yet granted or blocked
+    }
+    return false;
+  }, []);
+
+  useEffect(() => {
+    probeMicPermission();
+  }, [currentUser, probeMicPermission]);
+
   // Check microphone permissions on mount
   useEffect(() => {
     if (navigator.permissions && navigator.permissions.query) {
@@ -373,9 +439,7 @@ export default function App() {
             setMicPermissionGranted(permissionStatus.state === 'granted');
           };
         })
-        .catch(() => {
-          // Ignore if permission query not supported
-        });
+        .catch(() => {});
     }
 
     return () => {
@@ -755,6 +819,30 @@ export default function App() {
 
       const queryToSend = isCall && command ? command : userText;
       const lowerQ = queryToSend.toLowerCase();
+
+      // Direct Action Execution Triggers
+      if (lowerQ.includes('open youtube') || lowerQ.includes('go to youtube') || lowerQ.includes('launch youtube')) {
+        handleOpenUrlInBrowser('https://www.youtube.com', 'YouTube', 'youtube');
+      } else if (lowerQ.includes('open chrome') || lowerQ.includes('open google') || lowerQ.includes('go to google')) {
+        handleOpenUrlInBrowser('https://www.google.com', 'Google', 'google');
+      } else if (lowerQ.includes('open gmail') || lowerQ.includes('check my email') || lowerQ.includes('check gmail')) {
+        setIsGmailOpen(true);
+      } else if (lowerQ.includes('schedule') || lowerQ.includes('set reminder') || lowerQ.includes('remind me')) {
+        setIsScheduleOpen(true);
+      } else if (lowerQ.includes('who created you') || lowerQ.includes('who made you') || lowerQ.includes('who is your creator')) {
+        const creatorSpeech = 'I was created by Mubiru Robert as an advanced autonomous AI assistant.';
+        const assistantMsg: ChatMessage = {
+          id: createId('assistant'),
+          sender: 'assistant',
+          text: creatorSpeech,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setLastResponse(creatorSpeech);
+        speakResponse(creatorSpeech);
+        return;
+      }
+
       if (lowerQ.startsWith('play ') || lowerQ.includes('play music') || lowerQ.includes('music video') || lowerQ.includes('search song') || lowerQ.includes('what is playing')) {
         setIsMediaHubOpen(true);
       }
@@ -764,8 +852,8 @@ export default function App() {
       if (lowerQ.includes('update system') || lowerQ.includes('check updates') || lowerQ.includes('software update') || lowerQ.includes('technology updates')) {
         setIsUpdateOpen(true);
       }
-      if (lowerQ.includes('who am i') || lowerQ.includes('who created you') || lowerQ.includes('who is your founder') || lowerQ.includes('who developed') || lowerQ.includes('who is robert') || lowerQ.includes('creator profile')) {
-        setIsCreatorOpen(true);
+      if (lowerQ.includes('who am i') || lowerQ.includes('my profile') || lowerQ.includes('my account') || lowerQ.includes('who is logged in')) {
+        setIsUserProfileOpen(true);
       }
       if (lowerQ.includes('open memory') || lowerQ.includes('show memories') || lowerQ.includes('manage memory') || lowerQ.includes('personalization') || lowerQ.includes('my memories')) {
         setIsMemoryOpen(true);
@@ -829,9 +917,13 @@ export default function App() {
 
       setMessages((prev) => [...prev, initialAssistantMsg]);
 
+      const gmailToken = getCachedGmailAccessToken();
       const streamRes = await fetch('/api/rodex/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(gmailToken ? { Authorization: `Bearer ${gmailToken}` } : {}),
+        },
         signal: abortController.signal,
         body: JSON.stringify({
           message: queryToSend,
@@ -947,9 +1039,13 @@ export default function App() {
 
   const handleConfirmAction = async (actionId: string, toolName: string, params: any) => {
     try {
+      const gmailToken = getCachedGmailAccessToken();
       const res = await fetch('/api/rodex/confirm-action', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(gmailToken ? { Authorization: `Bearer ${gmailToken}` } : {}),
+        },
         body: JSON.stringify({ actionId, toolName, params }),
       });
       const data = await res.json();
@@ -977,7 +1073,7 @@ export default function App() {
   const wakeWordRecognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!voiceSettings.wakeWordEnabled || state !== 'idle' || !micPermissionGranted) {
+    if (!voiceSettings.wakeWordEnabled || state !== 'idle') {
       if (wakeWordRecognitionRef.current) {
         try {
           wakeWordRecognitionRef.current.abort();
@@ -995,7 +1091,7 @@ export default function App() {
     let wakeRec: any = null;
 
     const startWakeRecognition = () => {
-      if (!isAlive || !voiceSettings.wakeWordEnabled || state !== 'idle' || !micPermissionGranted) return;
+      if (!isAlive || !voiceSettings.wakeWordEnabled || state !== 'idle') return;
       try {
         wakeRec = new SpeechRecognition();
         wakeWordRecognitionRef.current = wakeRec;
@@ -1008,16 +1104,37 @@ export default function App() {
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             currentText += event.results[i][0].transcript;
           }
+          const match = checkWakeWordMatch(currentText, voiceSettings.customWakeWord);
           const isWakeTriggered =
+            match.isCall ||
             containsHeyRodexWakeWord(currentText) ||
-            checkWakeWordMatch(currentText, voiceSettings.customWakeWord).isCall;
+            isHeyRodexCall(currentText);
 
           if (isWakeTriggered) {
             triggerHaptic('activate');
             try {
               wakeRec.stop();
             } catch (_) {}
-            handleSendMessage(currentText.trim());
+
+            if (match.isPureActivation || isHeyRodexCall(currentText) || !match.command?.trim()) {
+              // Pure wake phrase: instantaneous local response without querying Gemini!
+              isLiveConversationRef.current = true;
+              setIsLiveConversation(true);
+              setState('listening');
+              playToneChime('wake');
+              const userName = currentUser?.profile?.preferredName || currentUser?.displayName?.split(' ')[0] || 'Operator';
+              const acknowledgeText = `Yes? I'm listening, ${userName}.`;
+              setLastResponse(acknowledgeText);
+              speakResponse(acknowledgeText, () => {
+                if (isLiveConversationRef.current) {
+                  playToneChime('listen');
+                  startListening();
+                }
+              });
+            } else {
+              // Wake word + command: dispatch directly to command executor
+              handleSendMessage(currentText.trim());
+            }
           }
         };
 
@@ -1028,7 +1145,7 @@ export default function App() {
         };
 
         wakeRec.onend = () => {
-          if (isAlive && voiceSettings.wakeWordEnabled && state === 'idle' && micPermissionGranted) {
+          if (isAlive && voiceSettings.wakeWordEnabled && state === 'idle') {
             setTimeout(() => {
               if (isAlive && voiceSettings.wakeWordEnabled && state === 'idle') {
                 startWakeRecognition();
@@ -1038,6 +1155,7 @@ export default function App() {
         };
 
         wakeRec.start();
+        setMicPermissionGranted(true);
       } catch (_) {}
     };
 
@@ -1052,7 +1170,7 @@ export default function App() {
       }
       wakeWordRecognitionRef.current = null;
     };
-  }, [voiceSettings.wakeWordEnabled, state, micPermissionGranted]);
+  }, [voiceSettings.wakeWordEnabled, state, micPermissionGranted, currentUser]);
 
   // Start Voice Recognition (Tap-to-talk, Barge-In, or Auto-Turn Taking)
   const startListening = async () => {
@@ -1172,14 +1290,16 @@ export default function App() {
           consecutiveSilenceCountRef.current = 0;
           handleSendMessage(finalText);
         } else if (isLiveConversationRef.current) {
-          // Continuous Live Call: Never ends on silence or pauses.
-          // The call continues running patiently and will ONLY end when Mr. Robert explicitly instructs
-          // (e.g., says "end call", "hang up", "goodbye") or taps the End Call button.
-          setTimeout(() => {
-            if (isLiveConversationRef.current && state !== 'speaking') {
-              startListening();
-            }
-          }, 250);
+          consecutiveSilenceCountRef.current++;
+          if (consecutiveSilenceCountRef.current >= 3) {
+            endLiveCall();
+          } else {
+            setTimeout(() => {
+              if (isLiveConversationRef.current && state !== 'speaking') {
+                startListening();
+              }
+            }, 300);
+          }
         } else {
           setState('idle');
         }
@@ -1219,17 +1339,32 @@ export default function App() {
     <AndroidFrame>
       <main
         id="rodex-main-screen"
-        className="w-full h-full flex flex-col justify-between relative bg-black text-white overflow-hidden select-none"
+        className="w-full h-full flex flex-col justify-between items-center relative bg-black text-white overflow-hidden select-none m-0 p-0"
       >
-        {/* Top Minimal Header */}
-        <header className="px-5 py-3.5 flex items-center justify-between z-20 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-900/80">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
-            <h1 className="text-sm font-bold tracking-[0.25em] text-white">RODEX</h1>
+        {/* Top Minimal Brand Header */}
+        <header className="w-full px-5 py-3.5 flex items-start justify-between z-20 bg-transparent shrink-0">
+          {/* TOP-LEFT: RODEX Brand + More Button immediately below */}
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
+              <h1 className="text-sm font-extrabold tracking-[0.25em] text-white uppercase">RODEX</h1>
+            </div>
+            <button
+              id="header-more-btn"
+              onClick={() => {
+                triggerHaptic('tap');
+                setIsMoreMenuOpen(true);
+              }}
+              className="px-2.5 py-1 rounded-full bg-neutral-900/90 border border-neutral-800/90 hover:border-cyan-500/50 text-neutral-300 hover:text-white flex items-center gap-1.5 text-[11px] font-medium active:scale-95 transition-all cursor-pointer shadow-sm"
+              title="Open System Features & More"
+            >
+              <span>More</span>
+              <Menu className="w-3 h-3 text-cyan-400" />
+            </button>
           </div>
 
-          {/* Center: Live Call indicator if active */}
-          <div className="flex items-center">
+          {/* TOP-RIGHT: Live Call / Mute status controls */}
+          <div className="flex items-center gap-2 pt-0.5">
             {isLiveConversation && (
               <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.3)] animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
@@ -1246,10 +1381,7 @@ export default function App() {
                 </button>
               </div>
             )}
-          </div>
 
-          {/* Right: Essential Window Controls */}
-          <div className="flex items-center gap-1">
             <button
               id="audio-mute-toggle"
               onClick={() => {
@@ -1257,148 +1389,57 @@ export default function App() {
                 setIsMuted(!isMuted);
               }}
               title={isMuted ? 'Unmute voice output' : 'Mute voice output'}
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all"
+              className="p-1.5 rounded-full text-neutral-500 hover:text-white transition-all cursor-pointer"
             >
               {isMuted ? (
-                <VolumeX className="w-4 h-4 text-neutral-500" />
+                <VolumeX className="w-4 h-4 text-neutral-600" />
               ) : (
-                <Volume2 className="w-4 h-4 text-cyan-400" />
+                <Volume2 className="w-4 h-4 text-cyan-400/80" />
               )}
             </button>
-
-            <button
-              id="header-chat-btn"
-              onClick={() => setIsChatOpen(true)}
-              title="Open Chat Session"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all relative"
-            >
-              <MessageSquare className="w-4 h-4" />
-              {messages.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-cyan-400 rounded-full" />
-              )}
-            </button>
-
-            <button
-              id="header-media-hub-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsMediaHubOpen(true);
-              }}
-              title="Web Music & Video Hub"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400"
-            >
-              <Music2 className="w-4 h-4" />
-            </button>
-
-            <button
-              id="header-doctor-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsDoctorOpen(true);
-              }}
-              title="RODEX Doctor System Reliability & Diagnostic Dashboard"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400 relative"
-            >
-              <Stethoscope className="w-4 h-4 text-cyan-400 animate-pulse" />
-            </button>
-
-            <button
-              id="header-security-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsSecurityOpen(true);
-              }}
-              title="RODEX Security Center"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-emerald-400"
-            >
-              <Shield className="w-4 h-4" />
-            </button>
-
-            <button
-              id="header-update-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsUpdateOpen(true);
-              }}
-              title="Autonomous Update & Intelligence"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-
-            <button
-              id="header-creator-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsCreatorOpen(true);
-              }}
-              title="Creator Profile & Founder Recognition"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-amber-400"
-            >
-              <Award className="w-4 h-4" />
-            </button>
-
-            <button
-              id="header-studio-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setMediaStudioTab('video');
-                setIsMediaStudioOpen(true);
-              }}
-              title="Veo 3 Video & Multimodal Studio"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-cyan-400"
-            >
-              <Film className="w-4 h-4" />
-            </button>
-
-            <button
-              id="header-capability-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsCapabilityOpen(true);
-              }}
-              title="RODEX Multi-Capability Hub & 8 Domains"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-indigo-400 relative"
-            >
-              <Cpu className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-            </button>
-
-            <button
-              id="header-memory-btn"
-              onClick={() => {
-                triggerHaptic('tap');
-                setIsMemoryOpen(true);
-              }}
-              title="Long-Term Memory & Personalization"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all text-purple-400"
-            >
-              <Brain className="w-4 h-4" />
-            </button>
-
-            <button
-              id="header-settings-btn"
-              onClick={() => setIsSettingsOpen(true)}
-              title="Settings"
-              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 active:scale-95 transition-all"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
-            {/* Firebase Google Auth Profile & Sync Badge */}
-            <FirebaseAuthButton />
           </div>
         </header>
 
         {/* Center: The Large Glowing AI Orb - Pure, Grand & Uncluttered Focus */}
-        <div className="flex-1 flex flex-col items-center justify-center relative px-6 w-full">
+        <div className="flex-1 flex flex-col items-center justify-center relative px-4 w-full my-0 py-0 overflow-visible">
           {/* Subtle Ambient Radial Glow */}
           <div
             className={`absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none transition-colors duration-700 ${currentOrbTheme.ambientGlowClass}`}
           />
 
           {/* Central Orb Identity */}
-          <div className="relative my-auto flex flex-col items-center py-2">
+          <motion.div
+            className="relative flex flex-col items-center cursor-pointer select-none m-0 p-0"
+            animate={{
+              scale:
+                state === 'wake_detected'
+                  ? [1, 1.12, 0.98, 1.1]
+                  : state === 'listening'
+                  ? [1, 1.04, 1]
+                  : state === 'speaking'
+                  ? [1, 1.03, 1]
+                  : state === 'thinking' || state === 'processing'
+                  ? [0.97, 1.02, 0.97]
+                  : state === 'executing_tool'
+                  ? [1, 1.06, 1]
+                  : 1,
+              opacity: 1,
+            }}
+            transition={{
+              duration:
+                state === 'wake_detected'
+                  ? 0.35
+                  : state === 'listening'
+                  ? 1.2
+                  : state === 'speaking'
+                  ? 1.0
+                  : state === 'thinking' || state === 'processing' || state === 'executing_tool'
+                  ? 0.8
+                  : 2.5,
+              repeat: state === 'idle' ? 0 : Infinity,
+              ease: 'easeInOut',
+            }}
+          >
             <Orb
               state={state}
               audioLevel={audioLevel}
@@ -1409,12 +1450,12 @@ export default function App() {
               isLive={isLiveConversation}
               themeAccent={themeAccent}
             />
-          </div>
+          </motion.div>
 
           {/* Active Browser Action Notification / Launcher */}
           {browserActionToast && (
             <div
-              className={`mb-3 px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 max-w-sm w-full mx-auto shadow-xl backdrop-blur-md z-30 transition-all ${
+              className={`absolute top-4 left-4 right-4 mx-auto px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 max-w-sm w-full shadow-xl backdrop-blur-md z-30 transition-all ${
                 browserActionToast.destinationType === 'youtube'
                   ? 'bg-red-950/90 border-red-500/60 text-red-100'
                   : 'bg-cyan-950/90 border-cyan-500/60 text-cyan-100'
@@ -1469,8 +1510,8 @@ export default function App() {
             </div>
           )}
 
-          {/* Clean Subtitle & Status Text */}
-          <div className="w-full max-w-sm text-center mb-4 min-h-[44px] flex items-center justify-center pointer-events-none">
+          {/* Clean Subtitle & Status Text - Overlayed below Orb without disturbing exact vertical centering */}
+          <div className="absolute bottom-2 left-0 right-0 mx-auto max-w-sm text-center min-h-[40px] flex items-center justify-center pointer-events-none px-4 z-20">
             {state === 'listening' ? (
               <p className="text-xs sm:text-sm text-cyan-300 font-normal leading-relaxed line-clamp-3 px-4 italic animate-pulse">
                 "{transcript || 'Listening to your voice...'}"
@@ -1500,126 +1541,42 @@ export default function App() {
                 {lastResponse || 'Speaking response...'}
               </p>
             ) : (
-              <p className="text-xs text-neutral-400 font-normal leading-relaxed line-clamp-2 px-4">
-                {lastResponse || (isLiveConversation ? 'Live Call Active — Listening...' : 'Tap orb or microphone to speak')}
+              <p className="text-xs sm:text-sm text-cyan-300/90 font-medium tracking-wide leading-relaxed line-clamp-2 px-4">
+                {lastResponse || (isLiveConversation ? 'Live Call Active — Listening...' : 'Say "Hello RODEX" or speak a command')}
               </p>
             )}
           </div>
         </div>
 
-        {/* Bottom Section: Microphone and Voice-Status Controls */}
-        <div className="w-full flex flex-col items-center pb-6 pt-2 z-20">
-          <div className="relative mb-2.5 flex items-center justify-center gap-4">
-            {/* Glow Aura when listening */}
-            {state === 'listening' && (
-              <div className="absolute w-24 h-24 rounded-full bg-cyan-400/30 blur-xl animate-pulse pointer-events-none" />
-            )}
-
-            {/* Microphone Button */}
-            <button
-              id="tap-to-talk-button"
-              onClick={startListening}
-              className={`relative w-18 h-18 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90 shadow-2xl border cursor-pointer ${
-                state === 'listening'
-                  ? 'bg-cyan-500 text-black border-cyan-300 shadow-[0_0_35px_rgba(6,182,212,0.8)] scale-105'
-                  : state === 'speaking'
-                  ? 'bg-teal-950 text-teal-300 border-teal-500/80 shadow-[0_0_20px_rgba(20,184,166,0.3)]'
-                  : state === 'thinking'
-                  ? 'bg-amber-950 text-amber-300 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
-                  : isLiveConversation
-                  ? 'bg-rose-950 text-rose-300 border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.4)] animate-pulse'
-                  : 'bg-neutral-900/90 hover:bg-neutral-850 text-cyan-400 border-neutral-800 hover:border-cyan-500/50 shadow-[0_0_20px_rgba(0,0,0,0.8)]'
-              }`}
-              title={
-                state === 'listening'
-                  ? 'Tap to send immediately'
-                  : state === 'speaking'
-                  ? 'Tap or speak to interrupt'
-                  : isLiveConversation
-                  ? 'Live Call Active - Tap to speak'
-                  : 'Tap to speak with RODEX'
-              }
-            >
-              {state === 'listening' ? (
-                <Mic className="w-7 h-7 animate-bounce" />
-              ) : state === 'speaking' ? (
-                <Volume2 className="w-7 h-7 animate-pulse" />
-              ) : state === 'thinking' ? (
-                <Sparkles className="w-7 h-7 animate-spin" />
-              ) : isLiveConversation ? (
-                <Mic className="w-7 h-7 text-rose-300" />
-              ) : (
-                <Mic className="w-7 h-7" />
-              )}
-            </button>
-
-            {/* Dedicated End Call Hang-Up Button when Live Call is active */}
-            {isLiveConversation && (
+        {/* Bottom Section: Subtle Hands-Free Voice Status */}
+        <div className="w-full flex flex-col items-center pb-6 pt-2 z-20 shrink-0">
+          {/* Dedicated End Call Hang-Up Button when Live Call is active */}
+          {isLiveConversation && (
+            <div className="mb-2">
               <button
                 id="hangup-call-btn"
                 onClick={endLiveCall}
-                className="w-12 h-12 rounded-full bg-red-950/90 hover:bg-red-900 border border-red-600/80 text-red-300 flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.35)] active:scale-90 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-full bg-red-950/90 hover:bg-red-900 border border-red-600/80 text-red-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.35)] active:scale-90 transition-all cursor-pointer text-xs font-semibold"
                 title="End Live Call"
               >
-                <PhoneOff className="w-5 h-5" />
+                <PhoneOff className="w-4 h-4" />
+                <span>End Call</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
-          <span className="text-[11px] font-medium tracking-wider text-neutral-500">
+          <span className="text-[11px] font-medium tracking-wider text-neutral-500 uppercase">
             {state === 'listening'
-              ? 'LISTENING • TAP TO SEND'
+              ? 'Listening...'
               : state === 'speaking'
-              ? 'SPEAKING • TAP TO INTERRUPT'
+              ? 'Speaking...'
               : state === 'thinking'
-              ? 'PROCESSING...'
+              ? 'Processing...'
               : isLiveConversation
-              ? 'LIVE CALL ACTIVE • SAY "END CALL" OR TAP END'
-              : 'TAP TO TALK OR SAY "HEY RODEX"'}
+              ? 'Live Call Active • Say "End Call" to Disconnect'
+              : 'Say "Hello RODEX"'}
           </span>
         </div>
-
-        {/* Android Native Permission Dialog */}
-        {showPermDialog && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-            <div className="w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl p-6 shadow-2xl space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-950/60 border border-cyan-800/60 text-cyan-400 flex items-center justify-center mx-auto">
-                <Mic className="w-6 h-6" />
-              </div>
-
-              <div className="text-center space-y-1.5">
-                <h3 className="text-base font-semibold text-white">
-                  Allow RODEX to record audio?
-                </h3>
-                <p className="text-xs text-neutral-400">
-                  RODEX requires microphone access to process voice commands and animate the neural orb in real time.
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <button
-                  id="grant-mic-button"
-                  onClick={() => requestMicPermission()}
-                  className="w-full py-3 rounded-xl bg-cyan-500 text-black font-semibold hover:bg-cyan-400 active:scale-98 transition-all text-xs"
-                >
-                  While using the app
-                </button>
-                <button
-                  onClick={() => requestMicPermission()}
-                  className="w-full py-2.5 rounded-xl bg-neutral-900 text-neutral-300 hover:bg-neutral-800 active:scale-98 transition-all text-xs border border-neutral-800"
-                >
-                  Only this time
-                </button>
-                <button
-                  onClick={() => setShowPermDialog(false)}
-                  className="w-full py-2 text-neutral-500 hover:text-neutral-300 text-xs transition-colors"
-                >
-                  Don't allow
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Slide-up Chat History Sheet */}
         <ChatSheet
@@ -1661,6 +1618,7 @@ export default function App() {
           onOpenSpotify={() => setIsSpotifyOpen(true)}
           onOpenWebVerify={() => setIsWebVerifyOpen(true)}
           onOpenMemory={() => setIsMemoryOpen(true)}
+          onOpenGmail={() => setIsGmailOpen(true)}
           onSelectMode={(mode) => {
             if (mode === 'home') {
               setActiveMode('home');
@@ -1669,6 +1627,36 @@ export default function App() {
               setActiveMode(mode);
             }
           }}
+        />
+
+        {/* More Menu Drawer */}
+        <MoreMenu
+          isOpen={isMoreMenuOpen}
+          onClose={() => setIsMoreMenuOpen(false)}
+          currentUser={currentUser}
+          onOpenChat={() => setIsChatOpen(true)}
+          onOpenImage={() => {
+            setMediaStudioTab('image');
+            setIsMediaStudioOpen(true);
+          }}
+          onOpenSchedule={() => setIsScheduleOpen(true)}
+          onOpenPlugins={() => setIsCapabilityOpen(true)}
+          onOpenUserProfile={() => setIsUserProfileOpen(true)}
+          onOpenAuthModal={() => {
+            setAuthModalTab('signin');
+            setIsAuthModalOpen(true);
+          }}
+          onOpenSecurity={() => setIsSecurityOpen(true)}
+          onOpenGmail={() => setIsGmailOpen(true)}
+          onOpenDoctor={() => setIsDoctorOpen(true)}
+          onOpenUpdate={() => setIsUpdateOpen(true)}
+          onOpenMemory={() => setIsMemoryOpen(true)}
+          onOpenMediaStudio={() => {
+            setMediaStudioTab('video');
+            setIsMediaStudioOpen(true);
+          }}
+          onOpenMediaHub={() => setIsMediaHubOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         {/* Voice Profile & Biometrics Modal */}
@@ -1702,6 +1690,22 @@ export default function App() {
           onOpenMediaStudio={(tab) => {
             setMediaStudioTab(tab);
             setIsMediaStudioOpen(true);
+          }}
+          onOpenSecurity={() => setIsSecurityOpen(true)}
+          onOpenGmail={() => setIsGmailOpen(true)}
+          onOpenDoctor={() => setIsDoctorOpen(true)}
+          onOpenUpdate={() => setIsUpdateOpen(true)}
+          onOpenUserProfile={() => setIsUserProfileOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenVoiceProfile={() => setIsVoiceProfileOpen(true)}
+        />
+
+        {/* Schedule Hub Modal */}
+        <ScheduleModal
+          isOpen={isScheduleOpen}
+          onClose={() => setIsScheduleOpen(false)}
+          onAddReminder={(title, timeStr) => {
+            handleSendMessage(`Remind me to ${title} at ${timeStr}`);
           }}
         />
 
@@ -1744,11 +1748,34 @@ export default function App() {
           onSpeakStatus={(text) => speakResponse(text)}
         />
 
-        {/* Creator Identity & Recognition Modal */}
-        <CreatorProfileModal
-          isOpen={isCreatorOpen}
-          onClose={() => setIsCreatorOpen(false)}
-          onSpeakStatus={(text) => speakResponse(text)}
+        {/* Multi-User Account Profile Modal */}
+        <UserProfileModal
+          isOpen={isUserProfileOpen}
+          onClose={() => setIsUserProfileOpen(false)}
+          currentUser={currentUser}
+          onUserUpdated={(user) => {
+            setCurrentUser(user);
+          }}
+          onOpenAuthModal={(tab) => {
+            setAuthModalTab(tab);
+            setIsAuthModalOpen(true);
+          }}
+          onLogout={() => {
+            globalAuthClient.logout();
+            setCurrentUser(null);
+            speakResponse('You have signed out of your account.');
+          }}
+        />
+
+        {/* Authentication & Registration Modal */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          initialTab={authModalTab}
+          onSuccess={(user) => {
+            setCurrentUser(user);
+            speakResponse(`Welcome, ${user.displayName}. Your account is authenticated.`);
+          }}
         />
 
         {/* Long-Term Memory & User Personalization Modal */}
@@ -1776,6 +1803,15 @@ export default function App() {
         <RodexDoctorModal
           isOpen={isDoctorOpen}
           onClose={() => setIsDoctorOpen(false)}
+        />
+
+        {/* RODEX Official Gmail & Email Integration Hub Modal */}
+        <GmailHubModal
+          isOpen={isGmailOpen}
+          onClose={() => setIsGmailOpen(false)}
+          onNotification={(text) => {
+            rodexSynth.speak(text);
+          }}
         />
       </main>
     </AndroidFrame>

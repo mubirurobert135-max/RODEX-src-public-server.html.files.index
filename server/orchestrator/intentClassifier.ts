@@ -8,6 +8,13 @@ import {
 import { ContextMemoryManager } from './contextMemory';
 
 export class IntentClassifier {
+  public static classifyIntent(
+    userInput: string,
+    history: Array<{ role: string; text: string }> = []
+  ): IntentClassification {
+    return this.classify(userInput, history);
+  }
+
   public static classify(
     userInput: string,
     history: Array<{ role: string; text: string }> = [],
@@ -283,7 +290,46 @@ export class IntentClassifier {
     }
 
     // 5. EMAIL OPERATIONS & EXACT RESPONSE CONTROL
-    // Draft reply with exact user instruction:
+    // Contextual reply (e.g. "Reply saying I'll come tomorrow", "Reply to this email saying I'll attend")
+    const replyContextMatch =
+      rawText.match(/(?:reply|draft\s+(?:a\s+)?reply)(?:\s+to\s+(?:this|that|the)\s+email)?\s+(?:saying|with)[:\s]+(.+)$/i);
+    if (replyContextMatch && replyContextMatch[1]) {
+      let replyContent = replyContextMatch[1].trim().replace(/^["']|["']$/g, '');
+      return {
+        primaryIntent: 'email_operation',
+        confidence: 0.99,
+        extractedEntities: {
+          action: 'draft_reply',
+          replyContent,
+        },
+        suggestedTools: ['email_service'],
+        requiresPlanning: true,
+        riskLevel: 'elevated',
+        interactionType: 'action_command',
+        responseFormat: 'exact',
+        detailLevel: 'concise',
+      };
+    }
+
+    // Generic draft reply: "Draft a reply to this email", "Draft a reply"
+    if (/^(rodex,?\s*)?(please\s+)?(draft\s+(?:a\s+)?reply(?:\s+to\s+(?:this|that|the)\s+email)?)$/i.test(rawLower)) {
+      return {
+        primaryIntent: 'email_operation',
+        confidence: 0.98,
+        extractedEntities: {
+          action: 'draft_reply',
+          replyContent: "I'll attend as requested.",
+        },
+        suggestedTools: ['email_service'],
+        requiresPlanning: true,
+        riskLevel: 'elevated',
+        interactionType: 'action_command',
+        responseFormat: 'exact',
+        detailLevel: 'concise',
+      };
+    }
+
+    // Draft reply with explicit recipient:
     // e.g. "Reply to John with: I'll attend the meeting"
     // e.g. "Reply to John and tell him I'll come tomorrow at 10"
     // e.g. "Draft a reply to Sarah saying I'll come tomorrow at 10"
@@ -316,8 +362,8 @@ export class IntentClassifier {
       };
     }
 
-    // Send drafted email: "send it", "send the email", "send email", "send draft"
-    if (/^(rodex,?\s*)?(please\s+)?(send it|send email|send the email|send draft|send this email|send message)$/i.test(rawLower)) {
+    // Send drafted email: "send it", "send the email", "send email", "send the reply", "send reply", "send draft"
+    if (/^(rodex,?\s*)?(please\s+)?(send it|send email|send the email|send the reply|send reply|send draft|send this email|send message)$/i.test(rawLower)) {
       return {
         primaryIntent: 'email_operation',
         confidence: 0.99,
@@ -331,8 +377,8 @@ export class IntentClassifier {
       };
     }
 
-    // Check new emails: "check emails", "check for new emails", "do i have new emails", "unread emails"
-    if (/\b(check emails|check for new emails|new emails|unread emails|any new emails|check my inbox|check inbox)\b/i.test(lower)) {
+    // Check new emails: "check emails", "check my email", "check gmail", "check my gmail", "do i have any new emails", "do i have new messages"
+    if (/\b(check emails|check my email|check email|check gmail|check my gmail|check for new emails|new emails|unread emails|any new emails|do i have (?:any\s+)?(?:new\s+)?(?:emails|messages)|do i have new messages|check my inbox|check inbox)\b/i.test(lower)) {
       return {
         primaryIntent: 'email_operation',
         confidence: 0.97,
@@ -346,7 +392,21 @@ export class IntentClassifier {
       };
     }
 
-    // Read email from sender: "read email from John", "read Sarah's email", "read the latest email"
+    // Read latest email: "read my latest email", "read the latest email", "read the latest one"
+    if (/\b(read (?:my\s+|the\s+)?latest email|read (?:the\s+)?latest one|read (?:the\s+)?latest message)\b/i.test(lower)) {
+      return {
+        primaryIntent: 'email_operation',
+        confidence: 0.98,
+        extractedEntities: { action: 'read_email' },
+        suggestedTools: ['email_service'],
+        requiresPlanning: true,
+        riskLevel: 'elevated',
+        interactionType: 'action_command',
+        responseFormat: 'concise',
+      };
+    }
+
+    // Read email from sender: "read email from John", "read Sarah's email"
     const readEmailMatch = lower.match(/(?:read\s+(?:the\s+)?email\s+(?:from\s+)?([a-zA-Z\s]+)|read\s+([a-zA-Z]+)'s\s+email)/i);
     if (readEmailMatch && (readEmailMatch[1] || readEmailMatch[2])) {
       const sender = (readEmailMatch[1] || readEmailMatch[2]).trim();
@@ -359,6 +419,35 @@ export class IntentClassifier {
         riskLevel: 'elevated',
         interactionType: 'action_command',
         responseFormat: 'concise',
+      };
+    }
+
+    // Summarize latest email: "summarize my latest email", "summarize latest email"
+    if (/\b(summarize (?:my\s+|the\s+)?latest email|summarize latest email)\b/i.test(lower)) {
+      return {
+        primaryIntent: 'email_operation',
+        confidence: 0.98,
+        extractedEntities: { action: 'summarize_email' },
+        suggestedTools: ['email_service'],
+        requiresPlanning: true,
+        riskLevel: 'elevated',
+        interactionType: 'action_command',
+        detailLevel: 'concise',
+      };
+    }
+
+    // Find / Search emails: "find emails from Robert", "find emails about my project", "do i have anything from Victoria University"
+    const findEmailMatch = lower.match(/(?:find\s+(?:the\s+)?emails?\s+(?:about|from|with|for)\s+(.+)|do i have anything from\s+(.+))/i);
+    if (findEmailMatch && (findEmailMatch[1] || findEmailMatch[2])) {
+      const q = (findEmailMatch[1] || findEmailMatch[2]).trim();
+      return {
+        primaryIntent: 'email_operation',
+        confidence: 0.97,
+        extractedEntities: { action: 'search_emails', searchQuery: q },
+        suggestedTools: ['email_service'],
+        requiresPlanning: true,
+        riskLevel: 'elevated',
+        interactionType: 'action_command',
       };
     }
 
@@ -455,6 +544,31 @@ export class IntentClassifier {
     }
 
     // 6. OPEN URL & DESTINATION BROWSING
+    // Native Desktop Application Launcher Integration
+    const desktopAppMatch = lower.match(/^(?:rodex,?\s*)?(?:please\s+)?(?:open|launch|start|run)\s+(chrome|google chrome|vs\s*code|visual studio code|spotify|file explorer|explorer|calculator|calc|settings|android studio)$/i);
+    if (desktopAppMatch && desktopAppMatch[1]) {
+      const matchedName = desktopAppMatch[1].toLowerCase();
+      let appName = 'chrome';
+      if (matchedName.includes('vs') || matchedName.includes('visual')) appName = 'vs_code';
+      else if (matchedName.includes('spotify')) appName = 'spotify';
+      else if (matchedName.includes('explorer')) appName = 'file_explorer';
+      else if (matchedName.includes('calc')) appName = 'calculator';
+      else if (matchedName.includes('settings')) appName = 'settings';
+      else if (matchedName.includes('android')) appName = 'android_studio';
+
+      return {
+        primaryIntent: 'open_url',
+        confidence: 0.99,
+        extractedEntities: { appName },
+        suggestedTools: ['desktop_launcher'],
+        requiresPlanning: true,
+        riskLevel: 'safe',
+        interactionType: 'action_command',
+        responseFormat: 'exact',
+        detailLevel: 'concise',
+      };
+    }
+
     // Strict concise command e.g. "Open YouTube", "Open Gmail", "Open Spotify", "Open Google"
     if (
       /^(rodex,?\s*)?(please\s+)?(open|launch|go to|visit)\s+(youtube|google|gmail|spotify|github|twitter|x\.com|wikipedia|reddit|claude|gemini|openai)(\s+website|\s+app)?$/i.test(
@@ -499,12 +613,15 @@ export class IntentClassifier {
       };
     }
 
-    // YouTube search commands e.g. "play <song> on youtube", "search youtube for <query>"
+    // YouTube search commands e.g. "play <song> on youtube", "search youtube for <query>", "open youtube and search for <query>", "play first youtube video of <query>"
     const ytMatch =
+      lower.match(/(?:open|go to|launch)\s+youtube\s+(?:and\s+)?(?:search(?:\s+for)?|play|watch|find)\s+(.+)$/i) ||
+      lower.match(/(?:play|watch|open)\s+(?:the\s+)?(?:first\s+)?youtube\s+video\s+(?:of|for|about)\s+(.+)$/i) ||
+      lower.match(/(?:open|play)\s+first\s+(?:search\s+)?result\s+(?:of|for)\s+(.+)$/i) ||
       lower.match(/(?:search\s+youtube\s+for|search\s+on\s+youtube\s+for|play\s+on\s+youtube|watch\s+on\s+youtube|youtube\s+search\s+for|find\s+on\s+youtube)\s+(.+)$/i) ||
       lower.match(/(?:play|watch|find)\s+(.+?)\s+on\s+youtube$/i);
-    if (ytMatch && ytMatch[1]) {
-      const query = ytMatch[1].trim();
+    if (ytMatch && (ytMatch[1] || ytMatch[2] || ytMatch[3] || ytMatch[4])) {
+      const query = (ytMatch[1] || ytMatch[2] || ytMatch[3] || ytMatch[4]).trim();
       return {
         primaryIntent: 'open_url',
         confidence: 0.98,
@@ -597,8 +714,22 @@ export class IntentClassifier {
       };
     }
 
-    // 11. CREATOR INQUIRY
-    if (/\b(who created you|who is your founder|who developed you|who developed|developed rodex|who made you|who is robert|who is mubiru robert)\b/i.test(lower)) {
+    // 11. USER IDENTITY INQUIRY ("Who am I?", "What is my profile?", "What's my name?")
+    if (/\b(who am i|what is my name|what's my name|my profile|who is logged in|my account name|which account am i)\b/i.test(lower)) {
+      return {
+        primaryIntent: 'user_identity_inquiry',
+        confidence: 0.99,
+        extractedEntities: {},
+        suggestedTools: [],
+        requiresPlanning: false,
+        riskLevel: 'safe',
+        interactionType: 'info_request',
+        detailLevel: 'concise',
+      };
+    }
+
+    // 12. CREATOR INQUIRY (Protected internal system metadata about RODEX's developer & founder)
+    if (/\b(who created you|who is your founder|who developed you|who developed rodex|who developed|developed rodex|who made you|who built you|who is the author of rodex|who is your creator)\b/i.test(lower)) {
       return {
         primaryIntent: 'creator_inquiry',
         confidence: 0.99,
@@ -611,7 +742,76 @@ export class IntentClassifier {
       };
     }
 
-    // 12. TOORO KINGDOM KNOWLEDGE
+    // 13. SCHEDULE & REMINDERS
+    const scheduleMatch =
+      lower.match(/(?:remind\s+me\s+(?:at\s+|to\s+|about\s+|tomorrow\s+at\s+)?(.+)|schedule\s+(?:a\s+)?(?:meeting|task|reminder|call)\s+(?:for\s+|at\s+|about\s+)?(.+)|set\s+(?:a\s+)?(?:reminder|alarm)\s+(?:for\s+|to\s+|at\s+)?(.+))/i) ||
+      lower.match(/\b(my reminders|show schedule|what are my reminders|list schedule|upcoming tasks|pending reminders)\b/i);
+
+    if (scheduleMatch) {
+      const isList = /\b(my reminders|show schedule|what are my reminders|list schedule|upcoming tasks|pending reminders)\b/i.test(lower);
+      let title = 'Reminder';
+      let timeStr = 'as requested';
+
+      if (!isList) {
+        const fullPayload = (scheduleMatch[1] || scheduleMatch[2] || scheduleMatch[3] || rawText).trim();
+        // Check for time tokens like "at 6 PM", "tomorrow at 8 AM", "in 30 mins"
+        const timeMatch = fullPayload.match(/(?:at\s+([0-9:]+\s*(?:am|pm)?)|tomorrow\s*(?:at\s+[0-9:]+\s*(?:am|pm)?)?|in\s+\d+\s*(?:minutes|hours|mins))/i);
+        if (timeMatch) {
+          timeStr = timeMatch[0].trim();
+          title = fullPayload.replace(timeMatch[0], '').replace(/^(to\s+|for\s+)/i, '').trim();
+        } else {
+          title = fullPayload.replace(/^(to\s+|for\s+)/i, '').trim();
+        }
+      }
+
+      return {
+        primaryIntent: 'schedule_operation' as any,
+        confidence: 0.98,
+        extractedEntities: {
+          action: isList ? 'list_schedule' : 'create_reminder',
+          title: title || 'Task',
+          timeStr,
+        },
+        suggestedTools: ['schedule_manager'],
+        requiresPlanning: true,
+        riskLevel: 'safe',
+        interactionType: 'action_command',
+        responseFormat: 'exact',
+        detailLevel: 'concise',
+      };
+    }
+
+    // 14. RODEX DOCTOR & SELF-DIAGNOSTICS
+    if (/\b(rodex doctor|health check|run doctor|scan yourself|system diagnostics|check health|diagnose system|self test|system health)\b/i.test(lower)) {
+      return {
+        primaryIntent: 'doctor_diagnostics' as any,
+        confidence: 0.99,
+        extractedEntities: { action: 'run_health_check' },
+        suggestedTools: ['doctor_diagnostics'],
+        requiresPlanning: true,
+        riskLevel: 'safe',
+        interactionType: 'action_command',
+        responseFormat: 'exact',
+        detailLevel: 'concise',
+      };
+    }
+
+    // 15. AUTONOMOUS SYSTEM UPDATES
+    if (/\b(check for updates|check updates|system updates|software update|available updates|check whether you have updates|version info)\b/i.test(lower)) {
+      return {
+        primaryIntent: 'system_updates' as any,
+        confidence: 0.99,
+        extractedEntities: { action: 'check_updates' },
+        suggestedTools: ['system_updates'],
+        requiresPlanning: true,
+        riskLevel: 'safe',
+        interactionType: 'action_command',
+        responseFormat: 'exact',
+        detailLevel: 'concise',
+      };
+    }
+
+    // 16. TOORO KINGDOM KNOWLEDGE
     if (/\b(tooro kingdom|toro kingdom|king oyo|omukama oyo|fort portal|queen best kemigisa|princess komuntale|kijanangoma)\b/i.test(lower)) {
       return {
         primaryIntent: 'cultural_knowledge',

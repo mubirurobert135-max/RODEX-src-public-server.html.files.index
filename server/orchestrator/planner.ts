@@ -8,7 +8,7 @@ export class TaskPlanner {
     const text = userInput.trim();
     const lower = text.toLowerCase();
     const steps: PlanStep[] = [];
-    const model = 'gemini-2.5-flash';
+    const model = 'gemini-3.8-flash';
 
     // ----------------------------------------------------
     // MULTI-STEP COMPOUND WORKFLOW PATTERNS
@@ -48,7 +48,7 @@ export class TaskPlanner {
       return {
         goal: `Coordinate WhatsApp communication to ${recipient} with message: "${messageText}"`,
         steps,
-        selectedModel: 'gemini-2.5-flash',
+        selectedModel: 'gemini-3.8-flash',
         estimatedComplexity: 'multi_step',
       };
     }
@@ -89,7 +89,7 @@ export class TaskPlanner {
       return {
         goal: `Inspect email from ${sender}, summarize thread, and prepare draft reply`,
         steps,
-        selectedModel: 'gemini-2.5-flash',
+        selectedModel: 'gemini-3.8-flash',
         estimatedComplexity: 'multi_step',
       };
     }
@@ -121,7 +121,7 @@ export class TaskPlanner {
       return {
         goal: `Perform web research on "${query}" and record findings into long-term memory`,
         steps,
-        selectedModel: 'gemini-2.5-flash',
+        selectedModel: 'gemini-3.8-flash',
         estimatedComplexity: 'multi_step',
       };
     }
@@ -190,7 +190,7 @@ export class TaskPlanner {
         return {
           goal: `Perform email operation (${action})`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -211,7 +211,7 @@ export class TaskPlanner {
         return {
           goal: `Access contact information (${action})`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -231,7 +231,7 @@ export class TaskPlanner {
         return {
           goal: 'Enforce zero-disclosure hardware device security',
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -257,7 +257,7 @@ export class TaskPlanner {
         return {
           goal: `Open ${label} in browser`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -273,7 +273,7 @@ export class TaskPlanner {
         return {
           goal: `Compute and answer: ${intent.extractedEntities.expression}`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -289,7 +289,7 @@ export class TaskPlanner {
         return {
           goal: `Provide precise current date and time for ${intent.extractedEntities.targetTimeZone}`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -305,7 +305,7 @@ export class TaskPlanner {
         return {
           goal: 'Retrieve and summarize system health and operational metrics',
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -321,7 +321,7 @@ export class TaskPlanner {
         return {
           goal: `Read and summarize file: ${intent.extractedEntities.filePath}`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'simple',
         };
       }
@@ -341,7 +341,7 @@ export class TaskPlanner {
         return {
           goal: `Control media playback on Spotify PC (${intent.extractedEntities.action})`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -357,7 +357,7 @@ export class TaskPlanner {
         return {
           goal: `Trigger application modal/action: ${intent.extractedEntities.action}`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -374,7 +374,7 @@ export class TaskPlanner {
         return {
           goal: `Retrieve current weather conditions for ${location}`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -397,7 +397,61 @@ export class TaskPlanner {
         return {
           goal: `Manage long-term memory (${intent.extractedEntities.action})`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
+          estimatedComplexity: 'instant',
+        };
+      }
+
+      case 'schedule_operation': {
+        steps.push({
+          stepNumber: 1,
+          description: `Manage user schedule: action="${intent.extractedEntities.action}"`,
+          toolName: 'schedule_manager',
+          toolParams: {
+            action: intent.extractedEntities.action,
+            title: intent.extractedEntities.title,
+            timeStr: intent.extractedEntities.timeStr,
+            category: intent.extractedEntities.category,
+            taskId: intent.extractedEntities.taskId,
+          },
+          status: 'pending',
+        });
+        return {
+          goal: `Schedule & reminder operation (${intent.extractedEntities.action})`,
+          steps,
+          selectedModel: 'gemini-3.8-flash',
+          estimatedComplexity: 'instant',
+        };
+      }
+
+      case 'doctor_diagnostics': {
+        steps.push({
+          stepNumber: 1,
+          description: 'Run RODEX Doctor self-healing diagnostic suite across subsystems',
+          toolName: 'doctor_diagnostics',
+          toolParams: { action: intent.extractedEntities.action || 'run_health_check' },
+          status: 'pending',
+        });
+        return {
+          goal: 'Execute RODEX Doctor diagnostic suite and verify subsystem health',
+          steps,
+          selectedModel: 'gemini-3.8-flash',
+          estimatedComplexity: 'instant',
+        };
+      }
+
+      case 'system_updates': {
+        steps.push({
+          stepNumber: 1,
+          description: 'Check for available RODEX system intelligence updates',
+          toolName: 'system_updates',
+          toolParams: { action: intent.extractedEntities.action || 'check_updates' },
+          status: 'pending',
+        });
+        return {
+          goal: 'Check system updates and intelligence definitions',
+          steps,
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -413,7 +467,7 @@ export class TaskPlanner {
         return {
           goal: 'Inspect platform bridge capabilities and environment constraints',
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'instant',
         };
       }
@@ -429,7 +483,7 @@ export class TaskPlanner {
         return {
           goal: `Retrieve live verified web facts for: ${intent.extractedEntities.query}`,
           steps,
-          selectedModel: 'gemini-2.5-flash',
+          selectedModel: 'gemini-3.8-flash',
           estimatedComplexity: 'simple',
         };
       }

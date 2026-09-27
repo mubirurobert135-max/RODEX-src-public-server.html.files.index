@@ -1,12 +1,12 @@
 {
-  "projectId": "hazel-champion-vt8c4",
-  "appId": "1:979655215969:web:6e3a3c8b8f124503b39320",
-  "apiKey": "AIzaSyCZVmJzykFTV84uzSithxnf__09K5tWI2g",
-  "authDomain": "hazel-champion-vt8c4.firebaseapp.com",
+  "projectId": "gen-lang-client-0404642577",
+  "appId": "1:225706102469:web:92479ffb4f75fc90e2aaac",
+  "apiKey": "AIzaSyAWtoMpa4KUQqlP-7GeKvghh5EY1sBBBAk",
+  "authDomain": "gen-lang-client-0404642577.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-rodex-ba475a9a-5c70-4c8d-80c9-d9755d4626fe",
-  "storageBucket": "hazel-champion-vt8c4.firebasestorage.app",
-  "messagingSenderId": "979655215969",
+  "storageBucket": "gen-lang-client-0404642577.firebasestorage.app",
+  "messagingSenderId": "225706102469",
   "measurementId": "",
-  "oAuthClientId": "979655215969-mdcu37vpvn1jftlp81tkpol4mdukbssc.apps.googleusercontent.com",
+  "oAuthClientId": "225706102469-38aa16m1upc7arngnq32uq65np8d7dtf.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

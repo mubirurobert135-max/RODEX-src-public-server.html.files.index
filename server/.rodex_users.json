@@ -1,0 +1,374 @@
+[
+  {
+    "id": "usr_robert_1001",
+    "username": "robert",
+    "email": "mubirurobert135@gmail.com",
+    "displayName": "Robert",
+    "passwordHash": "a103a9da18b11a5d07834e2a9f6614a78c2f14c156196da6920c08d357e915df9a5f5fe3e549b9f9daefa94d77d5b8e55a59cbe6ef6eeef2bdd0d6778ee5b7da",
+    "salt": "2473115b3bb287aeba1fe1e46e7c92d6",
+    "securityQuestion": "What is your primary AI project?",
+    "securityAnswerHash": "36eec1ea05e22fb6ef6a4b897d08933fa4efc40d1d595a400eea2c16c514db4c7d3ef2af123169dcf55c473ad3d6b6935a5b13014597141254819c0330af6f38",
+    "securityAnswerSalt": "c8ebca7aeaac0c996922b84c8988a924",
+    "role": "user",
+    "profile": {
+      "preferredName": "Robert",
+      "honorific": "Mr. Robert",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": [
+        "Prioritize verified, factual information and clear reasoning."
+      ]
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": true
+    },
+    "createdAt": "2026-09-27T10:02:48.279Z",
+    "updatedAt": "2026-09-27T10:02:48.279Z"
+  },
+  {
+    "id": "usr_1790503368438_0439c1ac",
+    "username": "alice_1790503368429",
+    "email": "alice_1790503368429@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "7de6521ad40dfa380a4d8642d0e9a3b0bf6150781db9948946a9f8a5f6c50b7c7ca2d07cc0560a8cdd17b31a12840e0bdee4c9d8d69ddbef0627bd412e2ae9a4",
+    "salt": "2017d0bbece6ef419288a6f0b3296796",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "1aa0bf3413e0bb757a052dcca9d300cde3310f47d4bcf94850a16788523802976911097836daccd2d1e6a998057a8d0908e73a87fee8894938b28d0064a30520",
+    "securityAnswerSalt": "ceaf838d9bce20c1ddc646b1ca221b0d",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T10:02:48.438Z",
+    "updatedAt": "2026-09-27T10:02:48.438Z"
+  },
+  {
+    "id": "usr_1790503368443_07794f30",
+    "username": "bob_1790503368439",
+    "email": "bob_1790503368439@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "e3671a4d8089a42ad2e6ad7ac595358dba03ef126e329439d6a0df51fc54d5f6a88b352e4fa589b793c4219b73b20a1dff82be6c1be077dc7a90991841b24289",
+    "salt": "b7d0195441fde5ab2b3898c28db4d196",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T10:02:48.443Z",
+    "updatedAt": "2026-09-27T10:02:48.443Z"
+  },
+  {
+    "id": "usr_1790503456078_62f73c0c",
+    "username": "alice_1790503456069",
+    "email": "alice_1790503456069@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "a0e7ff32b9d16d0b5ab90d23c22e241cebdfb7bf4527b5b8ffbc4efa7d214f17c1c098dca7e43bd4789cf788102085fecd8a151fc52748611f39292dce958256",
+    "salt": "02aa8825aae1608572e2bd319a06c629",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "f9d476eb50149b004761f66778d9c1fdf8042e06e7f02492b89a686abd73d30f9fa07d651af45481688a98fe361adcda7be7687f7831638af523790a030ae80a",
+    "securityAnswerSalt": "b0e5ae89061553995b2f2fa0de88084e",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T10:04:16.078Z",
+    "updatedAt": "2026-09-27T10:04:16.078Z"
+  },
+  {
+    "id": "usr_1790503456082_50dbd3fe",
+    "username": "bob_1790503456078",
+    "email": "bob_1790503456078@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "c1ad7dd0aa1700c144f90c9d2a90dce83a30ca128fac4e68fa9f837ab8574c38de0e44ae6de67ac91d96c4f3d88c4162a2a29c27acb1cb324dc54d7a16bf9e09",
+    "salt": "aad2b0cc8f380ff4cdcd395ed168b9e9",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T10:04:16.082Z",
+    "updatedAt": "2026-09-27T10:04:16.082Z"
+  },
+  {
+    "id": "usr_1790503976349_3c040cda",
+    "username": "alice_1790503976340",
+    "email": "alice_1790503976340@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "39c21c710f83407d3ea12a57ebea42fe12834c2c1e8fec22d8fec653438d08f5f87ca0e00b400c456db20700c46fd84a49dd1e1ab1660315197ece1352fddcfd",
+    "salt": "0131cb3d58d95c61142ec042bb591331",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "fc75270fed2bb8c01c5bb7be833943c7d82d680320fb29abf0b86657d26bc8bc8a2afe74d1ae4c720a2107d1363871084b42d5bd2c32739df983ff3ffabd1ac6",
+    "securityAnswerSalt": "783d27a231376526d8c8e664f3246dba",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T10:12:56.349Z",
+    "updatedAt": "2026-09-27T10:12:56.349Z"
+  },
+  {
+    "id": "usr_1790503976354_8732f26d",
+    "username": "bob_1790503976350",
+    "email": "bob_1790503976350@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "2baab46dc99d16670aa2ca9d6521428ba3c85d8cba9492b7d5dc2d92aa3a3d727496ab89083e9fb79fa8593d287baeb618b722504e680a1d277bb98cda25528b",
+    "salt": "18138f9a3148a53837225b0444ba045a",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T10:12:56.354Z",
+    "updatedAt": "2026-09-27T10:12:56.354Z"
+  },
+  {
+    "id": "usr_1790507478331_9d9149a7",
+    "username": "alice_1790507478323",
+    "email": "alice_1790507478323@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "33054d50b136e2cd1a349f9643a0f8fe393c46794fe633f59520e547e6f0c2adba9c099e406e7db7823443815c2ee57c690684e1fce3bc99e3d0a262d7cf35bb",
+    "salt": "6a8261c5e68399712209a625d6220c0f",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "ea372531e37feac9dce2cf4487e98b70ba7b21507930edd6fb6906e51bb0b0e42d7a9fe9ce5f80a570e0d0e70e8c34a4759ce3d5995c74af7fb617eb77c23aa7",
+    "securityAnswerSalt": "7c283321ac9c1b6493e3f38701ac1826",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T11:11:18.331Z",
+    "updatedAt": "2026-09-27T11:11:18.331Z"
+  },
+  {
+    "id": "usr_1790507478336_e981025f",
+    "username": "bob_1790507478332",
+    "email": "bob_1790507478332@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "455c55a3fefedf21971458ab61c84e5109e355735a11445e679e400f566bbbc313b10b5b420157531f37fa475f73738067059aa74642d7f20713ba0261eaa1ad",
+    "salt": "b529399c367d60cb4a1bc1254241e617",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T11:11:18.336Z",
+    "updatedAt": "2026-09-27T11:11:18.336Z"
+  },
+  {
+    "id": "usr_1790507908853_5a02c1ac",
+    "username": "alice_1790507908845",
+    "email": "alice_1790507908845@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "43264303ad4c157c0c6dda0e226cd0de2bbeae31834b21535d1f3bafa020f5422c541cb61d4f1f220bd31f7d74863210de085f4f3131e43e39b043573b48ec48",
+    "salt": "43e8f0b0ce2eb4a648c050ff9cebd833",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "ad8569ba314a9931b2fad72ccf46b745cc765859ee50f233f178c17ec3e89657aad327e248f97657781b23054d24b6743a1be90ac844bec224fdb869a3ec9b32",
+    "securityAnswerSalt": "05e6dcdd27154291ed0b194068ed0d8a",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T11:18:28.853Z",
+    "updatedAt": "2026-09-27T11:18:28.853Z"
+  },
+  {
+    "id": "usr_1790507908858_c1151387",
+    "username": "bob_1790507908854",
+    "email": "bob_1790507908854@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "f1983d3b51d6c22a82eff7f14d65f6a0ab4b95bb8109ee7a53cf7caf47018c7bf13cd3cd9b35bb18d707d06667f35f4b924982aca17b4307241a3a47f3b92b64",
+    "salt": "327df578fef0aa020a5188c03cec149a",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-27T11:18:28.858Z",
+    "updatedAt": "2026-09-27T11:18:28.858Z"
+  }
+]

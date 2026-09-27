@@ -1,4 +1,6 @@
 import { ToolDefinition } from '../types';
+import { globalGmailAuth } from '../../services/gmail/gmail.auth';
+import { globalGmailService } from '../../services/gmail/gmail.service';
 
 export interface EmailMessage {
   id: string;
@@ -120,10 +122,27 @@ export const emailTool: ToolDefinition = {
     },
   },
   handler: async (params, context) => {
+    if (context?.gmailAccessToken) {
+      globalGmailAuth.setAccessToken(context.gmailAccessToken, { name: context.userName });
+    }
+    const isGmailActive = !!globalGmailAuth.getAccessToken();
     const action = params?.action;
 
     switch (action) {
       case 'check_new': {
+        if (isGmailActive) {
+          try {
+            const result = await globalGmailService.checkNewEmails();
+            return {
+              success: true,
+              output: result,
+              message: result.spokenSummary,
+            };
+          } catch (err: any) {
+            console.warn('[email_service:check_new Gmail error]', err);
+          }
+        }
+
         const unread = mockEmailDatabase.filter((e) => !e.isRead);
         if (unread.length === 0) {
           return {
@@ -145,6 +164,28 @@ export const emailTool: ToolDefinition = {
       }
 
       case 'list_summaries': {
+        if (isGmailActive) {
+          try {
+            const emails = await globalGmailService.listEmails({ maxResults: 5 });
+            const summaries = emails.map((e) => ({
+              id: e.id,
+              from: e.senderName,
+              subject: e.subject,
+              snippet: e.snippet,
+              isRead: e.isRead,
+              date: e.date,
+            }));
+            const textList = summaries.map((s) => `• [${s.from}] ${s.subject} (${s.isRead ? 'Read' : 'Unread'})`).join('\n');
+            return {
+              success: true,
+              output: { total: emails.length, summaries },
+              message: `Recent emails from Gmail:\n${textList}`,
+            };
+          } catch (err: any) {
+            console.warn('[email_service:list_summaries Gmail error]', err);
+          }
+        }
+
         const count = mockEmailDatabase.length;
         const summaries = mockEmailDatabase.slice(0, 5).map((e) => ({
           id: e.id,
@@ -167,6 +208,19 @@ export const emailTool: ToolDefinition = {
       }
 
       case 'read_email': {
+        if (isGmailActive) {
+          try {
+            const { message, spokenText } = await globalGmailService.readEmail(params.emailId, params.searchQuery || params.senderQuery);
+            return {
+              success: true,
+              output: message,
+              message: spokenText,
+            };
+          } catch (err: any) {
+            console.warn('[email_service:read_email Gmail error]', err);
+          }
+        }
+
         let found: EmailMessage | undefined;
         if (params.emailId) {
           found = mockEmailDatabase.find((e) => e.id === params.emailId);
@@ -200,6 +254,24 @@ export const emailTool: ToolDefinition = {
       }
 
       case 'summarize_email': {
+        if (isGmailActive) {
+          try {
+            const { message, spokenText } = await globalGmailService.readEmail(params.emailId, params.searchQuery || params.senderQuery);
+            return {
+              success: true,
+              output: {
+                id: message.id,
+                from: message.senderName,
+                subject: message.subject,
+                summary: message.snippet,
+              },
+              message: spokenText,
+            };
+          } catch (err: any) {
+            console.warn('[email_service:summarize_email Gmail error]', err);
+          }
+        }
+
         let found: EmailMessage | undefined;
         if (params.emailId) {
           found = mockEmailDatabase.find((e) => e.id === params.emailId);
@@ -233,6 +305,41 @@ export const emailTool: ToolDefinition = {
       }
 
       case 'draft_reply': {
+        if (isGmailActive) {
+          try {
+            const draft = await globalGmailService.draftReply({
+              emailId: params.emailId,
+              recipient: params.recipient,
+              subject: params.subject,
+              replyContent: params.replyContent || "I'll attend.",
+            });
+            return {
+              success: true,
+              output: {
+                draftId: draft.draftId,
+                to: draft.to,
+                subject: draft.subject,
+                body: draft.body,
+              },
+              requiresConfirmation: true,
+              confirmationPayload: {
+                actionName: 'email_service',
+                description: `Send email to ${draft.to} with subject "${draft.subject}": "${draft.body}"`,
+                params: {
+                  action: 'send_email',
+                  emailId: draft.draftId,
+                  recipient: draft.to,
+                  subject: draft.subject,
+                  replyContent: draft.body,
+                },
+              },
+              message: `Draft ready.\nTo: ${draft.to}\nSubject: ${draft.subject}\nMessage: "${draft.body}"\nSay "Send it" or approve to send.`,
+            };
+          } catch (err: any) {
+            console.warn('[email_service:draft_reply Gmail error]', err);
+          }
+        }
+
         let targetEmail: EmailMessage | undefined;
         if (params.emailId) {
           targetEmail = mockEmailDatabase.find((e) => e.id === params.emailId);
@@ -318,6 +425,27 @@ export const emailTool: ToolDefinition = {
           };
         }
 
+        if (isGmailActive) {
+          try {
+            const sent = await globalGmailService.sendEmail({
+              recipient: params.recipient || 'recipient@domain.com',
+              subject: params.subject || 'Message from Robert',
+              body: params.replyContent || params.body || "I'll attend the meeting.",
+              explicitConfirmation: true,
+            });
+            if (params.emailId) {
+              activeDrafts = activeDrafts.filter((d) => d.id !== params.emailId);
+            }
+            return {
+              success: true,
+              output: sent,
+              message: 'Sent.',
+            };
+          } catch (err: any) {
+            console.warn('[email_service:send_email Gmail error]', err);
+          }
+        }
+
         const sentRecord = {
           id: `sent-${Date.now()}`,
           to: params.recipient || 'recipient@domain.com',
@@ -347,6 +475,21 @@ export const emailTool: ToolDefinition = {
             output: null,
             error: 'Search query required.',
           };
+        }
+
+        if (isGmailActive) {
+          try {
+            const results = await globalGmailService.searchEmails(params.searchQuery || params.senderQuery || '');
+            return {
+              success: true,
+              output: { count: results.length, emails: results },
+              message: results.length > 0
+                ? `Found ${results.length} email${results.length > 1 ? 's' : ''} matching "${params.searchQuery || params.senderQuery}".`
+                : `No emails found matching "${q}".`,
+            };
+          } catch (err: any) {
+            console.warn('[email_service:search_emails Gmail error]', err);
+          }
         }
 
         const matches = mockEmailDatabase.filter(

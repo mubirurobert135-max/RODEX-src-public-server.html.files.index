@@ -482,14 +482,15 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                     {/* Dedicated Email Execution / Draft Card */}
                     {msg.sender === 'assistant' &&
                       msg.orchestrationTrace?.executedTools?.some(
-                        (t) => t.toolName === 'email_service' && t.result?.success && t.result?.output
+                        (t) => (t.toolName === 'email_service' || t.toolName.startsWith('gmail_')) && t.result?.success && t.result?.output
                       ) && (
                         <div className="mt-3 space-y-2">
                           {msg.orchestrationTrace.executedTools
-                            .filter((t) => t.toolName === 'email_service' && t.result?.success && t.result?.output)
+                            .filter((t) => (t.toolName === 'email_service' || t.toolName.startsWith('gmail_')) && t.result?.success && t.result?.output)
                             .map((toolRec, eIdx) => {
                               const out = toolRec.result.output;
-                              const isDraft = out.draftId || out.to;
+                              const isDraft = out.draftId || out.to || out.recipient;
+                              const toAddress = out.to || out.recipient;
                               return (
                                 <div
                                   key={`email-card-${eIdx}`}
@@ -502,10 +503,10 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                                     </div>
                                     <span className="text-[10px] text-neutral-400">Encrypted</span>
                                   </div>
-                                  {out.to && (
+                                  {toAddress && (
                                     <div className="text-xs text-neutral-300">
                                       <span className="text-neutral-500 font-medium">To: </span>
-                                      <span className="text-neutral-200">{out.to}</span>
+                                      <span className="text-neutral-200">{toAddress}</span>
                                     </div>
                                   )}
                                   {out.subject && (
@@ -514,9 +515,9 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                                       <span className="text-neutral-200">{out.subject}</span>
                                     </div>
                                   )}
-                                  {out.body && (
+                                  {(out.body || out.replyContent) && (
                                     <div className="text-xs p-2 rounded-lg bg-black/50 border border-neutral-800 text-neutral-300 font-mono">
-                                      {out.body}
+                                      {out.body || out.replyContent}
                                     </div>
                                   )}
                                   {msg.pendingConfirmation && (

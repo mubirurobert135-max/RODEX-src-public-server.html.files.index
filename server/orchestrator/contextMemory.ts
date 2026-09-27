@@ -139,17 +139,24 @@ export class ContextMemoryManager {
       }
 
       // Extract last URL / website
-      if (!extracted.lastUrl) {
+      if (!extracted.lastUrl || !extracted.lastUrl.searchQuery) {
         if (/youtube\.com/i.test(text) || /\byoutube\b/i.test(text)) {
-          const songMatch = text.match(/search_query=([^&"]+)/i) || text.match(/play\s+(.+?)\s+on\s+youtube/i);
+          const songMatch =
+            text.match(/search_query=([^&"]+)/i) ||
+            text.match(/(?:open|go to|launch)\s+youtube\s+(?:and\s+)?(?:search(?:\s+for)?|play|watch|find)\s+(.+)/i) ||
+            text.match(/play\s+(.+?)\s+on\s+youtube/i) ||
+            text.match(/search\s+youtube\s+for\s+(.+)/i) ||
+            text.match(/youtube\s+search\s+for\s+(.+)/i);
           const q = songMatch ? decodeURIComponent(songMatch[1]) : undefined;
-          extracted.lastUrl = {
-            url: q ? `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` : 'https://www.youtube.com',
-            label: q ? `YouTube: "${q}"` : 'YouTube',
-            actionType: q ? 'youtube_search' : 'youtube_home',
-            searchQuery: q,
-          };
-        } else if (/google\.com/i.test(text) || /\bgoogle\b/i.test(text)) {
+          if (q || !extracted.lastUrl) {
+            extracted.lastUrl = {
+              url: q ? `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}` : 'https://www.youtube.com',
+              label: q ? `YouTube: "${q}"` : 'YouTube',
+              actionType: q ? 'youtube_search' : 'youtube_home',
+              searchQuery: q,
+            };
+          }
+        } else if (!extracted.lastUrl && (/google\.com/i.test(text) || /\bgoogle\b/i.test(text))) {
           extracted.lastUrl = {
             url: 'https://www.google.com',
             label: 'Google',
@@ -322,6 +329,40 @@ export class ContextMemoryManager {
         resolvedInput = `search google for ${target}`;
       } else {
         resolvedInput = `open ${target}`;
+      }
+    }
+
+    // YouTube/Spotify/Google continuation: e.g. "search for Python" or "search Python"
+    if (
+      (lower.startsWith('search for ') || lower.startsWith('search ') || lower.startsWith('play ')) &&
+      !lower.includes('on youtube') && !lower.includes('on spotify') && !lower.includes('google')
+    ) {
+      const q = lower.replace(/^(search for|search|play)\s+/i, '').trim();
+      const lastLabel = combinedState.lastUrl?.label?.toLowerCase() || '';
+      if (lastLabel.includes('youtube') || (combinedState.lastTopic && combinedState.lastTopic.toLowerCase().includes('youtube'))) {
+        isFollowUp = true;
+        resolvedInput = `search youtube for ${q}`;
+      } else if (lastLabel.includes('spotify') || (combinedState.lastTopic && combinedState.lastTopic.toLowerCase().includes('spotify'))) {
+        isFollowUp = true;
+        resolvedInput = `search spotify for ${q}`;
+      } else if (lastLabel.includes('google') || (combinedState.lastTopic && combinedState.lastTopic.toLowerCase().includes('google'))) {
+        isFollowUp = true;
+        resolvedInput = `search google for ${q}`;
+      }
+    }
+
+    // "Open the first one" or "open the first result" or "play the first result"
+    if (
+      /\b(open the first|play the first|the first result|open the first result|first one)\b/i.test(lower) &&
+      combinedState.lastUrl?.searchQuery
+    ) {
+      isFollowUp = true;
+      const lastQ = combinedState.lastUrl.searchQuery;
+      const lastLabel = combinedState.lastUrl.label.toLowerCase();
+      if (lastLabel.includes('youtube')) {
+        resolvedInput = `play first youtube video of ${lastQ}`;
+      } else {
+        resolvedInput = `open first search result of ${lastQ}`;
       }
     }
 

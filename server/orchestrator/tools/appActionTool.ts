@@ -7,7 +7,7 @@ export const appActionTool: ToolDefinition = {
   parameters: {
     action: {
       type: 'string',
-      description: 'The app action to perform: "open_settings", "open_voice_profile", "open_security_center", "open_spotify_player", "open_modes", "open_update_center", "open_creator_profile", "open_web_verifier", "clear_history"',
+      description: 'The app action to perform: "open_settings", "open_voice_profile", "open_security_center", "open_spotify_player", "open_modes", "open_update_center", "open_user_profile", "open_web_verifier", "clear_history"',
       enum: [
         'open_settings',
         'open_voice_profile',
@@ -15,7 +15,7 @@ export const appActionTool: ToolDefinition = {
         'open_spotify_player',
         'open_modes',
         'open_update_center',
-        'open_creator_profile',
+        'open_user_profile',
         'open_web_verifier',
         'clear_history',
       ],
@@ -57,7 +57,7 @@ export const appActionTool: ToolDefinition = {
       open_spotify_player: 'Opening Spotify Desktop Connect Player.',
       open_modes: 'Opening RODEX Operating Modes.',
       open_update_center: 'Opening System Update & Technology Center.',
-      open_creator_profile: 'Opening Mubiru Robert (Creator & Developer) Profile.',
+      open_user_profile: 'Opening User Account Profile & Settings.',
       open_web_verifier: 'Opening World Wide Web Link Verifier.',
       clear_history: 'Chat history cleared successfully.',
     };

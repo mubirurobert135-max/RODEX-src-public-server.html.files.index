@@ -68,25 +68,24 @@ export class AIProviderService {
     switch (tier) {
       case 'deep_reasoning':
         return [
+          'gemini-2.5-pro',
           'gemini-2.5-flash',
+          'gemini-2.5-flash-lite',
           'gemini-3.8-flash',
-          'gemini-3.1-pro-preview',
-          'gemini-3.1-flash-lite',
-          'gemini-flash-latest',
         ];
       case 'balanced':
         return [
           'gemini-2.5-flash',
+          'gemini-2.5-flash-lite',
+          'gemini-2.5-pro',
           'gemini-3.8-flash',
-          'gemini-3.1-flash-lite',
-          'gemini-flash-latest',
         ];
       case 'fast':
       default:
         return [
           'gemini-2.5-flash',
-          'gemini-3.1-flash-lite',
-          'gemini-flash-latest',
+          'gemini-2.5-flash-lite',
+          'gemini-2.5-pro',
           'gemini-3.8-flash',
         ];
     }
