@@ -522,8 +522,39 @@ export default function App() {
     probeMicPermission();
   }, [currentUser, probeMicPermission]);
 
-  // Check microphone permissions on mount
+  // Initialize unified voice manager AND handle permissions
   useEffect(() => {
+    globalSpeechManager.setCallbacks({
+      onStateChange: (state) => {
+        console.info('[RODEX SpeechManager] State changed:', state);
+        // Map to existing assistant state if needed
+      },
+      onTranscript: (text, isFinal) => {
+        setTranscript(text);
+      },
+      onWakeDetected: (pureActivation, command) => {
+        console.info('[RODEX SpeechManager] Wake detected, pure:', pureActivation, 'cmd:', command);
+        if (pureActivation) {
+          // Handle as pure wake
+        } else {
+          // Handle as command
+          handleSendMessage(command);
+        }
+      },
+      onCommandCaptured: (command) => {
+        console.info('[RODEX SpeechManager] Command captured:', command);
+        handleSendMessage(command);
+      },
+      onError: (error, fatal) => {
+        console.error('[RODEX SpeechManager] Error:', error);
+      },
+      onSpeechEnd: () => {
+        console.info('[RODEX SpeechManager] Speech ended');
+      }
+    });
+    
+    globalSpeechManager.startContinuousWakeListening(micPermissionGranted);
+
     console.info('[RODEX DIAGNOSTICS] VOICE INIT - System initializing...');
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions
@@ -551,7 +582,7 @@ export default function App() {
       audioMeterRef.current.stop();
       rodexSynth.stop();
     };
-  }, []);
+  }, [micPermissionGranted]);
 
   // Request Microphone Permission
   const requestMicPermission = useCallback(async (): Promise<boolean> => {
@@ -1425,7 +1456,7 @@ export default function App() {
             setDiagWakeMatched(true);
             triggerHaptic('activate');
             try {
-              wakeRec.stop();
+              wakeRec.abort();
             } catch (_) {}
 
             if (match.isPureActivation || isHeyRodexCall(currentText) || !match.command?.trim()) {
@@ -1459,9 +1490,13 @@ export default function App() {
               setLastResponse(acknowledgeText);
               console.info('[RODEX DIAGNOSTICS] COMMAND LISTENING triggered via pure wake word');
               speakResponse(acknowledgeText, () => {
+                console.info('[DEBUG] TTS completed, checking isLive:', isLiveConversationRef.current);
                 if (isLiveConversationRef.current) {
                   playToneChime('listen');
+                  console.info('[DEBUG] Calling startListening()');
                   startListening();
+                } else {
+                  console.info('[DEBUG] isLiveConversationRef.current is false, NOT starting listener');
                 }
               });
             } else {
@@ -1580,12 +1615,14 @@ export default function App() {
 
       recognition.onstart = async () => {
         console.info('[RODEX DIAGNOSTICS] AUDIO START - Speech recognition session active');
+        console.info('[DEBUG] About to start audio meter');
         setDiagRunning('Listening (Active Command)');
         setDiagLastEvent('onstart (Command)');
         setState('listening');
         setTranscript('');
         await audioMeterRef.current.start();
         startAudioMeterLoop();
+        console.info('[DEBUG] Audio meter started');
 
         // Start active session silence timeout: if user says absolutely nothing for 6s, return to standby
         if (liveSilenceTimeoutRef.current) {
@@ -1902,6 +1939,7 @@ export default function App() {
           <div className="flex flex-col items-start gap-1">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
+              <span className="font-bold text-white text-sm">RODEX</span>
             </div>
             <button
               id="header-more-btn"
