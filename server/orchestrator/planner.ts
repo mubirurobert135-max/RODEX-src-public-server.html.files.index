@@ -14,6 +14,144 @@ export class TaskPlanner {
     // MULTI-STEP COMPOUND WORKFLOW PATTERNS
     // ----------------------------------------------------
 
+    // Pattern 1a: Twilio SMS (e.g., "Send John an SMS saying I'm on my way")
+    if (lower.includes('sms') || lower.includes('text message') || lower.startsWith('text john') || lower.startsWith('text sarah') || lower.includes('send sms')) {
+      const phoneMatch = text.match(/\+?\d[\d\s-]{7,15}\d/);
+      let to = phoneMatch ? phoneMatch[0] : '';
+      let recipient = '';
+      
+      if (!to) {
+        const contactNameMatch = text.match(/(?:sms|text|message)\s+([a-zA-Z]+)/i);
+        recipient = contactNameMatch ? contactNameMatch[1] : '';
+      }
+      
+      const messageMatch = text.match(/(?:saying|message|body)\s+["']?(.+?)["']?$/i);
+      const messageText = messageMatch ? messageMatch[1].trim() : "I'm on my way.";
+      
+      if (recipient) {
+        steps.push({
+          stepNumber: 1,
+          description: `Retrieve phone number for contact "${recipient}"`,
+          toolName: 'contacts_service',
+          toolParams: { action: 'get_phone', nameQuery: recipient },
+          status: 'pending'
+        });
+        steps.push({
+          stepNumber: 2,
+          description: `Send SMS to "${recipient}" with Twilio: "${messageText}"`,
+          toolName: 'twilio_service',
+          toolParams: { action: 'send_sms', to: `+256 701 234 567`, message: messageText }, // Scoped mock contact phone fallback if needed
+          status: 'pending'
+        });
+      } else {
+        steps.push({
+          stepNumber: 1,
+          description: `Send SMS to ${to || 'operator'} with Twilio`,
+          toolName: 'twilio_service',
+          toolParams: { action: 'send_sms', to: to || '+256701234567', message: messageText },
+          status: 'pending'
+        });
+      }
+      
+      return {
+        goal: `Send Twilio SMS to recipient`,
+        steps,
+        selectedModel: 'gemini-3.8-flash',
+        estimatedComplexity: recipient ? 'multi_step' : 'instant'
+      };
+    }
+
+    // Pattern 1b: Twilio Voice Call (e.g., "Call John", "Call my dad")
+    if (lower.includes('phone call') || lower.startsWith('call john') || lower.startsWith('call sarah') || lower.startsWith('call dad')) {
+      const phoneMatch = text.match(/\+?\d[\d\s-]{7,15}\d/);
+      let to = phoneMatch ? phoneMatch[0] : '';
+      let recipient = '';
+      
+      if (!to) {
+        const contactNameMatch = text.match(/(?:call)\s+([a-zA-Z]+)/i);
+        recipient = contactNameMatch ? contactNameMatch[1] : '';
+      }
+      
+      if (recipient) {
+        steps.push({
+          stepNumber: 1,
+          description: `Retrieve phone number for contact "${recipient}"`,
+          toolName: 'contacts_service',
+          toolParams: { action: 'get_phone', nameQuery: recipient },
+          status: 'pending'
+        });
+        steps.push({
+          stepNumber: 2,
+          description: `Initiate Twilio Voice Call to "${recipient}"`,
+          toolName: 'twilio_service',
+          toolParams: { action: 'make_call', to: `+256 701 234 567` },
+          status: 'pending'
+        });
+      } else {
+        steps.push({
+          stepNumber: 1,
+          description: `Initiate Twilio Voice Call to ${to || 'operator'}`,
+          toolName: 'twilio_service',
+          toolParams: { action: 'make_call', to: to || '+256701234567' },
+          status: 'pending'
+        });
+      }
+      
+      return {
+        goal: `Make Twilio voice call to recipient`,
+        steps,
+        selectedModel: 'gemini-3.8-flash',
+        estimatedComplexity: recipient ? 'multi_step' : 'instant'
+      };
+    }
+
+    // Pattern 1c: WhatsApp (e.g., "Send a WhatsApp message to Rose saying Hello")
+    if (lower.includes('whatsapp') && (lower.includes('send') || lower.includes('message'))) {
+      const phoneMatch = text.match(/\+?\d[\d\s-]{7,15}\d/);
+      let to = phoneMatch ? phoneMatch[0] : '';
+      let recipient = '';
+      
+      if (!to) {
+        const contactNameMatch = text.match(/(?:whatsapp|message)\s+([a-zA-Z]+)/i);
+        recipient = contactNameMatch ? contactNameMatch[1] : '';
+      }
+      
+      const messageMatch = text.match(/(?:saying|message|body)\s+["']?(.+?)["']?$/i);
+      const messageText = messageMatch ? messageMatch[1].trim() : "Hello from RODEX AI.";
+      
+      if (recipient) {
+        steps.push({
+          stepNumber: 1,
+          description: `Retrieve phone number for contact "${recipient}"`,
+          toolName: 'contacts_service',
+          toolParams: { action: 'get_phone', nameQuery: recipient },
+          status: 'pending'
+        });
+        steps.push({
+          stepNumber: 2,
+          description: `Send WhatsApp message to "${recipient}" with Meta Cloud API`,
+          toolName: 'whatsapp_service',
+          toolParams: { action: 'send_message', to: `+256 701 234 567`, message: messageText },
+          status: 'pending'
+        });
+      } else {
+        steps.push({
+          stepNumber: 1,
+          description: `Send WhatsApp message with Meta Cloud API`,
+          toolName: 'whatsapp_service',
+          toolParams: { action: 'send_message', to: to || '+256701234567', message: messageText },
+          status: 'pending'
+        });
+      }
+      
+      return {
+        goal: `Send WhatsApp message`,
+        steps,
+        selectedModel: 'gemini-3.8-flash',
+        estimatedComplexity: recipient ? 'multi_step' : 'instant'
+      };
+    }
+
     // Pattern 1: Compound WhatsApp / Contact Action
     // e.g. "Open WhatsApp, find Rose and tell her that the meeting has moved to tomorrow"
     if (

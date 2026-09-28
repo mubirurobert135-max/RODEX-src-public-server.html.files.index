@@ -92,47 +92,9 @@ export const Orb: React.FC<OrbProps> = ({
       describeSvgArc(center, center, reticleRadius, 270, 315),
     ];
 
-    // 3. Precision optical caliper corner ticks (12 points at 30 deg)
-    let caliperTicksPath = '';
-    for (let t = 0; t < 12; t++) {
-      const angleRad = (t * Math.PI) / 6;
-      const isCardinal = t % 3 === 0;
-      const len = isCardinal ? 7 : 4;
-      const r1 = caliperRadius - 1;
-      const r2 = caliperRadius + len;
-      const x1 = center + Math.cos(angleRad) * r1;
-      const y1 = center + Math.sin(angleRad) * r1;
-      const x2 = center + Math.cos(angleRad) * r2;
-      const y2 = center + Math.sin(angleRad) * r2;
-      caliperTicksPath += `M ${x1.toFixed(2)} ${y1.toFixed(2)} L ${x2.toFixed(2)} ${y2.toFixed(2)} `;
-    }
-
-    // 4. Optical Corner HUD brackets
-    const bracketOffset = size / 2 + 30;
-    const bSize = 9;
-    const cornerBracketsPath = [
-      `M ${center - bracketOffset + bSize} ${center - bracketOffset} L ${center - bracketOffset} ${center - bracketOffset} L ${center - bracketOffset} ${center - bracketOffset + bSize}`,
-      `M ${center + bracketOffset - bSize} ${center - bracketOffset} L ${center + bracketOffset} ${center - bracketOffset} L ${center + bracketOffset} ${center - bracketOffset + bSize}`,
-      `M ${center - bracketOffset + bSize} ${center + bracketOffset} L ${center - bracketOffset} ${center + bracketOffset} L ${center - bracketOffset} ${center + bracketOffset - bSize}`,
-      `M ${center + bracketOffset - bSize} ${center + bracketOffset} L ${center + bracketOffset} ${center + bracketOffset} L ${center + bracketOffset} ${center + bracketOffset - bSize}`,
-    ].join(' ');
-
-    // 5. Cardinal alignment crosshairs
-    const crosshairLen = 12;
-    const crosshairGap = size / 2 + 10;
-    const crosshairsPath = `
-      M ${center - crosshairGap - crosshairLen} ${center} L ${center - crosshairGap} ${center}
-      M ${center + crosshairGap} ${center} L ${center + crosshairGap + crosshairLen} ${center}
-      M ${center} ${center - crosshairGap - crosshairLen} L ${center} ${center - crosshairGap}
-      M ${center} ${center + crosshairGap} L ${center} ${center + crosshairGap + crosshairLen}
-    `;
-
     return {
       orbitalArcs,
       counterArcs,
-      caliperTicksPath,
-      cornerBracketsPath,
-      crosshairsPath,
       center,
       outerRadius,
       caliperRadius,
@@ -716,34 +678,6 @@ export const Orb: React.FC<OrbProps> = ({
             transformOrigin: `${memoizedSvgPaths.center}px ${memoizedSvgPaths.center}px`,
           }}
         >
-          {/* Caliper Ticks */}
-          <path
-            d={memoizedSvgPaths.caliperTicksPath}
-            stroke={`rgba(${activeTheme.secondaryRGB.join(',')}, ${
-              state === 'thinking' ? 0.85 : state === 'listening' || state === 'speaking' ? 0.7 : 0.4
-            })`}
-            strokeWidth="1.2"
-            strokeLinecap="round"
-          />
-
-          {/* Corner HUD Brackets */}
-          <path
-            d={memoizedSvgPaths.cornerBracketsPath}
-            stroke={`rgba(${activeTheme.primaryRGB.join(',')}, ${
-              state === 'thinking' ? 0.65 : 0.35
-            })`}
-            strokeWidth="1"
-            fill="none"
-          />
-
-          {/* Cardinal Alignment Crosshairs */}
-          <path
-            d={memoizedSvgPaths.crosshairsPath}
-            stroke={`rgba(${activeTheme.primaryRGB.join(',')}, 0.28)`}
-            strokeWidth="0.9"
-            strokeDasharray="2, 4"
-          />
-
           {/* Segmented Orbital Reticle Arcs */}
           {memoizedSvgPaths.orbitalArcs.map((arcD, idx) => (
             <path
@@ -939,23 +873,12 @@ export const Orb: React.FC<OrbProps> = ({
             <span
               className="font-extrabold tracking-[0.24em] text-white uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] leading-tight"
               style={{
-                fontSize: `${Math.max(13, Math.min(22, size * 0.075))}px`,
-                letterSpacing: '0.22em',
+                fontSize: `${Math.max(16, Math.min(26, size * 0.09))}px`,
+                letterSpacing: '0.24em',
                 textShadow: '0 0 12px rgba(255,255,255,0.9), 0 0 20px rgba(6,182,212,0.7)',
               }}
             >
-              I AM RODEX
-            </span>
-
-            <span
-              className="mt-1.5 font-bold tracking-[0.18em] text-cyan-200 uppercase drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] leading-tight opacity-95"
-              style={{
-                fontSize: `${Math.max(8, Math.min(11, size * 0.04))}px`,
-                letterSpacing: '0.15em',
-                textShadow: '0 0 8px rgba(6,182,212,0.8)',
-              }}
-            >
-              SAY HELLO RODEX TO SPEAK
+              RODEX
             </span>
           </div>
         </div>

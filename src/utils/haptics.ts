@@ -69,6 +69,17 @@ export function triggerHaptic(type: HapticType = 'tap'): boolean {
   }
 }
 
+// Trigger a raw subtle haptic pulse of a specific millisecond duration
+export function triggerSubtlePulse(duration: number): boolean {
+  if (!hapticsEnabledState) return false;
+  try {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
+      return navigator.vibrate(duration);
+    }
+  } catch (_) {}
+  return false;
+}
+
 // Helper to check if the user's current device / browser supports the Vibration API
 export function isHapticsSupported(): boolean {
   return typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator;

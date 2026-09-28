@@ -25,6 +25,7 @@ export class RealTimeResponseEngine {
   private static instance: RealTimeResponseEngine;
   private responseCache: Map<string, { reply: string; timestamp: number; action?: any }> = new Map();
   private readonly CACHE_TTL_MS = 60000; // 60 seconds TTL
+  private cachedAiClient: GoogleGenAI | null = null;
 
   private constructor() {}
 
@@ -289,7 +290,10 @@ export class RealTimeResponseEngine {
     let sentenceIndex = 0;
 
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      if (!this.cachedAiClient) {
+        this.cachedAiClient = new GoogleGenAI({ apiKey });
+      }
+      const ai = this.cachedAiClient;
 
       // Parallel Context Assembly (Memory & Profile)
       const userProfile = globalUserProfile.getProfile();

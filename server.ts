@@ -929,6 +929,10 @@ async function startServer() {
     res.json({ status: "ok", permissions: permissionState });
   });
 
+  app.get("/api/rodex/performance", (_req, res) => {
+    res.json(globalPerformanceTracker.getMetricsSummary());
+  });
+
   app.post("/api/rodex/permissions/toggle", (req, res) => {
     const { permissionId, granted } = req.body;
     if (permissionState[permissionId]) {

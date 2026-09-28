@@ -14,6 +14,64 @@ export interface ScheduledTask {
 // In-memory persistent schedule store with user-scoping
 const userSchedules: Map<string, ScheduledTask[]> = new Map();
 
+// Helper to parse dynamic relative/human time expressions into start/end ISO strings
+function parseRelativeTime(timeStr: string): { start: string; end: string } {
+  const now = new Date();
+  let targetDate = new Date(now);
+  
+  const clean = timeStr.toLowerCase().trim();
+  
+  if (clean.includes('minute')) {
+    const match = clean.match(/(\d+)\s*minute/);
+    const mins = match ? parseInt(match[1], 10) : 30;
+    targetDate.setMinutes(now.getMinutes() + mins);
+  } else if (clean.includes('hour')) {
+    const match = clean.match(/(\d+)\s*hour/);
+    const hrs = match ? parseInt(match[1], 10) : 1;
+    targetDate.setHours(now.getHours() + hrs);
+  } else if (clean.includes('day')) {
+    const match = clean.match(/(\d+)\s*day/);
+    const days = match ? parseInt(match[1], 10) : 1;
+    targetDate.setDate(now.getDate() + days);
+  } else if (clean.includes('tomorrow')) {
+    targetDate.setDate(now.getDate() + 1);
+    const timeMatch = clean.match(/at\s*(\d+)(?::(\d+))?\s*(am|pm)?/i);
+    if (timeMatch) {
+      let hrs = parseInt(timeMatch[1], 10);
+      const mins = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+      const ampm = timeMatch[3];
+      if (ampm && ampm.toLowerCase() === 'pm' && hrs < 12) hrs += 12;
+      if (ampm && ampm.toLowerCase() === 'am' && hrs === 12) hrs = 0;
+      targetDate.setHours(hrs, mins, 0, 0);
+    } else {
+      targetDate.setHours(9, 0, 0, 0); // default 9 AM tomorrow
+    }
+  } else {
+    const timeMatch = clean.match(/(\d+)(?::(\d+))?\s*(am|pm)?/i);
+    if (timeMatch) {
+      let hrs = parseInt(timeMatch[1], 10);
+      const mins = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+      const ampm = timeMatch[3];
+      if (ampm && ampm.toLowerCase() === 'pm' && hrs < 12) hrs += 12;
+      if (ampm && ampm.toLowerCase() === 'am' && hrs === 12) hrs = 0;
+      targetDate.setHours(hrs, mins, 0, 0);
+      if (targetDate.getTime() < now.getTime()) {
+        targetDate.setDate(now.getDate() + 1);
+      }
+    } else {
+      targetDate.setHours(now.getHours() + 1);
+    }
+  }
+  
+  const endEvent = new Date(targetDate);
+  endEvent.setHours(targetDate.getHours() + 1); // 1 hour default
+  
+  return {
+    start: targetDate.toISOString(),
+    end: endEvent.toISOString()
+  };
+}
+
 export const scheduleTool: ToolDefinition = {
   name: 'schedule_manager',
   description: 'Create, inspect, list, or cancel scheduled tasks, reminders, meetings, and alarms for the user.',
@@ -48,6 +106,89 @@ export const scheduleTool: ToolDefinition = {
     const userId = context?.userId || 'usr_default';
     const userTasks = userSchedules.get(userId) || [];
 
+    // Authenticated Google Calendar integration path
+    if (context?.gmailAccessToken) {
+      try {
+        if (action === 'create_reminder') {
+          const title = params?.title || 'Reminder';
+          const timeStr = params?.timeStr || 'soon';
+          const { start, end } = parseRelativeTime(timeStr);
+          
+          const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${context.gmailAccessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              summary: title,
+              description: `Scheduled by RODEX AI for ${timeStr}`,
+              start: { dateTime: start },
+              end: { dateTime: end }
+            })
+          });
+          
+          if (response.ok) {
+            const eventData = await response.json();
+            return {
+              success: true,
+              output: eventData,
+              message: `Event "${title}" has been successfully scheduled on your Google Calendar for ${timeStr}.`
+            };
+          }
+        }
+
+        if (action === 'list_schedule') {
+          const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=10&orderBy=startTime&singleEvents=true&timeMin=' + new Date().toISOString(), {
+            headers: {
+              'Authorization': `Bearer ${context.gmailAccessToken}`
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const events = data.items || [];
+            const list = events.map((e: any) => {
+              const start = e.start?.dateTime || e.start?.date || '';
+              const formattedStart = start ? new Date(start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              return `"${e.summary}" at ${formattedStart || 'all day'}`;
+            }).join(', ');
+            
+            return {
+              success: true,
+              output: events,
+              message: events.length > 0 
+                ? `Your upcoming Google Calendar schedule: ${list}.`
+                : 'You have no upcoming events on your Google Calendar today.'
+            };
+          }
+        }
+
+        if (action === 'cancel_task') {
+          const taskId = params?.taskId;
+          if (taskId) {
+            const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${taskId}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${context.gmailAccessToken}`
+              }
+            });
+            
+            if (response.ok) {
+              return {
+                success: true,
+                output: { taskId },
+                message: `Event has been successfully cancelled and removed from your Google Calendar.`
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[schedule_manager] Google Calendar sync failed, falling back to local database.', err);
+      }
+    }
+
+    // Local in-memory fallback path
     if (action === 'create_reminder') {
       const title = params?.title || 'Reminder';
       const timeStr = params?.timeStr || 'soon';

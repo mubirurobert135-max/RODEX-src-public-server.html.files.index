@@ -23,6 +23,8 @@ import { desktopLauncherTool } from './tools/desktopLauncherTool';
 import { scheduleTool } from './tools/scheduleTool';
 import { doctorTool } from './tools/doctorTool';
 import { updateTool } from './tools/updateTool';
+import { twilioTool } from './tools/twilioTool';
+import { whatsappTool } from './tools/whatsappTool';
 import {
   gmailCheckNewTool,
   gmailListTool,
@@ -60,6 +62,8 @@ export class ToolRegistry {
     this.register(scheduleTool);
     this.register(doctorTool);
     this.register(updateTool);
+    this.register(twilioTool);
+    this.register(whatsappTool);
     this.register(gmailCheckNewTool);
     this.register(gmailListTool);
     this.register(gmailReadTool);
