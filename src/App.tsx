@@ -83,6 +83,7 @@ import {
 } from './utils/speech';
 import { triggerHaptic, setHapticsEnabled, triggerSubtlePulse } from './utils/haptics';
 import { rodexBeatbox } from './utils/beatbox';
+import { globalSpeechManager } from './utils/speechManager';
 import {
   loadActiveSession,
   saveActiveSession,
@@ -1565,92 +1566,15 @@ export default function App() {
       playToneChime('bargein');
     }
 
-    // If currently listening, manual tap stops and processes immediately
-    if (state === 'listening') {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (_) {}
-      }
-      stopAudioMeterLoop();
-      return;
-    }
-
     // Check permission
     if (!micPermissionGranted) {
       setShowPermDialog(true);
       return;
     }
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      // Graceful fallback for browsers without SpeechRecognition
-      setIsChatOpen(true);
-      return;
-    }
-
-    try {
-      // Safely abort any prior active command recognition instance to prevent overlapping sessions
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (_) {}
-        recognitionRef.current = null;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      let lastCaptured = '';
-      lastCapturedRef.current = '';
-
-      recognition.onstart = async () => {
-        console.info('[RODEX DIAGNOSTICS] AUDIO START - Speech recognition session active');
-        console.info('[DEBUG] About to start audio meter');
-        setDiagRunning('Listening (Active Command)');
-        setDiagLastEvent('onstart (Command)');
-        setState('listening');
-        setTranscript('');
-        await audioMeterRef.current.start();
-        startAudioMeterLoop();
-        console.info('[DEBUG] Audio meter started');
-
-        // Start active session silence timeout: if user says absolutely nothing for 6s, return to standby
-        if (liveSilenceTimeoutRef.current) {
-          clearTimeout(liveSilenceTimeoutRef.current);
-        }
-        if (isLiveConversationRef.current) {
-          liveSilenceTimeoutRef.current = setTimeout(() => {
-            if (stateRef.current === 'listening' && !lastCapturedRef.current?.trim()) {
-              console.info('[RODEX Live Call Silence Timeout] Returning to standby...');
-              endLiveCall();
-            }
-          }, 6000);
-        }
-      };
-
-      recognition.onspeechstart = () => {
-        console.info('[RODEX DIAGNOSTICS] SPEECH START - User speech energy detected');
-        setDiagLastEvent('onspeechstart (Command)');
-      };
-
-      recognition.onresult = (event: any) => {
-        let current = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          current += event.results[i][0].transcript;
-        }
-        lastCaptured = current;
-        lastCapturedRef.current = current;
-        setTranscript(current);
+    // Use unified speech manager
+    await globalSpeechManager.startCommandCapture();
+  };
         console.info('[RODEX DIAGNOSTICS] TRANSCRIPT RECEIVED:', current);
         setDiagLastEvent('onresult (Command)');
         setDiagLastTranscript(current);
