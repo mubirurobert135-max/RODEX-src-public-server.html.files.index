@@ -58,6 +58,8 @@ import { SpotifyMiniBar } from './components/SpotifyMiniBar';
 import { AndroidFrame } from './components/AndroidFrame';
 import { getCachedGmailAccessToken } from './services/firebase';
 import { globalAuthClient, AuthenticatedUser } from './services/authClient';
+import { TaskCard } from './components/TaskCard';
+import { globalTaskEngine } from './services/TaskEngine';
 import {
   AssistantState,
   ChatMessage,
@@ -69,6 +71,7 @@ import {
   SpotifyTrackInfo,
   SpotifyDevice,
   ChatSession,
+  AgentTask,
 } from './types';
 import {
   rodexSynth,
@@ -92,6 +95,11 @@ import {
   deleteSessionFromHistory,
 } from './utils/sessionStorage';
 import { getActiveOrbTheme } from './utils/orbTheme';
+
+const createId = (prefix = 'msg') =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 export default function App() {
   // Core Assistant States
@@ -174,6 +182,22 @@ export default function App() {
   const isLiveConversationRef = useRef(false);
   const consecutiveSilenceCountRef = useRef(0);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Active Agent Task State (Proactive, Multi-Step & Real-World Agent Jobs)
+  const [activeTask, setActiveTask] = useState<AgentTask | null>(null);
+
+  useEffect(() => {
+    const unsub = globalTaskEngine.subscribe((task) => {
+      setActiveTask(task);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (currentUser?.uid) {
+      globalTaskEngine.setUserId(currentUser.uid);
+    }
+  }, [currentUser]);
 
   // Voice Profile / Speaker Recognition State
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>({
@@ -490,7 +514,7 @@ export default function App() {
     });
   }, []);
 
-  // Auto-Probe Microphone Permission on Boot & Account Login
+  // Auto-Probe Microphone Permission on Boot & Account Login without triggering intrusive prompt
   const probeMicPermission = useCallback(async (): Promise<boolean> => {
     console.info('[RODEX DIAGNOSTICS] MIC PERMISSION probe started');
     setDiagPermission('Probing...');
@@ -501,20 +525,17 @@ export default function App() {
         setDiagPermission(permissionStatus.state);
         if (permissionStatus.state === 'granted') {
           setMicPermissionGranted(true);
+          globalSpeechManager.setMicPermission(true);
           return true;
+        } else {
+          setMicPermissionGranted(false);
+          globalSpeechManager.setMicPermission(false);
+          return false;
         }
       }
-      if (navigator.mediaDevices?.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop());
-        setMicPermissionGranted(true);
-        setDiagPermission('granted');
-        console.info('[RODEX DIAGNOSTICS] MIC PERMISSION granted via getUserMedia');
-        return true;
-      }
     } catch (e) {
-      setDiagPermission('denied/prompt');
-      console.warn('[RODEX DIAGNOSTICS] MIC PERMISSION probe failed or denied:', e);
+      setDiagPermission('prompt');
+      console.info('[RODEX DIAGNOSTICS] MIC PERMISSION query unavailable, will prompt on user click');
     }
     return false;
   }, []);
@@ -523,39 +544,8 @@ export default function App() {
     probeMicPermission();
   }, [currentUser, probeMicPermission]);
 
-  // Initialize unified voice manager AND handle permissions
+  // Set up microphone permission listener
   useEffect(() => {
-    globalSpeechManager.setCallbacks({
-      onStateChange: (state) => {
-        console.info('[RODEX SpeechManager] State changed:', state);
-        // Map to existing assistant state if needed
-      },
-      onTranscript: (text, isFinal) => {
-        setTranscript(text);
-      },
-      onWakeDetected: (pureActivation, command) => {
-        console.info('[RODEX SpeechManager] Wake detected, pure:', pureActivation, 'cmd:', command);
-        if (pureActivation) {
-          // Handle as pure wake
-        } else {
-          // Handle as command
-          handleSendMessage(command);
-        }
-      },
-      onCommandCaptured: (command) => {
-        console.info('[RODEX SpeechManager] Command captured:', command);
-        handleSendMessage(command);
-      },
-      onError: (error, fatal) => {
-        console.error('[RODEX SpeechManager] Error:', error);
-      },
-      onSpeechEnd: () => {
-        console.info('[RODEX SpeechManager] Speech ended');
-      }
-    });
-    
-    globalSpeechManager.startContinuousWakeListening(micPermissionGranted);
-
     console.info('[RODEX DIAGNOSTICS] VOICE INIT - System initializing...');
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions
@@ -563,18 +553,21 @@ export default function App() {
         .then((permissionStatus) => {
           console.info('[RODEX DIAGNOSTICS] MIC PERMISSION initial state:', permissionStatus.state);
           setDiagPermission(permissionStatus.state);
-          if (permissionStatus.state === 'granted') {
-            setMicPermissionGranted(true);
-          }
+          const isGranted = permissionStatus.state === 'granted';
+          setMicPermissionGranted(isGranted);
+          globalSpeechManager.setMicPermission(isGranted);
+
           permissionStatus.onchange = () => {
             console.info('[RODEX DIAGNOSTICS] MIC PERMISSION state changed to:', permissionStatus.state);
             setDiagPermission(permissionStatus.state);
-            setMicPermissionGranted(permissionStatus.state === 'granted');
+            const granted = permissionStatus.state === 'granted';
+            setMicPermissionGranted(granted);
+            globalSpeechManager.setMicPermission(granted);
           };
         })
         .catch((e) => {
-          setDiagPermission('error');
-          console.warn('[RODEX DIAGNOSTICS] MIC PERMISSION query failed:', e);
+          setDiagPermission('prompt');
+          console.info('[RODEX DIAGNOSTICS] MIC PERMISSION query failed or unsupported:', e);
         });
     }
 
@@ -583,20 +576,24 @@ export default function App() {
       audioMeterRef.current.stop();
       rodexSynth.stop();
     };
-  }, [micPermissionGranted]);
+  }, []);
 
-  // Request Microphone Permission
+  // Request Microphone Permission (Triggered upon user interaction with Orb or Mic button)
   const requestMicPermission = useCallback(async (): Promise<boolean> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Release initial probe stream
       stream.getTracks().forEach((track) => track.stop());
       setMicPermissionGranted(true);
+      globalSpeechManager.setMicPermission(true);
+      setDiagPermission('granted');
       setShowPermDialog(false);
       return true;
     } catch (err) {
-      console.warn('[RODEX Mic Perm Denied]', err);
+      console.warn('[RODEX Mic Perm Denied or Dismissed]', err);
       setMicPermissionGranted(false);
+      globalSpeechManager.setMicPermission(false);
+      setDiagPermission('denied');
       setShowPermDialog(false);
       return false;
     }
@@ -716,6 +713,7 @@ export default function App() {
       }
 
       console.info('[RODEX DIAGNOSTICS] TTS START:', text);
+      globalSpeechManager.setSelfSpeaking(true);
       rodexSynth.speak(text, {
         voiceURI: voiceSettings.voiceURI,
         rate: voiceSettings.rate,
@@ -726,6 +724,7 @@ export default function App() {
         },
         onEnd: () => {
           console.info('[RODEX DIAGNOSTICS] TTS END');
+          globalSpeechManager.setSelfSpeaking(false);
           if (bargeInAnimationFrameRef.current) {
             cancelAnimationFrame(bargeInAnimationFrameRef.current);
             bargeInAnimationFrameRef.current = null;
@@ -739,11 +738,19 @@ export default function App() {
           }
           setAudioLevel(0);
           setPitchHz(124);
-          setState('idle');
+
+          // Natural Conversational Follow-Up Window: allow user to reply without repeating wake-word
+          if (micPermissionGranted && (voiceSettings.wakeWordEnabled !== false || isLiveConversationRef.current)) {
+            setState('listening');
+            globalSpeechManager.startFollowUpWindow(7000);
+          } else {
+            setState('idle');
+          }
           onComplete?.();
         },
         onError: (err) => {
           console.warn('[RODEX DIAGNOSTICS] TTS ERROR:', err);
+          globalSpeechManager.setSelfSpeaking(false);
           if (bargeInAnimationFrameRef.current) {
             cancelAnimationFrame(bargeInAnimationFrameRef.current);
             bargeInAnimationFrameRef.current = null;
@@ -846,10 +853,6 @@ export default function App() {
     rodexBeatbox.stop();
 
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const createId = (prefix = 'msg') =>
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     // Deduplicate rapid identical submissions within 400ms
     const nowMs = Date.now();
@@ -1046,6 +1049,122 @@ export default function App() {
       const lowerQ = queryToSend.toLowerCase();
 
       console.info('[RODEX DIAGNOSTICS] AI REQUEST START:', queryToSend);
+
+      // 1. Check if user is confirming or declining an active pending task
+      const currentTask = globalTaskEngine.getActiveTask();
+      if (
+        currentTask &&
+        (currentTask.state === 'WAITING_FOR_USER' || currentTask.state === 'WAITING_FOR_PERMISSION')
+      ) {
+        const isAffirmative =
+          /^(yes|confirm|confirm it|confirm reservation|book it|go ahead|sure|do it|ok|okay|please do|proceed)\b/i.test(
+            lowerQ
+          );
+        const isNegative =
+          /^(no|cancel|decline|don't|dont|never mind|stop|abort)\b/i.test(lowerQ);
+
+        if (isAffirmative) {
+          setState('executing');
+          const { spokenSummary } = await globalTaskEngine.confirmRestaurantBooking(
+            currentTask.confirmationAction?.params,
+            (speech, st) => {
+              setLastResponse(speech);
+              if (st === 'COMPLETED') {
+                setState('success');
+                setTimeout(() => setState('idle'), 3500);
+              }
+            }
+          );
+          const assistantMsg: ChatMessage = {
+            id: createId('assistant'),
+            sender: 'assistant',
+            text: spokenSummary,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setLastResponse(spokenSummary);
+          speakResponse(spokenSummary, () => {
+            if (isLiveConversationRef.current) {
+              globalSpeechManager.startFollowUpWindow(6500);
+            }
+          });
+          return;
+        } else if (isNegative) {
+          globalTaskEngine.cancelActiveTask('User declined booking');
+          setState('idle');
+          const cancelReply = 'Understood. I have cancelled the reservation request.';
+          const assistantMsg: ChatMessage = {
+            id: createId('assistant'),
+            sender: 'assistant',
+            text: cancelReply,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setLastResponse(cancelReply);
+          speakResponse(cancelReply);
+          return;
+        }
+      }
+
+      // 2. Multi-Step Task / Agent Intent Detection (e.g. streaming setup, restaurant booking)
+      const detectedTask = globalTaskEngine.detectTaskIntent(queryToSend);
+      if (detectedTask.isTask) {
+        if (detectedTask.category === 'streaming_setup') {
+          setState('planning');
+          setLastResponse('Planning streaming setup...');
+          const { spokenSummary } = await globalTaskEngine.executeStreamingSetup(
+            (speech, taskState) => {
+              setLastResponse(speech);
+              if (taskState === 'PLANNING') setState('planning');
+              else if (taskState === 'EXECUTING') setState('executing');
+              else if (taskState === 'COMPLETED') {
+                setState('success');
+                setTimeout(() => setState('idle'), 4000);
+              }
+            }
+          );
+          const assistantMsg: ChatMessage = {
+            id: createId('assistant'),
+            sender: 'assistant',
+            text: spokenSummary,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setLastResponse(spokenSummary);
+          speakResponse(spokenSummary, () => {
+            if (isLiveConversationRef.current) {
+              globalSpeechManager.startFollowUpWindow(6500);
+            }
+          });
+          return;
+        } else if (detectedTask.category === 'restaurant_booking') {
+          setState('planning');
+          setLastResponse('Searching dining options...');
+          const { spokenPrompt } = await globalTaskEngine.executeRestaurantSearch(
+            detectedTask.entities || {},
+            (speech, taskState) => {
+              setLastResponse(speech);
+              if (taskState === 'PLANNING') setState('planning');
+              else if (taskState === 'EXECUTING') setState('executing');
+              else if (taskState === 'WAITING_FOR_USER') setState('warning');
+            }
+          );
+          const assistantMsg: ChatMessage = {
+            id: createId('assistant'),
+            sender: 'assistant',
+            text: spokenPrompt,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setLastResponse(spokenPrompt);
+          speakResponse(spokenPrompt, () => {
+            if (isLiveConversationRef.current) {
+              globalSpeechManager.startFollowUpWindow(7000);
+            }
+          });
+          return;
+        }
+      }
 
       // Direct Action Execution Triggers
       if (lowerQ.includes('beatbox') || lowerQ.includes('beat box')) {
@@ -1387,170 +1506,171 @@ export default function App() {
     }
   };
 
-  // Hands-Free Background "Hey RODEX" Wake Word Listener (iPhone Siri Style)
-  const wakeWordRecognitionRef = useRef<any>(null);
+  // Wake-word recognition handler for pure activation vs full voice command
+  const handleWakeWordDetected = useCallback(
+    (pureActivation: boolean, command: string) => {
+      triggerHaptic('activate');
+      setDiagWakeMatched(true);
 
+      if (pureActivation || !command?.trim()) {
+        // Pure wake phrase: instantaneous local response without querying Gemini!
+        isLiveConversationRef.current = true;
+        setIsLiveConversation(true);
+        setState('listening');
+        playToneChime('wake');
+
+        // Determine greeting based on user device local hour
+        const hour = new Date().getHours();
+        let timeGreeting = 'good morning';
+        if (hour >= 12 && hour < 17) {
+          timeGreeting = 'good afternoon';
+        } else if (hour >= 17) {
+          timeGreeting = 'good evening';
+        }
+
+        // Extract and clean the display name of the currently signed-in user
+        let rawName = currentUser?.profile?.preferredName || currentUser?.displayName || '';
+        if (rawName.includes('@')) {
+          rawName = rawName.split('@')[0];
+        }
+        const firstWord = rawName.trim().split(/\s+/)[0];
+        const cleanedName =
+          firstWord && !['undefined', 'null', 'user', 'operator'].includes(firstWord.toLowerCase())
+            ? firstWord
+            : '';
+
+        const acknowledgeText = cleanedName
+          ? `Yes, ${timeGreeting}, ${cleanedName}.`
+          : `Yes, ${timeGreeting}.`;
+
+        setLastResponse(acknowledgeText);
+        console.info('[RODEX DIAGNOSTICS] COMMAND LISTENING triggered via pure wake word');
+        speakResponse(acknowledgeText, () => {
+          if (isLiveConversationRef.current) {
+            playToneChime('listen');
+            startListening();
+          }
+        });
+      } else {
+        // Wake word + command: dispatch directly to command executor
+        console.info('[RODEX DIAGNOSTICS] COMMAND LISTENING triggered with query:', command);
+        handleSendMessage(command);
+      }
+    },
+    [currentUser, speakResponse, handleSendMessage]
+  );
+
+  // Synchronize Unified Speech Recognition Manager (Wake Word & Command Listening)
   useEffect(() => {
-    if (!voiceSettings.wakeWordEnabled || state !== 'idle' || isLiveConversation) {
-      if (wakeWordRecognitionRef.current) {
-        try {
-          wakeWordRecognitionRef.current.abort();
-        } catch (_) {}
-        wakeWordRecognitionRef.current = null;
-      }
-      return;
-    }
-
-    console.info('[RODEX DIAGNOSTICS] VOICE INIT - Hands-Free Wake-Word Listener starting');
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.warn('[RODEX DIAGNOSTICS] VOICE INIT - Browser does not support SpeechRecognition');
-      return;
-    }
-
-    let isAlive = true;
-    let wakeRec: any = null;
-
-    const startWakeRecognition = () => {
-      if (!isAlive || !voiceSettings.wakeWordEnabled || state !== 'idle') return;
-      try {
-        console.info('[RODEX DIAGNOSTICS] RECOGNITION CREATED');
-        setDiagCreated(true);
-        wakeRec = new SpeechRecognition();
-        wakeWordRecognitionRef.current = wakeRec;
-        wakeRec.continuous = true;
-        wakeRec.interimResults = true;
-        wakeRec.lang = 'en-US';
-
-        wakeRec.onstart = () => {
-          console.info('[RODEX DIAGNOSTICS] Wake Listener onstart event fired');
+    globalSpeechManager.setCallbacks({
+      onStateChange: (recState: any) => {
+        console.info('[RODEX SpeechManager] State changed:', recState);
+        if (
+          recState === 'LISTENING' ||
+          recState === 'listening_command' ||
+          recState === 'ready_for_followup' ||
+          recState === 'FOLLOW_UP_READY'
+        ) {
+          setState('listening');
+          setDiagRunning(
+            recState === 'ready_for_followup' || recState === 'FOLLOW_UP_READY'
+              ? 'Follow-Up Active (Listening)'
+              : 'Listening (Active Command)'
+          );
+        } else if (recState === 'WAKE_DETECTED' || recState === 'wake_detected') {
+          setState('wake_detected');
+          setDiagRunning('Wake Word Detected');
+        } else if (recState === 'PROCESSING' || recState === 'processing') {
+          setState('thinking');
+          setDiagRunning('Processing Intent');
+        } else if (recState === 'EXECUTING' || recState === 'executing') {
+          setState('executing');
+          setDiagRunning('Executing Action');
+        } else if (recState === 'SPEAKING' || recState === 'speaking') {
+          setState('speaking');
+          setDiagRunning('Speaking Response');
+        } else if (recState === 'IDLE_LISTENING' || recState === 'listening_wake') {
           setDiagRunning('Listening (Wake Word)');
-          setDiagLastEvent('onstart');
-        };
-
-        wakeRec.onresult = (event: any) => {
-          let currentText = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            currentText += event.results[i][0].transcript;
+          if (stateRef.current === 'listening' || stateRef.current === 'wake_detected') {
+            setState('idle');
           }
+        } else if (recState === 'MIC_PERMISSION_REQUIRED' || recState === 'PERMISSION_REVOKED') {
+          setMicPermissionGranted(false);
+          setDiagPermission('denied');
+          if (stateRef.current === 'listening') {
+            setState('idle');
+          }
+        } else if (recState === 'MIC_UNAVAILABLE') {
+          setDiagRunning('Mic Unavailable');
+        } else if (recState === 'idle' || recState === 'MIC_READY' || recState === 'PAUSED') {
+          if (stateRef.current === 'listening' || stateRef.current === 'wake_detected') {
+            setState('idle');
+          }
+          setDiagRunning('Idle');
+        }
+      },
+      onTranscript: (text, isFinal) => {
+        setTranscript(text);
+        setDiagLastTranscript(text);
+        if (isFinal) {
           setDiagLastEvent('onresult');
-          setDiagLastTranscript(currentText);
-
-          console.info(`[RODEX DIAGNOSTICS] RAW TRANSCRIPT: "${currentText}"`);
-          const normalized = normalizeForWakeWord(currentText);
-          console.info(`[RODEX DIAGNOSTICS] NORMALIZED TRANSCRIPT: "${normalized}"`);
-
-          const match = checkWakeWordMatch(currentText, voiceSettings.customWakeWord);
-          const isWakeTriggered =
-            match.isCall ||
-            containsHeyRodexWakeWord(currentText) ||
-            isHeyRodexCall(currentText);
-
-          console.info(`[RODEX DIAGNOSTICS] WAKE MATCH CANDIDATE: "hello"`);
-          console.info(`[RODEX DIAGNOSTICS] MATCH SCORE: ${isWakeTriggered ? "1.0" : "0.0"}`);
-          console.info(`[RODEX DIAGNOSTICS] WAKE WORD DETECTED: ${isWakeTriggered ? "TRUE" : "FALSE"}`);
-
-          if (isWakeTriggered) {
-            console.info('[RODEX DIAGNOSTICS] WAKE WORD DETECTED:', currentText);
-            setDiagWakeMatched(true);
-            triggerHaptic('activate');
-            try {
-              wakeRec.abort();
-            } catch (_) {}
-
-            if (match.isPureActivation || isHeyRodexCall(currentText) || !match.command?.trim()) {
-              // Pure wake phrase: instantaneous local response without querying Gemini!
-              isLiveConversationRef.current = true;
-              setIsLiveConversation(true);
-              setState('listening');
-              playToneChime('wake');
-
-              // Determine greeting based on user device local hour
-              const hour = new Date().getHours();
-              let timeGreeting = "good morning";
-              if (hour >= 12 && hour < 17) {
-                timeGreeting = "good afternoon";
-              } else if (hour >= 17) {
-                timeGreeting = "good evening";
-              }
-
-              // Extract and clean the display name of the currently signed-in user
-              let rawName = currentUser?.profile?.preferredName || currentUser?.displayName || '';
-              if (rawName.includes('@')) {
-                rawName = rawName.split('@')[0];
-              }
-              const firstWord = rawName.trim().split(/\s+/)[0];
-              const cleanedName = firstWord && !['undefined', 'null', 'user', 'operator'].includes(firstWord.toLowerCase()) ? firstWord : '';
-
-              const acknowledgeText = cleanedName 
-                ? `Yes, ${timeGreeting}, ${cleanedName}.`
-                : `Yes, ${timeGreeting}.`;
-
-              setLastResponse(acknowledgeText);
-              console.info('[RODEX DIAGNOSTICS] COMMAND LISTENING triggered via pure wake word');
-              speakResponse(acknowledgeText, () => {
-                console.info('[DEBUG] TTS completed, checking isLive:', isLiveConversationRef.current);
-                if (isLiveConversationRef.current) {
-                  playToneChime('listen');
-                  console.info('[DEBUG] Calling startListening()');
-                  startListening();
-                } else {
-                  console.info('[DEBUG] isLiveConversationRef.current is false, NOT starting listener');
-                }
-              });
-            } else {
-              // Wake word + command: dispatch directly to command executor
-              console.info('[RODEX DIAGNOSTICS] COMMAND LISTENING triggered with query:', match.command);
-              handleSendMessage(match.command);
-            }
+        }
+      },
+      onWakeDetected: (pureActivation, command) => {
+        console.info('[RODEX SpeechManager] Wake detected, pure:', pureActivation, 'cmd:', command);
+        handleWakeWordDetected(pureActivation, command);
+      },
+      onCommandCaptured: (command) => {
+        console.info('[RODEX SpeechManager] Command captured:', command);
+        setState('thinking');
+        handleSendMessage(command);
+      },
+      onError: (error, fatal) => {
+        if (error === 'Microphone permission denied' || error.includes('permission')) {
+          console.warn('[RODEX SpeechManager] Microphone access requires user permission.');
+          setMicPermissionGranted(false);
+          setDiagPermission('denied');
+          if (stateRef.current === 'listening') {
+            setState('idle');
           }
-        };
+          return;
+        }
+        console.warn('[RODEX SpeechManager] Voice engine note:', error);
+      },
+      onAudioMetrics: (metrics) => {
+        setAudioLevel(metrics.level * (voiceSettings.audioSens * 0.7));
+        if (metrics.pitchHz > 0) {
+          setPitchHz(metrics.pitchHz);
+        }
+        if (metrics.isSpeech) {
+          setVoiceProfile((prev) => ({
+            ...prev,
+            pitchHz: metrics.pitchHz,
+            confidence: Math.max(prev.confidence, metrics.confidence || 95),
+            voiceprintStatus: 'matched',
+          }));
+        }
+      },
+    });
 
-        wakeRec.onerror = (err: any) => {
-          console.warn('[RODEX DIAGNOSTICS] RECOGNITION ERROR in wake-word listener:', err?.error);
-          setDiagLastEvent('onerror');
-          setDiagLastError(err?.error || 'Unknown');
-          if (err?.error === 'not-allowed') {
-            setMicPermissionGranted(false);
-          }
-        };
+    globalSpeechManager.setCustomWakeWord(voiceSettings.customWakeWord);
+    globalSpeechManager.autoInitialize();
 
-        wakeRec.onend = () => {
-          console.info('[RODEX DIAGNOSTICS] RECOGNITION ENDED (wake listener)');
-          setDiagLastEvent('onend');
-          setDiagRunning('Stopped');
-          if (isAlive && voiceSettings.wakeWordEnabled && state === 'idle') {
-            console.info('[RODEX DIAGNOSTICS] RETURN TO WAKE LISTENING - Restarting wake-word engine');
-            setTimeout(() => {
-              if (isAlive && voiceSettings.wakeWordEnabled && state === 'idle') {
-                startWakeRecognition();
-              }
-            }, 200);
-          }
-        };
-
-        wakeRec.start();
-        console.info('[RODEX DIAGNOSTICS] RECOGNITION STARTED - Listening for "RODEX" hotword...');
-        setMicPermissionGranted(true);
-      } catch (e) {
-        console.error('[RODEX DIAGNOSTICS] RECOGNITION ERROR during startup:', e);
-      }
-    };
-
-    startWakeRecognition();
-
-    return () => {
-      isAlive = false;
-      if (wakeRec) {
-        try {
-          wakeRec.abort();
-        } catch (_) {}
-      }
-      wakeWordRecognitionRef.current = null;
-    };
-  }, [voiceSettings.wakeWordEnabled, state, isLiveConversation, micPermissionGranted, currentUser]);
+    if (micPermissionGranted && voiceSettings.wakeWordEnabled && state === 'idle' && !isLiveConversation) {
+      globalSpeechManager.startContinuousWakeListening(true);
+    } else if (!voiceSettings.wakeWordEnabled && state === 'idle') {
+      globalSpeechManager.stopAll();
+    }
+  }, [
+    micPermissionGranted,
+    voiceSettings.wakeWordEnabled,
+    voiceSettings.customWakeWord,
+    voiceSettings.audioSens,
+    state,
+    isLiveConversation,
+    handleWakeWordDetected,
+    handleSendMessage,
+  ]);
 
   // Start Voice Recognition (Tap-to-talk, Barge-In, or Auto-Turn Taking)
   const startListening = async () => {
@@ -1560,137 +1680,50 @@ export default function App() {
     // Physical haptic tap feedback
     triggerHaptic('tap');
 
-    // If speaking, barge-in interrupts speech and immediately listens to Mr. Robert
+    // If speaking, barge-in interrupts speech and immediately listens to user
     if (state === 'speaking') {
       rodexSynth.stop();
       playToneChime('bargein');
     }
 
-    // Check permission
+    // Check permission - request directly in response to user click
     if (!micPermissionGranted) {
-      setShowPermDialog(true);
-      return;
+      const granted = await requestMicPermission();
+      if (!granted) {
+        setLastResponse('Microphone access is required for voice commands. Please allow microphone access in your browser.');
+        return;
+      }
     }
 
     // Use unified speech manager
     await globalSpeechManager.startCommandCapture();
-  };
-        console.info('[RODEX DIAGNOSTICS] TRANSCRIPT RECEIVED:', current);
-        setDiagLastEvent('onresult (Command)');
-        setDiagLastTranscript(current);
-
-        // Clear active conversation silence timeout as soon as speech content arrives
-        if (liveSilenceTimeoutRef.current) {
-          clearTimeout(liveSilenceTimeoutRef.current);
-          liveSilenceTimeoutRef.current = null;
-        }
-
-        // Immediate trigger if user said "Hey RODEX" while recording
-        if (isHeyRodexCall(current)) {
-          if (silenceTimerRef.current) {
-            clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = null;
-          }
-          try {
-            recognition.stop();
-          } catch (_) {}
-          return;
-        }
-
-        // Real-time human turn-taking: 850ms silence pause automatically finalizes the turn
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-        }
-        silenceTimerRef.current = setTimeout(() => {
-          if (current.trim()) {
-            try {
-              recognition.stop();
-            } catch (_) {}
-          }
-        }, 850);
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('[RODEX DIAGNOSTICS] RECOGNITION ERROR:', event.error);
-        setDiagLastEvent('onerror (Command)');
-        setDiagLastError(event.error);
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-        if (liveSilenceTimeoutRef.current) {
-          clearTimeout(liveSilenceTimeoutRef.current);
-          liveSilenceTimeoutRef.current = null;
-        }
-        stopAudioMeterLoop();
-        if (event.error === 'not-allowed') {
-          setMicPermissionGranted(false);
-          setShowPermDialog(true);
-        }
-        setState('idle');
-      };
-
-      recognition.onend = () => {
-        console.info('[RODEX DIAGNOSTICS] RECOGNITION ENDED');
-        setDiagLastEvent('onend (Command)');
-        setDiagRunning('Stopped');
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-        if (liveSilenceTimeoutRef.current) {
-          clearTimeout(liveSilenceTimeoutRef.current);
-          liveSilenceTimeoutRef.current = null;
-        }
-        stopAudioMeterLoop();
-        const finalText = (lastCaptured || transcript).trim();
-        if (finalText) {
-          consecutiveSilenceCountRef.current = 0;
-          handleSendMessage(finalText);
-        } else if (isLiveConversationRef.current) {
-          consecutiveSilenceCountRef.current++;
-          if (consecutiveSilenceCountRef.current >= 3) {
-            endLiveCall();
-          } else {
-            setTimeout(() => {
-              if (isLiveConversationRef.current && stateRef.current !== 'speaking') {
-                startListening();
-              }
-            }, 300);
-          }
-        } else {
-          setState('idle');
-        }
-      };
-
-      recognition.start();
-      console.info('[RODEX DIAGNOSTICS] RECOGNITION STARTED - Microphone active');
-    } catch (e) {
-      console.error('[RODEX Start Listening error]', e);
-      stopAudioMeterLoop();
-      setState('idle');
-    }
   };
 
   // Status subtitle copy
   const getStatusText = () => {
     switch (state) {
       case 'listening':
-        return transcript || 'Listening to your voice...';
+        return transcript || (isLiveConversation ? 'Ready for follow-up — Listening...' : 'Listening to your voice...');
       case 'thinking':
       case 'processing':
-        return 'RODEX is thinking...';
+        return 'RODEX is understanding...';
+      case 'planning':
+        return 'Planning task execution...';
+      case 'executing':
       case 'executing_tool':
-        return 'Executing approved action...';
+        return 'Executing authorized actions...';
+      case 'success':
+        return 'Task completed successfully';
+      case 'warning':
       case 'permission_required':
-        return 'Operator approval required';
+        return 'Operator confirmation required';
       case 'error':
         return 'System alert — Check connection';
       case 'speaking':
         return 'Speaking response...';
       case 'idle':
       default:
-        return isLiveConversation ? 'Live Call Active — Listening...' : 'Tap orb or mic to speak';
+        return 'Call "Hey RODEX" or tap Orb to interact';
     }
   };
 
@@ -1967,6 +2000,60 @@ export default function App() {
               themeAccent={themeAccent}
             />
           </motion.div>
+
+          {/* Active Task Card (Lightweight Proactive & Multi-Step Agent Agenda Card) */}
+          {activeTask && (
+            <div className="w-full max-w-sm px-3 z-30 -mt-3 mb-2">
+              <TaskCard
+                task={activeTask}
+                onConfirm={async (actionId, params) => {
+                  if (actionId === 'confirm_restaurant_booking') {
+                    setState('executing');
+                    const { spokenSummary } = await globalTaskEngine.confirmRestaurantBooking(
+                      params,
+                      (speech, st) => {
+                        setLastResponse(speech);
+                        if (st === 'COMPLETED') {
+                          setState('success');
+                          setTimeout(() => setState('idle'), 3500);
+                        }
+                      }
+                    );
+                    const assistantMsg: ChatMessage = {
+                      id: createId('assistant'),
+                      sender: 'assistant',
+                      text: spokenSummary,
+                      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    };
+                    setMessages((prev) => [...prev, assistantMsg]);
+                    setLastResponse(spokenSummary);
+                    speakResponse(spokenSummary, () => {
+                      if (isLiveConversationRef.current) {
+                        globalSpeechManager.startFollowUpWindow(6500);
+                      }
+                    });
+                  }
+                }}
+                onCancel={() => {
+                  globalTaskEngine.cancelActiveTask('User declined booking');
+                  setState('idle');
+                  const cancelReply = 'Understood. I have cancelled the reservation request.';
+                  const assistantMsg: ChatMessage = {
+                    id: createId('assistant'),
+                    sender: 'assistant',
+                    text: cancelReply,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  };
+                  setMessages((prev) => [...prev, assistantMsg]);
+                  setLastResponse(cancelReply);
+                  speakResponse(cancelReply);
+                }}
+                onDismiss={() => {
+                  globalTaskEngine.clearTask();
+                }}
+              />
+            </div>
+          )}
 
           {/* Active Browser Action Notification / Launcher */}
           {browserActionToast && (

@@ -2,12 +2,132 @@ export type AssistantState =
   | 'idle'
   | 'listening'
   | 'thinking'
+  | 'planning'
+  | 'executing'
   | 'processing'
   | 'executing_tool'
   | 'speaking'
+  | 'success'
+  | 'warning'
   | 'error'
   | 'permission_required'
   | 'wake_detected';
+
+export type VoiceEngineState =
+  | 'INITIALIZING'
+  | 'MIC_PERMISSION_REQUIRED'
+  | 'MIC_READY'
+  | 'IDLE_LISTENING'
+  | 'WAKE_DETECTED'
+  | 'LISTENING'
+  | 'PROCESSING'
+  | 'EXECUTING'
+  | 'SPEAKING'
+  | 'FOLLOW_UP_READY'
+  | 'PAUSED'
+  | 'MIC_UNAVAILABLE'
+  | 'PERMISSION_REVOKED'
+  | 'ERROR';
+
+export interface VoiceDiagnostics {
+  state: VoiceEngineState;
+  hasInputDevice: boolean;
+  permissionState: 'granted' | 'denied' | 'prompt' | 'unknown';
+  isStreamActive: boolean;
+  isRecognitionActive: boolean;
+  isSynthActive: boolean;
+  wakeWordEnabled: boolean;
+  consecutiveErrors: number;
+  reconnectAttempts: number;
+  lastEvent: string;
+  lastError: string | null;
+  audioLevel: number;
+  pitchHz: number;
+  followUpWindowMs: number;
+}
+
+export function mapVoiceStateToAssistantState(vState: VoiceEngineState): AssistantState {
+  switch (vState) {
+    case 'INITIALIZING':
+      return 'planning';
+    case 'MIC_PERMISSION_REQUIRED':
+    case 'PERMISSION_REVOKED':
+      return 'permission_required';
+    case 'MIC_READY':
+    case 'IDLE_LISTENING':
+    case 'PAUSED':
+      return 'idle';
+    case 'WAKE_DETECTED':
+      return 'wake_detected';
+    case 'LISTENING':
+    case 'FOLLOW_UP_READY':
+      return 'listening';
+    case 'PROCESSING':
+      return 'thinking';
+    case 'EXECUTING':
+      return 'executing';
+    case 'SPEAKING':
+      return 'speaking';
+    case 'MIC_UNAVAILABLE':
+      return 'warning';
+    case 'ERROR':
+      return 'error';
+    default:
+      return 'idle';
+  }
+}
+
+export type TaskState =
+  | 'CREATED'
+  | 'UNDERSTANDING'
+  | 'PLANNING'
+  | 'WAITING_FOR_PERMISSION'
+  | 'EXECUTING'
+  | 'WAITING_FOR_EXTERNAL_RESULT'
+  | 'WAITING_FOR_USER'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface TaskStepItem {
+  id: string;
+  stepNumber: number;
+  title: string;
+  description: string;
+  status: 'pending' | 'executing' | 'completed' | 'failed' | 'waiting';
+  toolName?: string;
+  result?: any;
+  error?: string;
+}
+
+export interface AgentTask {
+  id: string;
+  title: string;
+  category: 'streaming_setup' | 'restaurant_booking' | 'communication' | 'schedule' | 'device' | 'multi_step' | 'general';
+  goal: string;
+  state: TaskState;
+  currentStepIndex: number;
+  steps: TaskStepItem[];
+  requiresConfirmation?: boolean;
+  confirmationPrompt?: string;
+  confirmationAction?: {
+    label: string;
+    actionId: string;
+    params?: any;
+  };
+  alternativeProposal?: string;
+  resultSummary?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskEvent {
+  id: string;
+  taskId: string;
+  eventType: 'state_changed' | 'step_completed' | 'step_failed' | 'user_confirmation' | 'task_completed';
+  payload?: any;
+  timestamp: string;
+}
 
 export interface WebSource {
   title: string;

@@ -444,7 +444,7 @@ export class AudioMeter {
   }
 }
 
-// Robust Spacing & Phonetic Normalizer for "HELLO" Wake Word Variations
+// Robust Spacing & Phonetic Normalizer for "RODEX" and Wake Word Variations
 export function normalizeForWakeWord(text: string): string {
   if (!text) return '';
   let clean = text.toLowerCase().trim();
@@ -455,33 +455,37 @@ export function normalizeForWakeWord(text: string): string {
   // Collapse multiple spaces
   clean = clean.replace(/\s+/g, ' ').trim();
 
+  // Normalize phonetic variations of RODEX: "rodes", "roddex", "radex", "rotex", "rhodex" -> "rodex"
+  clean = clean.replace(/\b(rodes|roddex|radex|rotex|rhodex|roadex|rowdex)\b/g, 'rodex');
+
   // Normalize phonetic variations of HELLO to a clean single term 'hello'
-  // Supports "helo", "hallo", "hehllo", "hillo", "hillow", "hellow"
   clean = clean.replace(/\b(helo|hallo|hehllo|hillo|hillow|hellow)\b/g, 'hello');
 
   return clean;
 }
 
-// Helpers for "Hello/Hey/Hi/Okay HELLO" wake-call & speaker identification
+// Helpers for "Hello/Hey/Hi/Okay RODEX" & pure wake-call identification
 export function isHeyRodexCall(text: string): boolean {
   if (!text) return false;
   const clean = normalizeForWakeWord(text);
   return (
-    /^(hello|hey\s+hello|hi\s+hello|ok\s+hello|okay\s+hello|good\s+(morning|afternoon|evening)\s+hello|call\s+hey\s+hello|call\s+hello|live\s+call(\s+(with\s+)?(hello|wake\s+word))?|start\s+(a\s+)?(live\s+)?call(\s+with\s+hello)?|voice\s+call|start\s+voice\s+call|hlo\s+hello|yo\s+hello|wake\s+up\s+hello|wake\s+up|are\s+you\s+there(\s+hello)?|can\s+you\s+hear\s+me(\s+hello)?|talk\s+to\s+me(\s+hello)?)$/i.test(
+    /^(rodex|hello\s+rodex|hey\s+rodex|hi\s+rodex|ok\s+rodex|okay\s+rodex|good\s+(morning|afternoon|evening)\s+rodex|call\s+hey\s+rodex|call\s+rodex|hello|hey|hi|yo\s+rodex|wake\s+up\s+rodex|wake\s+up|are\s+you\s+there(\s+rodex)?|can\s+you\s+hear\s+me(\s+rodex)?|talk\s+to\s+me(\s+rodex)?)$/i.test(
       clean
     )
   );
 }
 
-// Ambient hotword detector: checks if speech contains "Hello", "Hey Hello", "Hi Hello", "Hello", or "OK Hello"
+// Ambient hotword detector: checks if speech contains "Hello RODEX", "Hey RODEX", "Hi RODEX", "Hello", "Hey", "Hi", etc.
 export function containsHeyRodexWakeWord(text: string): boolean {
   if (!text) return false;
   const clean = normalizeForWakeWord(text);
   return (
-    /\b(hey|hi|hello|ok|okay|good\s+morning|good\s+afternoon|good\s+evening|call\s+hey|call|live\s+call|start\s+call|hlo|yo)\s+hello\b/i.test(clean) ||
-    /^hello[,\s]+/i.test(clean) ||
-    /^hello$/i.test(clean) ||
-    /\b(wake\s+up|talk\s+to\s+me|are\s+you\s+there)\s+hello\b/i.test(clean)
+    /\b(hey|hi|hello|ok|okay|good\s+morning|good\s+afternoon|good\s+evening|call\s+hey|call|live\s+call|start\s+call|yo)\s+rodex\b/i.test(clean) ||
+    /\b(hey|hi|hello)\b/i.test(clean) ||
+    /\brodex\b/i.test(clean) ||
+    /^rodex[,\s]+/i.test(clean) ||
+    /^rodex$/i.test(clean) ||
+    /\b(wake\s+up|talk\s+to\s+me|are\s+you\s+there)\s+rodex\b/i.test(clean)
   );
 }
 
@@ -491,12 +495,12 @@ export function extractHeyRodexCommand(text: string): { isCall: boolean; command
   const clean = text.trim();
   const normalizedText = normalizeForWakeWord(clean);
   
-  const wakePattern = /^(hey\s+hello|hi\s+hello|hello|ok\s+hello|okay\s+hello|good\s+(morning|afternoon|evening)\s+hello|call\s+hey\s+hello|hlo\s+hello|yo\s+hello)[,\s]*/i;
+  // Pattern 1: Wake phrase followed by command: "Hey RODEX prepare my streaming setup", "Hello RODEX find me a restaurant"
+  const wakePattern = /^(hello\s+rodex|hey\s+rodex|hi\s+rodex|ok\s+rodex|okay\s+rodex|good\s+(morning|afternoon|evening)\s+rodex|rodex|hello|hey|hi|yo\s+rodex)[,\s:]*/i;
   
   if (wakePattern.test(normalizedText)) {
     const match = normalizedText.match(wakePattern);
     if (match) {
-      // Find original trigger word count and extract the rest of original raw words
       const rawWords = clean.split(/\s+/);
       const triggerWordsCount = match[0].trim().split(/\s+/).length;
       const commandWords = rawWords.slice(triggerWordsCount);
@@ -504,8 +508,8 @@ export function extractHeyRodexCommand(text: string): { isCall: boolean; command
     }
   }
   
-  // Embedded check: if "hey hello" or "hello" is anywhere in normalized text
-  const embeddedPattern = /\b(hey|hi|hello|ok|okay|hlo|yo)\s+hello\b[,\s]*/i;
+  // Pattern 2: Embedded check: "can you hey RODEX prepare stream"
+  const embeddedPattern = /\b(hello\s+rodex|hey\s+rodex|hi\s+rodex|ok\s+rodex|okay\s+rodex|rodex)\b[,\s:]*/i;
   if (embeddedPattern.test(normalizedText)) {
     const match = normalizedText.match(embeddedPattern);
     if (match) {
@@ -515,8 +519,8 @@ export function extractHeyRodexCommand(text: string): { isCall: boolean; command
     }
   }
 
-  // End pattern check
-  const endPattern = /[,\s]+hello[.!?]*$/i;
+  // Pattern 3: End pattern check: "prepare stream please RODEX"
+  const endPattern = /[,\s]+rodex[.!?]*$/i;
   if (endPattern.test(normalizedText)) {
     const match = normalizedText.match(endPattern);
     if (match) {
@@ -526,9 +530,9 @@ export function extractHeyRodexCommand(text: string): { isCall: boolean; command
     }
   }
   
-  // If "hello" is standalone but didn't match the triggers
-  if (/\bhello\b/i.test(normalizedText)) {
-    const parts = normalizedText.split(/\bhello\b/i);
+  // Standalone "rodex" anywhere
+  if (/\brodex\b/i.test(normalizedText)) {
+    const parts = normalizedText.split(/\brodex\b/i);
     const command = parts.find(p => p.trim())?.trim() || '';
     return { isCall: true, command };
   }

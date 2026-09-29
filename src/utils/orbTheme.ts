@@ -267,10 +267,16 @@ export function getActiveOrbTheme(params: {
   if (state === 'error') {
     return ORB_THEMES.error;
   }
-  if (state === 'permission_required') {
+  if (state === 'permission_required' || state === 'warning') {
     return ORB_THEMES.permission_required;
   }
-  if (state === 'executing_tool') {
+  if (state === 'success') {
+    return ORB_THEMES.emerald;
+  }
+  if (state === 'planning') {
+    return ORB_THEMES.purple;
+  }
+  if (state === 'executing' || state === 'executing_tool') {
     return ORB_THEMES.executing_tool;
   }
 

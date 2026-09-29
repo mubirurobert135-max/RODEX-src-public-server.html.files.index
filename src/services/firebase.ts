@@ -273,6 +273,60 @@ export interface FirestoreScheduleItem {
   createdAt: string;
 }
 
+// Agent Task Persistence in Firestore
+export interface FirestoreAgentTask {
+  id: string;
+  title: string;
+  category: string;
+  goal: string;
+  state: string;
+  currentStepIndex: number;
+  steps: any[];
+  requiresConfirmation?: boolean;
+  confirmationPrompt?: string;
+  confirmationAction?: any;
+  alternativeProposal?: string;
+  resultSummary?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const saveTaskToFirestore = async (
+  userId: string,
+  task: FirestoreAgentTask
+): Promise<boolean> => {
+  const path = `users/${userId}/tasks/${task.id}`;
+  try {
+    const taskRef = doc(db, 'users', userId, 'tasks', task.id);
+    await setDoc(taskRef, {
+      ...task,
+      updatedAt: new Date().toISOString(),
+      timestamp: serverTimestamp(),
+    });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+    return false;
+  }
+};
+
+export const loadUserTasksFromFirestore = async (
+  userId: string
+): Promise<FirestoreAgentTask[]> => {
+  const path = `users/${userId}/tasks`;
+  try {
+    const tasksRef = collection(db, 'users', userId, 'tasks');
+    const snap = await getDocs(tasksRef);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as any),
+    }));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, path);
+    return [];
+  }
+};
+
 export const saveScheduleToFirestore = async (
   userId: string,
   item: Omit<FirestoreScheduleItem, 'id' | 'createdAt'>
