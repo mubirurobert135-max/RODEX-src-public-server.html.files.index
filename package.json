@@ -18,6 +18,8 @@
     "test:gmail": "tsx scripts/testGmailIntegration.ts",
     "test:multiuser": "tsx scripts/testMultiUser.ts",
     "test:orb": "tsx scripts/testOrbWake.ts",
+    "test:firebase": "tsx scripts/testFirebaseIntegration.ts",
+    "test:agent": "tsx scripts/testAgentTaskEngine.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -31,12 +33,14 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
+    "@types/ws": "^8.18.2",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",

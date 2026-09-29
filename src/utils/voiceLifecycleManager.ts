@@ -12,6 +12,7 @@ import {
   AudioMeter,
 } from './speech';
 import { triggerHaptic } from './haptics';
+import { globalVoiceTransitionEngine } from './voiceTransitionEngine';
 
 export interface VoiceManagerCallbacks {
   onStateChange: (state: VoiceEngineState) => void;
@@ -61,6 +62,7 @@ export class VoiceLifecycleManager {
   private lastCapturedTranscript: string = '';
 
   private constructor() {
+    globalVoiceTransitionEngine.setAudioMeter(this.audioMeter);
     this.setupLifecycleEventListeners();
   }
 

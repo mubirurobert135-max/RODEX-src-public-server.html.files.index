@@ -37,6 +37,7 @@ import { globalGmailService } from "./server/services/gmail/gmail.service";
 import { authMiddleware, requireAuth } from "./server/services/auth/authMiddleware";
 import { globalAuthService } from "./server/services/auth/auth.service";
 import { SYSTEM_METADATA } from "./server/systemMetadata";
+import { setupGeminiLiveWebSocket } from "./server/services/liveGeminiService";
 
 dotenv.config();
 
@@ -2410,10 +2411,17 @@ Content: "${content}"`;
     console.log(` - Port: ${PORT} (0.0.0.0)`);
     console.log(` - Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(` - Gemini API Key: ${apiKeyStatus}`);
+    console.log(` - Gemini 3.8 Live API: ws://0.0.0.0:${PORT}/api/live (gemini-3.8-live + googleMaps)`);
     console.log(` - Database: In-Memory / Vector Storage Active`);
     console.log(` - Health Check: http://0.0.0.0:${PORT}/health`);
     console.log(` - Readiness Check: http://0.0.0.0:${PORT}/health/ready`);
     console.log(`====================================================`);
+  });
+
+  // Setup Gemini 3.8 Live API WebSocket Handler with Google Maps Tool
+  setupGeminiLiveWebSocket(server, {
+    getAI,
+    getSystemInstruction: buildSystemInstruction,
   });
 
   // Graceful Process Shutdown Handler

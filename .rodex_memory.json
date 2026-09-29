@@ -437,5 +437,217 @@
     "id": "mem_1790507912004_o5fm0",
     "createdAt": "2026-09-27T11:18:32.004Z",
     "updatedAt": "2026-09-27T11:18:32.004Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790711539778",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790711539779_53v2d",
+    "createdAt": "2026-09-29T19:52:19.779Z",
+    "updatedAt": "2026-09-29T19:52:19.779Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790711543598",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790711543599_oucig",
+    "createdAt": "2026-09-29T19:52:23.599Z",
+    "updatedAt": "2026-09-29T19:52:23.599Z"
+  },
+  {
+    "userId": "usr_1790711572474_9bf29862",
+    "key": "project_name",
+    "value": "Autonomous Robotics Lab in Entebbe",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "project",
+      "robotics"
+    ],
+    "id": "mem_1790711572481_aq38p",
+    "createdAt": "2026-09-29T19:52:52.481Z",
+    "updatedAt": "2026-09-29T19:52:52.481Z"
+  },
+  {
+    "userId": "usr_1790711572479_923faeab",
+    "key": "favorite_language",
+    "value": "Rust and WebAssembly",
+    "category": "preference",
+    "confidence": 0.95,
+    "tags": [
+      "tech"
+    ],
+    "id": "mem_1790711572481_vnimi",
+    "createdAt": "2026-09-29T19:52:52.481Z",
+    "updatedAt": "2026-09-29T19:52:52.481Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790712258007",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790712258008_aa8s4",
+    "createdAt": "2026-09-29T20:04:18.008Z",
+    "updatedAt": "2026-09-29T20:04:18.008Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790712259151",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790712259153_l9tct",
+    "createdAt": "2026-09-29T20:04:19.153Z",
+    "updatedAt": "2026-09-29T20:04:19.153Z"
+  },
+  {
+    "userId": "usr_1790712273311_66c2c07d",
+    "key": "project_name",
+    "value": "Autonomous Robotics Lab in Entebbe",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "project",
+      "robotics"
+    ],
+    "id": "mem_1790712273318_4bthz",
+    "createdAt": "2026-09-29T20:04:33.318Z",
+    "updatedAt": "2026-09-29T20:04:33.318Z"
+  },
+  {
+    "userId": "usr_1790712273316_98033166",
+    "key": "favorite_language",
+    "value": "Rust and WebAssembly",
+    "category": "preference",
+    "confidence": 0.95,
+    "tags": [
+      "tech"
+    ],
+    "id": "mem_1790712273319_41cpl",
+    "createdAt": "2026-09-29T20:04:33.319Z",
+    "updatedAt": "2026-09-29T20:04:33.319Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790712341966",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790712341967_3dbrl",
+    "createdAt": "2026-09-29T20:05:41.967Z",
+    "updatedAt": "2026-09-29T20:05:41.967Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790712343332",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790712343333_t9qu9",
+    "createdAt": "2026-09-29T20:05:43.333Z",
+    "updatedAt": "2026-09-29T20:05:43.333Z"
+  },
+  {
+    "userId": "usr_1790712358572_2409114f",
+    "key": "project_name",
+    "value": "Autonomous Robotics Lab in Entebbe",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "project",
+      "robotics"
+    ],
+    "id": "mem_1790712358586_t6i1p",
+    "createdAt": "2026-09-29T20:05:58.586Z",
+    "updatedAt": "2026-09-29T20:05:58.586Z"
+  },
+  {
+    "userId": "usr_1790712358584_789de80f",
+    "key": "favorite_language",
+    "value": "Rust and WebAssembly",
+    "category": "preference",
+    "confidence": 0.95,
+    "tags": [
+      "tech"
+    ],
+    "id": "mem_1790712358587_rvobt",
+    "createdAt": "2026-09-29T20:05:58.587Z",
+    "updatedAt": "2026-09-29T20:05:58.587Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790712418558",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790712418559_7uocp",
+    "createdAt": "2026-09-29T20:06:58.559Z",
+    "updatedAt": "2026-09-29T20:06:58.559Z"
+  },
+  {
+    "userId": "doctor_system",
+    "key": "doctor_repair_1790712419717",
+    "value": "Auto-repair verification entry",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "repair"
+    ],
+    "id": "mem_1790712419718_4l2tg",
+    "createdAt": "2026-09-29T20:06:59.718Z",
+    "updatedAt": "2026-09-29T20:06:59.718Z"
+  },
+  {
+    "userId": "usr_1790712434182_38c92929",
+    "key": "project_name",
+    "value": "Autonomous Robotics Lab in Entebbe",
+    "category": "fact",
+    "confidence": 1,
+    "tags": [
+      "project",
+      "robotics"
+    ],
+    "id": "mem_1790712434192_ubmov",
+    "createdAt": "2026-09-29T20:07:14.192Z",
+    "updatedAt": "2026-09-29T20:07:14.192Z"
+  },
+  {
+    "userId": "usr_1790712434189_0ef7ef51",
+    "key": "favorite_language",
+    "value": "Rust and WebAssembly",
+    "category": "preference",
+    "confidence": 0.95,
+    "tags": [
+      "tech"
+    ],
+    "id": "mem_1790712434192_5tvvi",
+    "createdAt": "2026-09-29T20:07:14.192Z",
+    "updatedAt": "2026-09-29T20:07:14.192Z"
   }
 ]

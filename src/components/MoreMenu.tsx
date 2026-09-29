@@ -16,6 +16,7 @@ import {
   Settings,
   X,
   ChevronRight,
+  Radio,
 } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
 import { AuthenticatedUser } from '../services/authClient';

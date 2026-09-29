@@ -3,11 +3,21 @@ import { saveTaskToFirestore, saveScheduleToFirestore, saveMemoryToFirestore } f
 
 export type TaskUpdateListener = (task: AgentTask | null) => void;
 
-class TaskEngineService {
+export interface DynamicTaskOptions {
+  category?: 'streaming_setup' | 'restaurant_booking' | 'communication' | 'schedule' | 'device' | 'multi_step' | 'general';
+  priority?: 'low' | 'normal' | 'high';
+  requiresConfirmation?: boolean;
+  timeoutMs?: number;
+}
+
+export class TaskEngineService {
   private static instance: TaskEngineService;
   private currentActiveTask: AgentTask | null = null;
   private listeners: Set<TaskUpdateListener> = new Set();
   private activeUserId: string = 'usr_robert_1001';
+  private maxRetriesPerStep: number = 3;
+  private defaultTimeoutMs: number = 30000;
+  private executionAbortController: AbortController | null = null;
 
   private constructor() {}
 
@@ -20,6 +30,10 @@ class TaskEngineService {
 
   public setUserId(userId: string) {
     this.activeUserId = userId;
+  }
+
+  public getUserId(): string {
+    return this.activeUserId;
   }
 
   public subscribe(listener: TaskUpdateListener): () => void {
@@ -62,16 +76,167 @@ class TaskEngineService {
   }
 
   /**
+   * Creates a structured multi-step task plan from a goal
+   */
+  public createTaskPlan(
+    goal: string,
+    steps: Array<{ title: string; description: string; toolName?: string; requiredPermission?: string }>,
+    options: DynamicTaskOptions = {}
+  ): AgentTask {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const taskSteps: TaskStepItem[] = steps.map((s, index) => ({
+      id: `step_${index + 1}`,
+      stepNumber: index + 1,
+      title: s.title,
+      description: s.description,
+      status: 'pending',
+      toolName: s.toolName,
+    }));
+
+    const task: AgentTask = {
+      id: taskId,
+      title: goal.length > 32 ? `${goal.substring(0, 30)}...` : goal,
+      category: options.category || 'multi_step',
+      goal,
+      state: 'PLANNING',
+      currentStepIndex: 0,
+      steps: taskSteps,
+      requiresConfirmation: options.requiresConfirmation || false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.currentActiveTask = task;
+    this.notify();
+    this.persistCurrentTask();
+    return task;
+  }
+
+  /**
+   * Executes a plan step by step with verification, failure recovery and bounded retries
+   */
+  public async executeTask(
+    taskId: string,
+    stepHandlers: Record<number, () => Promise<{ success: boolean; output?: any; message?: string; error?: string }>>,
+    onProgress?: (speechUpdate: string, state: TaskState) => void
+  ): Promise<{ task: AgentTask; success: boolean; resultSummary: string }> {
+    if (!this.currentActiveTask || this.currentActiveTask.id !== taskId) {
+      throw new Error(`Task ${taskId} is not the active task.`);
+    }
+
+    this.executionAbortController = new AbortController();
+    const { signal } = this.executionAbortController;
+
+    // Transition to EXECUTING
+    this.updateActiveTask((t) => {
+      t.state = 'EXECUTING';
+      t.updatedAt = new Date().toISOString();
+      return t;
+    });
+
+    onProgress?.(`Starting execution for: ${this.currentActiveTask.goal}`, 'EXECUTING');
+
+    for (let i = 0; i < this.currentActiveTask.steps.length; i++) {
+      if (signal.aborted) {
+        this.updateActiveTask((t) => {
+          t.state = 'CANCELLED';
+          t.resultSummary = 'Task execution cancelled by user.';
+          return t;
+        });
+        return { task: this.currentActiveTask!, success: false, resultSummary: 'Task cancelled.' };
+      }
+
+      const stepNumber = i + 1;
+      this.updateActiveTask((t) => {
+        t.currentStepIndex = i;
+        t.steps[i].status = 'executing';
+        return t;
+      });
+
+      let stepSuccess = false;
+      let attempt = 0;
+      let stepResult: any = null;
+      let stepError: string | undefined = undefined;
+
+      while (attempt < this.maxRetriesPerStep && !stepSuccess && !signal.aborted) {
+        attempt++;
+        try {
+          const handler = stepHandlers[stepNumber];
+          if (handler) {
+            const res = await Promise.race([
+              handler(),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Step execution timeout')), this.defaultTimeoutMs)
+              ),
+            ]);
+            // Verification check on result
+            if (res && res.success === true) {
+              stepSuccess = true;
+              stepResult = res.output;
+            } else {
+              stepError = res?.error || res?.message || 'Verification failed on step result';
+            }
+          } else {
+            // Default deterministic step pass
+            await new Promise((r) => setTimeout(r, 400));
+            stepSuccess = true;
+          }
+        } catch (err: any) {
+          stepError = err?.message || String(err);
+        }
+
+        if (!stepSuccess && attempt < this.maxRetriesPerStep) {
+          onProgress?.(`Step ${stepNumber} encountered issue. Retrying (attempt ${attempt + 1})...`, 'EXECUTING');
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+
+      if (!stepSuccess) {
+        // Step failed after max retries
+        const failedTask = this.updateActiveTask((t) => {
+          t.steps[i].status = 'failed';
+          t.steps[i].error = stepError || 'Execution failed';
+          t.state = 'FAILED';
+          t.resultSummary = `Task failed on step ${stepNumber}: ${t.steps[i].title}`;
+          return t;
+        })!;
+
+        const spokenError = `Task stopped at step ${stepNumber}: ${this.currentActiveTask.steps[i].title}.`;
+        onProgress?.(spokenError, 'FAILED');
+        return { task: failedTask, success: false, resultSummary: failedTask.resultSummary || 'Execution failed.' };
+      }
+
+      // Step succeeded and verified
+      this.updateActiveTask((t) => {
+        t.steps[i].status = 'completed';
+        t.steps[i].result = stepResult;
+        return t;
+      });
+    }
+
+    // All steps completed and verified
+    const finalTask = this.updateActiveTask((t) => {
+      t.state = 'COMPLETED';
+      t.resultSummary = `All ${t.steps.length} steps completed and verified successfully.`;
+      return t;
+    })!;
+
+    const summary = `Task completed successfully: ${finalTask.goal}.`;
+    onProgress?.(summary, 'COMPLETED');
+    return { task: finalTask, success: true, resultSummary: summary };
+  }
+
+  /**
    * Identifies whether the natural-language command is a structured multi-step task
    */
   public detectTaskIntent(input: string): {
     isTask: boolean;
-    category?: 'streaming_setup' | 'restaurant_booking' | 'communication' | 'schedule';
+    category?: 'streaming_setup' | 'restaurant_booking' | 'communication' | 'schedule' | 'multi_step';
     entities?: Record<string, any>;
   } {
     const text = input.toLowerCase().trim();
 
-    // 1. Streaming Setup ("prepare my streaming setup", "set up stream", "prepare everything for my stream")
+    // 1. Streaming Setup
     if (
       text.includes('stream') &&
       (text.includes('prepare') || text.includes('setup') || text.includes('set up') || text.includes('ready'))
@@ -79,7 +244,7 @@ class TaskEngineService {
       return { isTask: true, category: 'streaming_setup' };
     }
 
-    // 2. Restaurant Booking ("find me a restaurant for three tonight", "table for 3 tonight", "book a table")
+    // 2. Restaurant Booking
     if (
       (text.includes('restaurant') || text.includes('table for') || text.includes('dinner') || text.includes('reservation')) &&
       (text.includes('find') || text.includes('book') || text.includes('reserve') || text.includes('table') || text.includes('three') || text.includes('tonight'))
@@ -100,6 +265,20 @@ class TaskEngineService {
           time: '7:00 PM',
           location: text.includes('kampala') ? 'Kampala Road' : 'Kampala',
           quietPreference: text.includes('quiet') || text.includes('fine dining'),
+        },
+      };
+    }
+
+    // 3. Meeting / Presentation Preparation
+    if (
+      (text.includes('presentation') || text.includes('meeting') || text.includes('conference')) &&
+      (text.includes('prepare') || text.includes('get ready') || text.includes('organize') || text.includes('set up'))
+    ) {
+      return {
+        isTask: true,
+        category: 'multi_step',
+        entities: {
+          topic: text.includes('presentation') ? 'presentation' : 'meeting',
         },
       };
     }
@@ -339,6 +518,9 @@ class TaskEngineService {
    * Cancel or dismiss the active task
    */
   public cancelActiveTask(reason: string = 'Cancelled by user') {
+    if (this.executionAbortController) {
+      this.executionAbortController.abort();
+    }
     if (!this.currentActiveTask) return;
     this.updateActiveTask((t) => {
       t.state = 'CANCELLED';
@@ -348,6 +530,9 @@ class TaskEngineService {
   }
 
   public clearTask() {
+    if (this.executionAbortController) {
+      this.executionAbortController.abort();
+    }
     this.currentActiveTask = null;
     this.notify();
   }

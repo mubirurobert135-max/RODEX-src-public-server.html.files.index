@@ -87,6 +87,8 @@ import {
 import { triggerHaptic, setHapticsEnabled, triggerSubtlePulse } from './utils/haptics';
 import { rodexBeatbox } from './utils/beatbox';
 import { globalSpeechManager } from './utils/speechManager';
+import { globalVoiceTransitionEngine } from './utils/voiceTransitionEngine';
+import { globalLiveConversationService } from './services/liveConversationService';
 import {
   loadActiveSession,
   saveActiveSession,
@@ -501,17 +503,22 @@ export default function App() {
   const processSpeechQueue = useCallback(() => {
     if (speechQueueRef.current.length === 0) {
       isSpeechQueueRunningRef.current = false;
-      if (isLiveConversationRef.current && stateRef.current !== 'listening' && stateRef.current !== 'thinking') {
-        playToneChime('listen');
-        startListening();
-      }
       return;
     }
     isSpeechQueueRunningRef.current = true;
     const nextSentence = speechQueueRef.current.shift()!;
-    speakResponse(nextSentence, () => {
-      processSpeechQueue();
-    });
+    const hasMore = speechQueueRef.current.length > 0;
+    speakResponse(
+      nextSentence,
+      () => {
+        if (hasMore) {
+          processSpeechQueue();
+        } else {
+          isSpeechQueueRunningRef.current = false;
+        }
+      },
+      { isQueueInterim: hasMore }
+    );
   }, []);
 
   // Auto-Probe Microphone Permission on Boot & Account Login without triggering intrusive prompt
@@ -632,7 +639,7 @@ export default function App() {
 
   // Speak AI text response using voice synthesis
   const speakResponse = useCallback(
-    (text: string, onComplete?: () => void) => {
+    (text: string, onComplete?: () => void, options?: { isQueueInterim?: boolean }) => {
       if (isMuted || !voiceSettings.autoSpeak) {
         setState('idle');
         onComplete?.();
@@ -713,6 +720,7 @@ export default function App() {
       }
 
       console.info('[RODEX DIAGNOSTICS] TTS START:', text);
+      globalVoiceTransitionEngine.transitionProcessingToSpeaking({ source: 'speak_response_start' });
       globalSpeechManager.setSelfSpeaking(true);
       rodexSynth.speak(text, {
         voiceURI: voiceSettings.voiceURI,
@@ -723,13 +731,11 @@ export default function App() {
           setState('speaking');
         },
         onEnd: () => {
-          console.info('[RODEX DIAGNOSTICS] TTS END');
-          globalSpeechManager.setSelfSpeaking(false);
           if (bargeInAnimationFrameRef.current) {
             cancelAnimationFrame(bargeInAnimationFrameRef.current);
             bargeInAnimationFrameRef.current = null;
           }
-          if (isLiveConversationRef.current) {
+          if (isLiveConversationRef.current && !options?.isQueueInterim) {
             audioMeterRef.current.stop();
           }
           if (speakIntervalRef.current) {
@@ -739,11 +745,28 @@ export default function App() {
           setAudioLevel(0);
           setPitchHz(124);
 
-          // Natural Conversational Follow-Up Window: allow user to reply without repeating wake-word
+          // If more sentences are queued, remain in speaking state for the next sentence
+          if (options?.isQueueInterim) {
+            onComplete?.();
+            return;
+          }
+
+          console.info('[RODEX DIAGNOSTICS] TTS END -> Zero-Latency Handoff to Listening');
+          globalSpeechManager.setSelfSpeaking(false);
+
+          // Atomic instantaneous handoff from speaking to listening
           if (micPermissionGranted && (voiceSettings.wakeWordEnabled !== false || isLiveConversationRef.current)) {
             setState('listening');
-            globalSpeechManager.startFollowUpWindow(7000);
+            globalVoiceTransitionEngine.handoffSpeakingToListening(
+              { followUpDurationMs: 7000, source: 'tts_sentence_complete' },
+              {
+                onActivateMic: () => {
+                  globalSpeechManager.startFollowUpWindow(7000);
+                },
+              }
+            );
           } else {
+            globalVoiceTransitionEngine.transitionTo('IDLE', { source: 'mic_not_granted_or_wake_disabled' });
             setState('idle');
           }
           onComplete?.();
@@ -764,49 +787,146 @@ export default function App() {
           }
           setAudioLevel(0);
           setPitchHz(124);
+          globalVoiceTransitionEngine.transitionTo('IDLE', { source: 'tts_error' });
           setState('idle');
           onComplete?.();
         },
       });
     },
-    [isMuted, voiceSettings]
+    [isMuted, voiceSettings, micPermissionGranted]
   );
 
-  // Direct Live Real-Time Call Controller
+  // Direct Live Real-Time Call Controller (Powered by Gemini 3.8 Live API + Google Maps)
   const startLiveCall = async () => {
     if (!micPermissionGranted) {
       const granted = await requestMicPermission();
       if (!granted) return;
     }
+
+    // Stop standard Web Speech recognition & synth to avoid conflict with bidirectional Live API audio stream
+    rodexSynth.stop();
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (_) {}
+    }
+    stopAudioMeterLoop();
+
     isLiveConversationRef.current = true;
     setIsLiveConversation(true);
     consecutiveSilenceCountRef.current = 0;
     playToneChime('wake');
-    const introSpeech = 'Live call connected. How can I assist you today?';
-    setLastResponse(introSpeech);
+    setState('connecting' as any);
+    setLastResponse('Connecting to Gemini 3.8 Live neural stream...');
 
     const liveStartMsg: ChatMessage = {
       id: `live-start-${Date.now()}`,
       sender: 'assistant',
-      text: 'Live audio connection active. Listening for your voice.',
+      text: 'Live voice stream connected (Gemini 3.8 Live • 16kHz in / 24kHz out • Google Maps tool active). Speak naturally in real-time.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       speakerVerified: true,
       webGrounded: true,
     };
     setMessages((prev) => [...prev, liveStartMsg]);
 
-    speakResponse(introSpeech, () => {
-      if (isLiveConversationRef.current) {
-        playToneChime('listen');
-        startListening();
-      }
-    });
+    try {
+      globalLiveConversationService.setCallbacks({
+        onStatusChange: (newStatus) => {
+          if (newStatus === 'speaking') {
+            setState('speaking');
+          } else if (newStatus === 'listening') {
+            setState('listening');
+          } else if (newStatus === 'thinking') {
+            setState('thinking');
+          } else if (newStatus === 'disconnected') {
+            if (isLiveConversationRef.current) {
+              setIsLiveConversation(false);
+              isLiveConversationRef.current = false;
+            }
+            setState('idle');
+          }
+        },
+        onAudioLevel: (inputLevel, outputLevel) => {
+          const activeLevel = outputLevel > 0 ? outputLevel : inputLevel;
+          setAudioLevel(activeLevel);
+          if (activeLevel > 0.35) {
+            triggerSubtlePulse(8);
+          }
+        },
+        onInputTranscript: (userText) => {
+          setTranscript(userText);
+          setMessages((prev) => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.sender === 'user' && lastMsg.id.startsWith('live-user-')) {
+              return [...prev.slice(0, -1), { ...lastMsg, text: userText }];
+            }
+            return [
+              ...prev,
+              {
+                id: `live-user-${Date.now()}`,
+                sender: 'user',
+                text: userText,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                speaker: 'User',
+                speakerVerified: true,
+              },
+            ];
+          });
+        },
+        onOutputTranscript: (modelText) => {
+          setLastResponse(modelText);
+          setMessages((prev) => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.sender === 'assistant' && lastMsg.id.startsWith('live-asst-')) {
+              return [...prev.slice(0, -1), { ...lastMsg, text: modelText }];
+            }
+            return [
+              ...prev,
+              {
+                id: `live-asst-${Date.now()}`,
+                sender: 'assistant',
+                text: modelText,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                speakerVerified: true,
+                webGrounded: true,
+              },
+            ];
+          });
+        },
+        onInterrupted: () => {
+          playToneChime('bargein');
+          setState('listening');
+        },
+        onError: (err) => {
+          console.warn('[Gemini Live Error]', err);
+          setLastResponse(`Live connection note: ${err}`);
+        },
+      });
+
+      await globalLiveConversationService.start();
+      setState('listening');
+      playToneChime('listen');
+    } catch (err: any) {
+      console.error('[Gemini Live Start Failure]', err);
+      // Fallback to standard voice turn
+      setState('idle');
+      const fallbackSpeech = 'Live connection unavailable. Falling back to high-velocity neural orchestrator.';
+      setLastResponse(fallbackSpeech);
+      speakResponse(fallbackSpeech, () => {
+        if (isLiveConversationRef.current) {
+          startListening();
+        }
+      });
+    }
   };
 
   const endLiveCall = () => {
     isLiveConversationRef.current = false;
     setIsLiveConversation(false);
     consecutiveSilenceCountRef.current = 0;
+
+    globalLiveConversationService.stop();
+
     if (speakIntervalRef.current) {
       clearInterval(speakIntervalRef.current);
       speakIntervalRef.current = null;
@@ -820,13 +940,13 @@ export default function App() {
     }
     stopAudioMeterLoop();
     setState('idle');
-    const endText = 'Conversation ended. Say "Hey RODEX" to talk again.';
+    const endText = 'Live conversation ended. Say "Hey RODEX" to talk again.';
     setLastResponse(endText);
 
     const liveEndMsg: ChatMessage = {
       id: `live-end-${Date.now()}`,
       sender: 'assistant',
-      text: 'Live audio call disconnected. Session transcript preserved and ready to retrieve anytime.',
+      text: 'Live voice stream disconnected. Session transcript preserved in chat history.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setMessages((prev) => [...prev, liveEndMsg]);
@@ -1672,21 +1792,56 @@ export default function App() {
     handleSendMessage,
   ]);
 
-  // Start Voice Recognition (Tap-to-talk, Barge-In, or Auto-Turn Taking)
-  const startListening = async () => {
-    // Prime the voice synthesis engine immediately on user gesture to guarantee speech playback
+  // Unified Orb Click Handler (Seamlessly Integrates Real-Time Live Voice with the Orb)
+  const handleOrbClick = async () => {
     rodexSynth.prime();
-
-    // Physical haptic tap feedback
     triggerHaptic('tap');
 
-    // If speaking, barge-in interrupts speech and immediately listens to user
+    // 1. Natural Barge-In: If speaking, immediately interrupt and listen
+    if (state === 'speaking') {
+      if (isLiveConversation && globalLiveConversationService.isConnected()) {
+        globalLiveConversationService.stopAllPlayback();
+        setState('listening');
+        playToneChime('bargein');
+        return;
+      }
+      rodexSynth.stop();
+      playToneChime('bargein');
+      setState('listening');
+      globalSpeechManager.startCommandCapture();
+      return;
+    }
+
+    // 2. If already in live conversation, keep listening
+    if (isLiveConversation && globalLiveConversationService.isConnected()) {
+      playToneChime('listen');
+      setState('listening');
+      return;
+    }
+
+    // 3. Request mic permission if not granted
+    if (!micPermissionGranted) {
+      const granted = await requestMicPermission();
+      if (!granted) {
+        setLastResponse('Microphone access is required for voice interaction. Please allow microphone access.');
+        return;
+      }
+    }
+
+    // 4. Connect real-time Live Voice conversation directly through the Orb
+    await startLiveCall();
+  };
+
+  // Start Voice Recognition (Fallback or Secondary Trigger)
+  const startListening = async () => {
+    rodexSynth.prime();
+    triggerHaptic('tap');
+
     if (state === 'speaking') {
       rodexSynth.stop();
       playToneChime('bargein');
     }
 
-    // Check permission - request directly in response to user click
     if (!micPermissionGranted) {
       const granted = await requestMicPermission();
       if (!granted) {
@@ -1695,7 +1850,6 @@ export default function App() {
       }
     }
 
-    // Use unified speech manager
     await globalSpeechManager.startCommandCapture();
   };
 
@@ -1994,7 +2148,7 @@ export default function App() {
               audioLevel={audioLevel}
               pitchHz={pitchHz}
               size={260}
-              onClick={startListening}
+              onClick={handleOrbClick}
               activeMode={activeMode}
               isLive={isLiveConversation}
               themeAccent={themeAccent}

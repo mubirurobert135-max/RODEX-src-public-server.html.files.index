@@ -370,5 +370,273 @@
     },
     "createdAt": "2026-09-27T11:18:28.858Z",
     "updatedAt": "2026-09-27T11:18:28.858Z"
+  },
+  {
+    "id": "usr_1790711572474_9bf29862",
+    "username": "alice_1790711572466",
+    "email": "alice_1790711572466@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "b017562e2c1ed7ffac0e172190aef1b2365f9a3f7430bb46d562db5e10c91020596b406ffd6f3500881e646b19fca8c0a6e0a4126cf81b169ab846f30fc0aa3e",
+    "salt": "179fb479a8eb7d44f969a02cc37c01f0",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "6c15ff586f4ea9418a8993769bb1d744ab2db92465bcf944e034d06f7b3de91e410378af1bbd9bf7d4b94e06116114d450987ade56922360231ce56ce1074bad",
+    "securityAnswerSalt": "d108c3b84aeb197979e08873852aecaf",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T19:52:52.474Z",
+    "updatedAt": "2026-09-29T19:52:52.474Z"
+  },
+  {
+    "id": "usr_1790711572479_923faeab",
+    "username": "bob_1790711572475",
+    "email": "bob_1790711572475@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "3cdbcf9bc4aff157b1f940789aa425fd0507df5d3be3494ac73ceb35ed4e42978f3eccdff836e6f513e5972914f8e99bdb3e9ef65d3fd3f4b51bac0e93795960",
+    "salt": "090fd7e35f97af4fcdd791101d6bb5cb",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T19:52:52.479Z",
+    "updatedAt": "2026-09-29T19:52:52.479Z"
+  },
+  {
+    "id": "usr_1790712273311_66c2c07d",
+    "username": "alice_1790712273302",
+    "email": "alice_1790712273302@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "21c70e1f9b647463fbb9ee189075cf45a20e8b13b6747fce03058c905da774212119c7eecfd701e93d039b4b5a3bd1cb18c3e7906359d45f422a6b8bed2be6de",
+    "salt": "5a040f0a0963f9b91c92eb6bf3040557",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "cc5db4332118c81f7e9e2bf3a3d76b3a94e919a89f37e9ab6f3378cf640052b3f4cf75b2daec7171f8f27c1fa1b76a33eae500bc82d690985ed9858467066bb9",
+    "securityAnswerSalt": "1a28b0ced832ac9cce3139785a3846b0",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T20:04:33.311Z",
+    "updatedAt": "2026-09-29T20:04:33.311Z"
+  },
+  {
+    "id": "usr_1790712273316_98033166",
+    "username": "bob_1790712273312",
+    "email": "bob_1790712273312@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "a6bb6b71c238461235249d1c303d8232ebe4d9f86669caf9775a403fdd4a703e176ec479b3b9ba317fe60754a834d9aa9ff1e2af827ad48267671bd23eebf9dd",
+    "salt": "edbca7063efda02f456e10e6e387055e",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T20:04:33.316Z",
+    "updatedAt": "2026-09-29T20:04:33.316Z"
+  },
+  {
+    "id": "usr_1790712358572_2409114f",
+    "username": "alice_1790712358564",
+    "email": "alice_1790712358564@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "d9c9c69056435b8c365623aca723c310ce77b07363677847e0aa22a2769befd509c017ef8d8dcc6f479f6598ea420c047140ee5268a68685aa04f7b4d031e4bd",
+    "salt": "87e4bb4ab97bf9c5a8eb286bbceee750",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "4958290f9becb14ad70df2c1d1484514b5a51521b141c14a44384c30e3ad1fc00dfe1e6243c7a94282cbadb5266132a72cb013705f0c58146b81f6490b9ed368",
+    "securityAnswerSalt": "74df8aaf5633bfa0e31f2bd653978e2f",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T20:05:58.572Z",
+    "updatedAt": "2026-09-29T20:05:58.572Z"
+  },
+  {
+    "id": "usr_1790712358584_789de80f",
+    "username": "bob_1790712358574",
+    "email": "bob_1790712358574@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "507b4dde4e03d9b384ef7d7e636a406673d6c13df3d4d3baa9276c156b4b6fd64f8f79539387c3a45faaaa5de2e6564c62be579c0d1dae4249ce1bde40d4ccce",
+    "salt": "61970823bcb4759d19b17bc1093d0613",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T20:05:58.584Z",
+    "updatedAt": "2026-09-29T20:05:58.584Z"
+  },
+  {
+    "id": "usr_1790712434182_38c92929",
+    "username": "alice_1790712434173",
+    "email": "alice_1790712434173@example.com",
+    "displayName": "Alice Walker",
+    "passwordHash": "8d1638757bc413f57b600000c209e3da93542125fec96900a9dd6230b8d6c35dc1898635a45e007e106eb2e14c5948e28fe2b579b11caff924ec2a5811af715d",
+    "salt": "fe99ddd92b85c51d2cf95a3f7a1f9fd2",
+    "securityQuestion": "Favorite city?",
+    "securityAnswerHash": "8bc5dd6e141f8dc01dfcd923222320115ddac30c060db1ef2a323507b0a525be4e073322a8d2135ffd92f6bdcb0366a39c01ab8dcf8026e745944ddfabba64d0",
+    "securityAnswerSalt": "f8e3206cda662c45e6afb64e52988d27",
+    "role": "user",
+    "profile": {
+      "preferredName": "Alice",
+      "honorific": "Alice Walker",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T20:07:14.182Z",
+    "updatedAt": "2026-09-29T20:07:14.182Z"
+  },
+  {
+    "id": "usr_1790712434189_0ef7ef51",
+    "username": "bob_1790712434184",
+    "email": "bob_1790712434184@example.com",
+    "displayName": "Bob Smith",
+    "passwordHash": "19f494d3ebf302a87e9ed82546f618f6be45146da1bfa0f7abfd80961f9528a28d11a29c831a54a7613f50495263ce76ca42aacfae93a1b3cd6eef101a31e688",
+    "salt": "08f1a4e7f70b4e1223b1c7ff2b94a14e",
+    "role": "user",
+    "profile": {
+      "preferredName": "Bob",
+      "honorific": "Bob Smith",
+      "responseStyle": "balanced",
+      "tone": "professional",
+      "timezone": "Africa/Kampala",
+      "customDirectives": []
+    },
+    "voiceProfile": {
+      "pitch": 1,
+      "rate": 1,
+      "autoSpeak": true
+    },
+    "connectedServices": {},
+    "permissions": {
+      "microphone": true,
+      "contacts": true,
+      "spotify": true,
+      "gmail": true,
+      "terminal": false
+    },
+    "createdAt": "2026-09-29T20:07:14.189Z",
+    "updatedAt": "2026-09-29T20:07:14.189Z"
   }
 ]
