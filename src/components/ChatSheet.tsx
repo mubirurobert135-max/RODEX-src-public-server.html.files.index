@@ -98,6 +98,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      console.info('[RODEX TRACE] CHAT UI RENDERED');
       scrollToBottom();
     }
   }, [messages, isOpen]);

@@ -682,6 +682,22 @@ export interface FirestoreAgentTask {
   updatedAt: string;
 }
 
+function sanitizeForFirestore<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, any>)) {
+    if (value !== undefined) {
+      sanitized[key] = sanitizeForFirestore(value);
+    }
+  }
+  return sanitized as T;
+}
+
 export const saveTaskToFirestore = async (
   userId: string,
   task: FirestoreAgentTask
@@ -689,11 +705,12 @@ export const saveTaskToFirestore = async (
   const path = `users/${userId}/tasks/${task.id}`;
   try {
     const taskRef = doc(db, 'users', userId, 'tasks', task.id);
-    await setDoc(taskRef, {
+    const sanitizedData = sanitizeForFirestore({
       ...task,
       updatedAt: new Date().toISOString(),
       timestamp: serverTimestamp(),
     });
+    await setDoc(taskRef, sanitizedData);
     return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, path);

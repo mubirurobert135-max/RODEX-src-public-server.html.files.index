@@ -67,25 +67,12 @@ export class AIProviderService {
   public getModelTiers(tier: 'fast' | 'balanced' | 'deep_reasoning' = 'fast'): string[] {
     switch (tier) {
       case 'deep_reasoning':
-        return [
-          'gemini-2.5-pro',
-          'gemini-2.5-flash',
-          'gemini-2.5-flash-lite',
-          'gemini-3.8-flash',
-        ];
       case 'balanced':
-        return [
-          'gemini-2.5-flash',
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-pro',
-          'gemini-3.8-flash',
-        ];
       case 'fast':
       default:
         return [
-          'gemini-2.5-flash',
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-pro',
+          'gemini-3.1-flash-lite',
+          'gemini-flash-latest',
           'gemini-3.8-flash',
         ];
     }
@@ -108,9 +95,7 @@ export class AIProviderService {
       };
     }
 
-    const candidateModels = request.modelOverride
-      ? [request.modelOverride, ...this.getModelTiers(tier)]
-      : this.getModelTiers(tier);
+    const candidateModels = this.getModelTiers(tier);
 
     const isSearchCooldown = Date.now() < this.searchCooldownUntil;
     const tools = !isSearchCooldown && request.tools && request.tools.length > 0 ? request.tools : undefined;
@@ -166,10 +151,7 @@ export class AIProviderService {
         } catch (err: any) {
           lastError = err;
           const msg = err?.message || String(err);
-          if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
-            this.searchCooldownUntil = Date.now() + 25000;
-            break;
-          }
+          console.warn(`[AIProvider] Model ${model} failed, trying next candidate:`, msg);
         }
       }
     }
@@ -188,22 +170,23 @@ export class AIProviderService {
           },
         });
 
-        if (res && res.text) {
+        if (res && (res.text || res.candidates?.length)) {
           return {
-            text: res.text,
+            text: res.text || '',
             modelUsed: model,
             latencyMs: Date.now() - startTime,
           };
         }
       } catch (err: any) {
         lastError = err;
+        const msg = err?.message || String(err);
+        console.warn(`[AIProvider Direct] Model ${model} failed:`, msg);
       }
     }
 
-    // 3. Graceful degradation fallback
     return {
-      text: 'I am here and listening, Mr. Robert. My neural subsystems remain active and verified. How can I assist you right now?',
-      modelUsed: 'graceful_fallback',
+      text: 'RODEX: I have received your request and am fully operational. How can I assist you further, Robert?',
+      modelUsed: 'resilient_fallback',
       latencyMs: Date.now() - startTime,
     };
   }

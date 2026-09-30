@@ -19,6 +19,14 @@ async function runOrbWakeTests() {
   // 1. Natural Wake Phrase Variations
   console.log('1. Testing Natural Wake Phrase Variations...');
   const wakePhrases = [
+    'hello rodex',
+    'hi rodex',
+    'hey rodex',
+    'hello',
+    'hi',
+    'hey',
+    'hi what\'s up',
+    'hi whats up',
     'Hello RODEX',
     'Hello, RODEX',
     'Hey RODEX',
@@ -29,8 +37,8 @@ async function runOrbWakeTests() {
     'Rodex',
     'Okay RODEX',
     'OK RODEX',
-    'Good morning RODEX',
-    'Good evening RODEX',
+    'Good morning',
+    'Good evening',
   ];
 
   for (const phrase of wakePhrases) {

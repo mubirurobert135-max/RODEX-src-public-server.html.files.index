@@ -34,6 +34,8 @@ export class VoiceLifecycleManager {
   private hasInputDevice: boolean = false;
   private permissionState: 'granted' | 'denied' | 'prompt' | 'unknown' = 'unknown';
   private permissionStatusObj: PermissionStatus | null = null;
+  private isInitializingRef: boolean = false;
+  private isInitializedRef: boolean = false;
 
   // Single Persistent Microphone Stream & AudioMeter
   private audioMeter: AudioMeter = new AudioMeter();
@@ -43,6 +45,7 @@ export class VoiceLifecycleManager {
   // Speech Recognition Session (Browser SpeechRecognition API)
   private recognition: any = null;
   private isRecognitionRunning: boolean = false;
+  private isStartingRecognition: boolean = false;
   private isWakeWordEnabled: boolean = true;
   private customWakeWordConfig?: { phrase: string; enabled: boolean; isTrained?: boolean };
 
@@ -53,6 +56,13 @@ export class VoiceLifecycleManager {
   private followUpWindowDurationMs: number = 7000;
 
   // Error Recovery & Diagnostics
+  private liveVoiceMode: boolean = true;
+  private instanceCounter: number = 0;
+  private currentInstanceId: string = 'RDX-000';
+  private diagnosticLogs: Array<{ id: string; time: string; text: string }> = [];
+  private micProbeDetail: string = 'Not probed';
+  private micSignalStatus: 'NO_SIGNAL' | 'SIGNAL_DETECTED' | 'CHECKING' = 'NO_SIGNAL';
+  private speechRecStatus: 'NOT_STARTED' | 'STARTED_NO_AUDIO_EVENTS' | 'AUDIO_EVENTS_RECEIVED' | 'RESULT_RECEIVED' = 'NOT_STARTED';
   private consecutiveErrors: number = 0;
   private reconnectAttempts: number = 0;
   private lastEvent: string = 'boot';
@@ -131,6 +141,121 @@ export class VoiceLifecycleManager {
     return this.permissionState === 'granted';
   }
 
+  public addDiagnosticLog(msg: string) {
+    const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const logItem = { id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, time, text: msg };
+    this.diagnosticLogs = [logItem, ...this.diagnosticLogs].slice(0, 40);
+    console.info(`[RODEX TRACE ${time}] ${msg}`);
+  }
+
+  public getDiagnosticLogs(): Array<{ id: string; time: string; text: string }> {
+    return this.diagnosticLogs;
+  }
+
+  public getInstanceId(): string {
+    return this.currentInstanceId;
+  }
+
+  public getMicProbeDetail(): string {
+    return this.micProbeDetail;
+  }
+
+  public setLiveVoiceMode(active: boolean) {
+    this.liveVoiceMode = active;
+    if (active) {
+      this.stopRecognition();
+      this.addDiagnosticLog('[VoiceLifecycle] liveVoiceMode enabled: Web Speech Recognition gated OFF');
+    } else {
+      this.addDiagnosticLog('[VoiceLifecycle] liveVoiceMode disabled');
+    }
+  }
+
+  public isLiveVoiceMode(): boolean {
+    return this.liveVoiceMode;
+  }
+
+  public getMicSignalStatus(): 'NO_SIGNAL' | 'SIGNAL_DETECTED' | 'CHECKING' {
+    return this.micSignalStatus;
+  }
+
+  public getSpeechRecStatus(): 'NOT_STARTED' | 'STARTED_NO_AUDIO_EVENTS' | 'AUDIO_EVENTS_RECEIVED' | 'RESULT_RECEIVED' {
+    return this.speechRecStatus;
+  }
+
+  /**
+   * Diagnostic Test 1: Real microphone audio level analysis (3 seconds)
+   * Requests getUserMedia, connects to Web Audio AnalyserNode, calculates peak RMS volume,
+   * displays MIC AUDIO LEVEL = ... and then IMMEDIATELY releases all tracks and closes AudioContext.
+   */
+  public async runMicAudioLevelTest(): Promise<{ peakLevel: number; signalDetected: boolean }> {
+    this.micSignalStatus = 'CHECKING';
+    this.addDiagnosticLog('TEST MICROPHONE AUDIO started (3s analysis window)...');
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        this.addDiagnosticLog('TEST MIC AUDIO FAILED: getUserMedia missing');
+        this.micSignalStatus = 'NO_SIGNAL';
+        return { peakLevel: 0, signalDetected: false };
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      let maxRms = 0;
+      const startTime = Date.now();
+
+      await new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          const norm = Math.min(1.0, Math.max(0.0, avg / 128));
+          if (norm > maxRms) maxRms = norm;
+
+          if (Date.now() - startTime >= 3000) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 50);
+      });
+
+      // CLEANUP MIC TEST TRACKS & AUDIOCONTEXT IMMEDIATELY!
+      stream.getTracks().forEach((t) => t.stop());
+      try {
+        source.disconnect();
+        analyser.disconnect();
+        await ctx.close();
+      } catch (_) {}
+
+      const signalDetected = maxRms > 0.02;
+      this.micSignalStatus = signalDetected ? 'SIGNAL_DETECTED' : 'NO_SIGNAL';
+      this.addDiagnosticLog(`MIC AUDIO LEVEL = ${(maxRms * 100).toFixed(1)}% -> Result: ${this.micSignalStatus}`);
+      return { peakLevel: maxRms, signalDetected };
+    } catch (err: any) {
+      this.micSignalStatus = 'NO_SIGNAL';
+      this.addDiagnosticLog(`MIC AUDIO TEST ERROR: ${err?.message || err}`);
+      return { peakLevel: 0, signalDetected: false };
+    }
+  }
+
+  /**
+   * Diagnostic Test 2: Speech Recognition lifecycle test
+   * Starts exactly ONE SpeechRecognition instance and logs full lifecycle events.
+   */
+  public testSpeechRecognitionSingle(): void {
+    this.addDiagnosticLog('TEST SPEECH RECOGNITION button clicked -> Starting single instance test...');
+    this.speechRecStatus = 'NOT_STARTED';
+    this.liveVoiceMode = false;
+    this.initOrResumeRecognition('wake_detection');
+  }
+
   public getDiagnostics(): VoiceDiagnostics {
     const metrics = this.audioMeter.getVoiceMetrics();
     return {
@@ -168,46 +293,68 @@ export class VoiceLifecycleManager {
    * If permission is already granted, the mic stream and wake-word listener start automatically.
    */
   public async autoInitialize(): Promise<void> {
-    this.transitionTo('INITIALIZING', 'auto_init_start');
-
-    if (typeof window === 'undefined') return;
-
-    // 1. Detect microphone input hardware
-    await this.detectInputDevices();
-
-    if (!this.hasInputDevice) {
-      this.transitionTo('MIC_UNAVAILABLE', 'no_audio_input_hardware');
+    if (this.isInitializingRef) {
+      console.info('[RODEX Voice] initialization skipped - already running');
+      return;
+    }
+    if (this.isInitializedRef && this.permissionState === 'granted' && this.isRecognitionRunning) {
+      console.info('[RODEX Voice] initialization skipped - already running');
       return;
     }
 
-    // 2. Query OS / Browser permission status
-    if (navigator.permissions && navigator.permissions.query) {
-      try {
-        const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        this.permissionStatusObj = status;
-        this.permissionState = status.state as any;
+    this.isInitializingRef = true;
+    console.info('[RODEX Voice] initialization started');
+    this.transitionTo('INITIALIZING', 'auto_init_start');
 
-        // Listen for OS / Browser permission changes in real-time
-        status.onchange = () => {
-          this.handlePermissionChange(status.state);
-        };
+    if (typeof window === 'undefined') {
+      this.isInitializingRef = false;
+      return;
+    }
 
-        if (status.state === 'granted') {
-          // Returning User: Permission is already granted! Automatically initialize mic & wake engine.
-          console.info('[VoiceLifecycle] Microphone permission already granted. Auto-initializing hands-free voice engine...');
-          await this.initializeHardwareAndWakeListening();
-        } else if (status.state === 'denied') {
-          this.transitionTo('PERMISSION_REVOKED', 'permission_denied_by_os');
-        } else {
-          // First use: status is 'prompt'. Do not trigger invasive prompt until user interacts with the minimal UI.
-          this.transitionTo('MIC_PERMISSION_REQUIRED', 'permission_prompt_required');
-        }
-      } catch (err: any) {
-        console.info('[VoiceLifecycle] Permissions API query unavailable, checking via fallback:', err?.message);
-        this.transitionTo('MIC_PERMISSION_REQUIRED', 'permissions_query_unsupported');
+    try {
+      // 1. Detect microphone input hardware
+      await this.detectInputDevices();
+
+      if (!this.hasInputDevice) {
+        this.transitionTo('MIC_UNAVAILABLE', 'no_audio_input_hardware');
+        this.isInitializingRef = false;
+        return;
       }
-    } else {
-      this.transitionTo('MIC_PERMISSION_REQUIRED', 'permissions_api_missing');
+
+      // 2. Query OS / Browser permission status
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          this.permissionStatusObj = status;
+          this.permissionState = status.state as any;
+
+          // Listen for OS / Browser permission changes in real-time
+          status.onchange = () => {
+            this.handlePermissionChange(status.state);
+          };
+
+          if (status.state === 'granted') {
+            // Returning User: Permission is already granted! Automatically initialize mic & wake engine.
+            console.info('[RODEX Voice] microphone ready');
+            await this.initializeHardwareAndWakeListening();
+          } else if (status.state === 'denied') {
+            this.transitionTo('PERMISSION_REVOKED', 'permission_denied_by_os');
+          } else {
+            // First use: status is 'prompt'. Do not trigger invasive prompt until user interacts with the minimal UI.
+            this.transitionTo('MIC_PERMISSION_REQUIRED', 'permission_prompt_required');
+          }
+        } catch (err: any) {
+          console.info('[RODEX Voice] Permissions API query unavailable, checking via fallback:', err?.message);
+          this.transitionTo('MIC_PERMISSION_REQUIRED', 'permissions_query_unsupported');
+        }
+      } else {
+        this.transitionTo('MIC_PERMISSION_REQUIRED', 'permissions_api_missing');
+      }
+    } catch (err: any) {
+      console.warn('[RODEX Voice] initialization error:', err);
+    } finally {
+      this.isInitializingRef = false;
+      this.isInitializedRef = true;
     }
   }
 
@@ -249,11 +396,43 @@ export class VoiceLifecycleManager {
   /**
    * Hardware & Wake-Word Stream Startup
    */
-  private async initializeHardwareAndWakeListening(): Promise<void> {
-    this.transitionTo('MIC_READY', 'mic_ready');
+  private async initializeHardwareAndWakeListening(): Promise<boolean> {
+    this.addDiagnosticLog('microphone permission check started');
+    this.addDiagnosticLog(`microphone permission state = ${this.permissionState}`);
 
-    // Start single shared audio meter for voice activity & haptics
-    await this.startSharedAudioMeter();
+    // Probe actual microphone stream capture to verify document/iframe permissions policy
+    if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      try {
+        this.addDiagnosticLog('getUserMedia requested');
+        const probeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.addDiagnosticLog('microphone stream acquired');
+        const tracks = probeStream.getAudioTracks();
+        this.addDiagnosticLog(`microphone tracks = ${tracks.length}`);
+        if (tracks.length > 0) {
+          const t = tracks[0];
+          this.micProbeDetail = `LIVE | kind=${t.kind} | readyState=${t.readyState} | enabled=${t.enabled} | label="${t.label || 'Default Mic'}"`;
+          this.addDiagnosticLog(`audio track kind = ${t.kind}`);
+          this.addDiagnosticLog(`audio track readyState = ${t.readyState}`);
+          this.addDiagnosticLog(`audio track enabled = ${t.enabled}`);
+          this.addDiagnosticLog(`audio track label = ${t.label || 'Default Mic'}`);
+        } else {
+          this.micProbeDetail = 'No audio tracks found on stream';
+          this.addDiagnosticLog('NO AUDIO TRACKS FOUND ON ACQUIRED STREAM');
+        }
+        // Release probe tracks immediately so SpeechRecognition has 100% exclusive hardware access!
+        tracks.forEach((track) => track.stop());
+      } catch (err: any) {
+        this.micProbeDetail = `FAILED: ${err?.message || err}`;
+        this.addDiagnosticLog(`getUserMedia PROBE FAILED: ${err?.message || err}`);
+        this.permissionState = 'denied';
+        this.transitionTo('MIC_UNAVAILABLE', 'permissions_policy_violation');
+        this.callbacks?.onError('Microphone audio capture is restricted in this document context', false);
+        return false;
+      }
+    }
+
+    this.addDiagnosticLog('microphone hardware check complete -> MIC READY');
+    this.transitionTo('MIC_READY', 'mic_ready');
 
     // Start continuous wake-word detection
     if (this.isWakeWordEnabled) {
@@ -261,6 +440,7 @@ export class VoiceLifecycleManager {
     } else {
       this.transitionTo('PAUSED', 'wake_disabled');
     }
+    return true;
   }
 
   private handlePermissionChange(newState: string) {
@@ -313,17 +493,22 @@ export class VoiceLifecycleManager {
 
     // App Visibility / Tab Focus Handling
     document.addEventListener('visibilitychange', () => {
+      this.addDiagnosticLog(`visibilitychange event: visibilityState=${document.visibilityState}, hasFocus=${document.hasFocus()}`);
       if (document.visibilityState === 'visible') {
-        console.info('[VoiceLifecycle] App active/visible: checking and restoring voice engine...');
         if (this.permissionState === 'granted') {
-          if (!this.isRecognitionRunning && this.isWakeWordEnabled) {
+          if (!this.isRecognitionRunning && !this.isStartingRecognition && this.isWakeWordEnabled) {
             this.startWakeWordListening();
           }
         }
-      } else {
-        // App inactive/backgrounded: safely maintain or pause background speech recognition
-        console.info('[VoiceLifecycle] App in background');
       }
+    });
+
+    window.addEventListener('focus', () => {
+      this.addDiagnosticLog(`focus event: visibilityState=${document.visibilityState}, hasFocus=true`);
+    });
+
+    window.addEventListener('blur', () => {
+      this.addDiagnosticLog(`blur event: visibilityState=${document.visibilityState}, hasFocus=false`);
     });
   }
 
@@ -428,48 +613,96 @@ export class VoiceLifecycleManager {
   private initOrResumeRecognition(mode: 'wake_detection' | 'command_capture'): boolean {
     if (typeof window === 'undefined') return false;
 
+    // GATED: Prevent SpeechRecognition from running when Live Voice mode is active
+    if (this.liveVoiceMode) {
+      this.addDiagnosticLog('[VoiceLifecycle] Web Speech recognition gated off while Live Voice mode is active');
+      return false;
+    }
+
     const SpeechRecognitionClass =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognitionClass) {
-      console.warn('[VoiceLifecycle] SpeechRecognition API is unsupported in this browser.');
+      this.addDiagnosticLog('SpeechRecognition API is unsupported in this browser environment');
       this.callbacks?.onError('SpeechRecognition API unsupported in browser', true);
       return false;
     }
 
     // Reuse existing running session if mode matches and recognition is alive
-    if (this.recognition && this.isRecognitionRunning) {
+    if (this.isStartingRecognition || (this.recognition && this.isRecognitionRunning)) {
       return true;
     }
 
     if (this.recognition) {
       try {
+        this.addDiagnosticLog(`recognition.abort() called on prior instance ${this.currentInstanceId}`);
         this.recognition.abort();
       } catch (_) {}
       this.recognition = null;
     }
 
     try {
+      this.isStartingRecognition = true;
+      this.instanceCounter++;
+      this.currentInstanceId = `RDX-${String(this.instanceCounter).padStart(3, '0')}`;
+
       const rec = new SpeechRecognitionClass();
       this.recognition = rec;
-      rec.continuous = true;
-      rec.interimResults = true;
+      rec.continuous = false;
+      rec.interimResults = false;
       rec.lang = 'en-US';
-      rec.maxAlternatives = 2;
+      rec.maxAlternatives = 1;
+
+      this.addDiagnosticLog(`RDX recognition instance created ${this.currentInstanceId}`);
 
       rec.onstart = () => {
+        this.addDiagnosticLog(`RDX recognition start ${this.currentInstanceId}`);
+        this.addDiagnosticLog(`recognition onstart (${this.currentInstanceId})`);
+        this.speechRecStatus = 'STARTED_NO_AUDIO_EVENTS';
+        this.isStartingRecognition = false;
         this.isRecognitionRunning = true;
         this.consecutiveErrors = 0;
-        this.lastEvent = 'recognition_onstart';
+        this.lastEvent = `recognition_onstart_${this.currentInstanceId}`;
+
+        const isIframe = typeof window !== 'undefined' && window.top !== window.self;
+        if (isIframe) {
+          this.addDiagnosticLog(`ENVIRONMENT DIAGNOSTIC: Embedded iframe detected (window.top !== window.self). SecureContext: ${window.isSecureContext}`);
+        }
+      };
+
+      rec.onaudiostart = () => {
+        if (this.speechRecStatus === 'STARTED_NO_AUDIO_EVENTS') {
+          this.speechRecStatus = 'AUDIO_EVENTS_RECEIVED';
+        }
+        this.addDiagnosticLog(`recognition onaudiostart (${this.currentInstanceId})`);
+      };
+
+      rec.onsoundstart = () => {
+        if (this.speechRecStatus === 'STARTED_NO_AUDIO_EVENTS') {
+          this.speechRecStatus = 'AUDIO_EVENTS_RECEIVED';
+        }
+        this.addDiagnosticLog(`recognition onsoundstart (${this.currentInstanceId})`);
+      };
+
+      rec.onspeechstart = () => {
+        if (this.speechRecStatus === 'STARTED_NO_AUDIO_EVENTS') {
+          this.speechRecStatus = 'AUDIO_EVENTS_RECEIVED';
+        }
+        this.addDiagnosticLog(`recognition onspeechstart (${this.currentInstanceId})`);
+      };
+
+      rec.onnomatch = () => {
+        this.addDiagnosticLog(`recognition onnomatch (${this.currentInstanceId})`);
       };
 
       rec.onresult = (event: any) => {
+        this.speechRecStatus = 'RESULT_RECEIVED';
+        this.addDiagnosticLog(`recognition onresult (${this.currentInstanceId})`);
+
         // -------------------------------------------------------------
         // BARGE-IN & INTERRUPTION HANDLING (While RODEX is speaking)
         // -------------------------------------------------------------
         if (this.isSelfSpeaking || rodexSynth.isSpeaking() || this.state === 'SPEAKING') {
-          // Grace period: ignore microphone input during the first 750ms of speech output
-          // to prevent false triggering from speaker output onset or chimes
           if (Date.now() - this.ttsStartTime < 750) {
             return;
           }
@@ -480,7 +713,7 @@ export class VoiceLifecycleManager {
           }
           const spoken = speechDuringTTS.trim();
           if (spoken.length > 2) {
-            console.info('[VoiceLifecycle] User interruption detected during speech output:', spoken);
+            this.addDiagnosticLog(`User interruption detected during TTS: "${spoken}"`);
             rodexSynth.stop();
             this.notifySpeaking(false);
             playToneChime('bargein');
@@ -515,8 +748,28 @@ export class VoiceLifecycleManager {
         const currentText = (finalTranscript || interimTranscript || '').trim();
         if (!currentText) return;
 
+        this.addDiagnosticLog(`transcript = "${currentText}"`);
+
         this.lastCapturedTranscript = currentText;
         this.callbacks?.onTranscript(currentText, Boolean(finalTranscript));
+
+        // Bypassing Gemini AI test command check
+        if (currentText.toLowerCase().includes('hello rodex test')) {
+          this.addDiagnosticLog('LOCAL TEST COMMAND MATCHED: "hello rodex test" -> Bypassing Gemini AI');
+          triggerHaptic('activate');
+          playToneChime('wake');
+          this.transitionTo('SPEAKING', 'local_test_command_speak');
+          rodexSynth.speak('Voice test successful.', {
+            onStart: () => {
+              this.addDiagnosticLog('TTS started (Local test phrase)');
+            },
+            onEnd: () => {
+              this.addDiagnosticLog('TTS ended (Local test phrase)');
+              this.startWakeWordListening();
+            },
+          });
+          return;
+        }
 
         // In follow-up window, speech immediately cancels the window timeout
         if (this.followUpTimer) {
@@ -528,11 +781,14 @@ export class VoiceLifecycleManager {
         // PASSIVE WAKE-WORD DETECTION (IDLE_LISTENING)
         // -------------------------------------------------------------
         if (this.state === 'IDLE_LISTENING') {
+          this.addDiagnosticLog(`wake matching against transcript: "${currentText}"`);
           const match = checkWakeWordMatch(currentText, this.customWakeWordConfig);
+          this.addDiagnosticLog(`wake MATCHED = ${match.isCall}`);
 
           if (match.isCall) {
             triggerHaptic('activate');
             playToneChime('wake');
+            this.addDiagnosticLog('wake handler called');
             this.transitionTo('WAKE_DETECTED', 'wake_matched');
 
             if (match.isPureActivation) {
@@ -553,45 +809,72 @@ export class VoiceLifecycleManager {
           const wakeCheck = extractHeyRodexCommand(currentText);
           const effectiveCmd = wakeCheck.isCall ? wakeCheck.command : currentText;
 
-          // Check if user says conversation exit (e.g., "stop", "cancel", "that's all", "goodbye")
           if (isConversationExit(effectiveCmd)) {
-            console.info('[VoiceLifecycle] User requested conversation exit in follow-up window:', effectiveCmd);
+            this.addDiagnosticLog(`User requested exit: "${effectiveCmd}"`);
             this.clearTimers();
             this.startWakeWordListening();
             return;
           }
 
-          // If user repeated pure wake word (e.g., "Hey RODEX"), re-trigger wake detection
           if (wakeCheck.isCall && !effectiveCmd.trim()) {
             triggerHaptic('activate');
             playToneChime('wake');
+            this.addDiagnosticLog('wake handler called in follow-up');
             this.transitionTo('WAKE_DETECTED', 'wake_matched_in_followup');
             this.callbacks?.onWakeDetected(true, '');
             return;
           }
 
-          // Natural 900ms silence boundary for responsive turn-taking
           this.silenceTimer = setTimeout(() => {
             if (effectiveCmd.trim()) {
+              this.addDiagnosticLog(`command captured = "${effectiveCmd.trim()}"`);
               this.callbacks?.onCommandCaptured(effectiveCmd.trim());
             }
           }, 900);
         }
       };
 
+      rec.onspeechend = () => {
+        this.addDiagnosticLog(`recognition onspeechend (${this.currentInstanceId})`);
+      };
+
+      rec.onsoundend = () => {
+        this.addDiagnosticLog(`recognition onsoundend (${this.currentInstanceId})`);
+      };
+
+      rec.onaudioend = () => {
+        this.addDiagnosticLog(`recognition onaudioend (${this.currentInstanceId})`);
+      };
+
+      let wasNoSpeech = false;
+
       rec.onerror = (event: any) => {
         const errType = event?.error || 'unknown';
         this.lastError = errType;
+        this.addDiagnosticLog(`recognition onerror = ${errType} (${this.currentInstanceId})`);
 
         if (errType === 'no-speech') {
+          wasNoSpeech = true;
           return;
         }
 
         if (errType === 'not-allowed' || errType === 'service-not-allowed') {
+          this.addDiagnosticLog('Microphone access denied or service not allowed by browser');
           this.permissionState = 'denied';
           this.stopAll();
           this.transitionTo('PERMISSION_REVOKED', 'not_allowed_error');
-          this.callbacks?.onError('Microphone access requires user permission', true);
+          this.callbacks?.onError('Microphone access is not allowed in this document context', true);
+          return;
+        }
+
+        if (errType === 'audio-capture') {
+          this.consecutiveErrors++;
+          if (this.consecutiveErrors >= 3) {
+            this.stopAll();
+            this.transitionTo('MIC_UNAVAILABLE', 'audio_capture_hardware_error');
+            this.callbacks?.onError('Microphone hardware capture error. Please verify device connection.', false);
+            return;
+          }
           return;
         }
 
@@ -600,36 +883,66 @@ export class VoiceLifecycleManager {
         }
 
         this.consecutiveErrors++;
-        console.warn('[VoiceLifecycle] Recognition error:', errType, `Streak: ${this.consecutiveErrors}`);
-
         if (this.consecutiveErrors > 5) {
           this.callbacks?.onError(`Speech recognition error: ${errType}`, false);
         }
       };
 
       rec.onend = () => {
+        this.addDiagnosticLog(`RDX recognition stop ${this.currentInstanceId}`);
+        this.addDiagnosticLog(`recognition onend (${this.currentInstanceId})`);
         this.isRecognitionRunning = false;
-        this.lastEvent = 'recognition_onend';
+        this.isStartingRecognition = false;
 
-        // Auto-restart if in an active listening state and permission is granted
+        const isIframe = typeof window !== 'undefined' && window.top !== window.self;
+
+        if (this.speechRecStatus === 'STARTED_NO_AUDIO_EVENTS') {
+          if (isIframe) {
+            this.addDiagnosticLog('SpeechRecognition started but browser delivered no audio events. Preview iframe may be blocking Web Speech audio input.');
+          } else {
+            this.addDiagnosticLog('SpeechRecognition started but no audio events received. Check browser microphone input selection.');
+          }
+        }
+
+        if (wasNoSpeech || !this.lastError || this.lastError === 'no-speech') {
+          this.consecutiveErrors = 0;
+        }
+
+        // If SpeechRecognition started but delivered zero audio events in an iframe, do NOT create an aggressive restart loop!
+        if (this.speechRecStatus === 'STARTED_NO_AUDIO_EVENTS' && isIframe) {
+          this.addDiagnosticLog('[RODEX DIAGNOSTIC] Auto-restart loop paused because browser delivered no audio events in iframe.');
+          return;
+        }
+
         if (
           this.permissionState === 'granted' &&
-          (this.state === 'IDLE_LISTENING' || this.state === 'LISTENING' || this.state === 'FOLLOW_UP_READY')
+          (this.state === 'IDLE_LISTENING' || this.state === 'LISTENING' || this.state === 'FOLLOW_UP_READY') &&
+          this.consecutiveErrors < 5
         ) {
           this.reconnectAttempts++;
-          const backoff = Math.min(1000, 150 + this.consecutiveErrors * 200);
+          const backoff = wasNoSpeech ? 350 : Math.min(3000, 500 + this.consecutiveErrors * 500);
+          this.addDiagnosticLog(`[RODEX DIAGNOSTIC] scheduled recognition restart in ${backoff}ms`);
+          if (this.restartBackoffTimer) clearTimeout(this.restartBackoffTimer);
           this.restartBackoffTimer = setTimeout(() => {
-            if (this.permissionState === 'granted' && this.state !== 'PAUSED') {
+            if (
+              this.permissionState === 'granted' &&
+              !this.isRecognitionRunning &&
+              !this.isStartingRecognition &&
+              (this.state === 'IDLE_LISTENING' || this.state === 'LISTENING' || this.state === 'FOLLOW_UP_READY')
+            ) {
+              this.addDiagnosticLog('[RODEX DIAGNOSTIC] recognition restart executed');
               this.initOrResumeRecognition(mode);
             }
           }, backoff);
         }
       };
 
+      this.addDiagnosticLog(`recognition.start() called on instance ${this.currentInstanceId}`);
       rec.start();
       return true;
     } catch (err: any) {
-      console.warn('[VoiceLifecycle] Failed starting speech recognition:', err?.message || err);
+      this.addDiagnosticLog(`Failed starting speech recognition instance ${this.currentInstanceId}: ${err?.message || err}`);
+      this.isStartingRecognition = false;
       this.lastError = err?.message || 'start_failed';
       return false;
     }

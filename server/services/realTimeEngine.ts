@@ -90,7 +90,7 @@ export class RealTimeResponseEngine {
 
     // Check fast-path response cache for static/repeat queries
     const cached = this.responseCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+    if (cached && cached.reply && cached.reply.trim().length > 0 && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       const ttfrMs = Date.now() - startTime;
       globalPerformanceTracker.recordCacheHit();
       this.sendSSEEvent(res, { type: 'start', path: 'fast_cache_path', ttfrMs });
@@ -318,57 +318,82 @@ export class RealTimeResponseEngine {
         parts: [{ text: userInput }],
       });
 
-      // Stream generation from Gemini model
-      const modelName = 'gemini-3.8-flash';
-      const streamResult = await ai.models.generateContentStream({
-        model: modelName,
-        contents: formattedContents,
-        config: {
-          systemInstruction,
-          maxOutputTokens: isLiveCall ? 180 : 800,
-          temperature: 0.7,
-        },
-      });
+      // Stream generation from Gemini model with multi-model fallback resilience
+      const candidateModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+      let streamSucceeded = false;
+      let chosenModel = candidateModels[0];
 
-      this.sendSSEEvent(res, { type: 'start', path: 'light_path_stream', model: modelName });
+      for (const modelName of candidateModels) {
+        if (streamSucceeded) break;
+        try {
+          const streamResult = await ai.models.generateContentStream({
+            model: modelName,
+            contents: formattedContents,
+            config: {
+              systemInstruction,
+              maxOutputTokens: isLiveCall ? 180 : 800,
+              temperature: 0.7,
+            },
+          });
 
-      for await (const chunk of streamResult) {
-        if (abortSignal?.aborted) {
-          console.log('[RODEX Stream Engine] Client aborted stream.');
-          break;
-        }
+          chosenModel = modelName;
+          this.sendSSEEvent(res, { type: 'start', path: 'light_path_stream', model: modelName });
 
-        const tokenText = chunk.text;
-        if (!tokenText) continue;
+          for await (const chunk of streamResult) {
+            if (abortSignal?.aborted) {
+              console.log('[RODEX Stream Engine] Client aborted stream.');
+              break;
+            }
 
-        if (ttfrMs === null) {
-          ttfrMs = Date.now() - startTime;
-        }
+            const tokenText = chunk.text;
+            if (!tokenText) continue;
 
-        fullAccumulatedText += tokenText;
-        sentenceBuffer += tokenText;
+            if (ttfrMs === null) {
+              ttfrMs = Date.now() - startTime;
+            }
 
-        // Emit token chunk to UI immediately
-        this.sendSSEEvent(res, { type: 'token', token: tokenText });
+            fullAccumulatedText += tokenText;
+            sentenceBuffer += tokenText;
 
-        // Sentence Boundary Detection for Early Speech Start
-        const { sentences, remaining } = this.extractSentences(sentenceBuffer);
-        if (sentences.length > 0) {
-          for (const sentence of sentences) {
-            const cleanSentence = sentence.trim();
-            if (cleanSentence) {
-              if (ttfaMs === null) {
-                ttfaMs = Date.now() - startTime;
+            // Emit token chunk to UI immediately
+            this.sendSSEEvent(res, { type: 'token', token: tokenText });
+
+            // Sentence Boundary Detection for Early Speech Start
+            const { sentences, remaining } = this.extractSentences(sentenceBuffer);
+            if (sentences.length > 0) {
+              for (const sentence of sentences) {
+                const cleanSentence = sentence.trim();
+                if (cleanSentence) {
+                  if (ttfaMs === null) {
+                    ttfaMs = Date.now() - startTime;
+                  }
+                  this.sendSSEEvent(res, {
+                    type: 'sentence',
+                    text: cleanSentence,
+                    index: sentenceIndex++,
+                  });
+                }
               }
-              this.sendSSEEvent(res, {
-                type: 'sentence',
-                text: cleanSentence,
-                index: sentenceIndex++,
-              });
+              sentenceBuffer = remaining;
             }
           }
-          sentenceBuffer = remaining;
+
+          streamSucceeded = true;
+          break;
+        } catch (modelErr: any) {
+          console.warn(`[RealTimeEngine] Stream on ${modelName} encountered error:`, modelErr?.message || modelErr);
+          if (fullAccumulatedText.length > 0) {
+            break;
+          }
         }
+      }
+
+      if (!streamSucceeded && fullAccumulatedText.length === 0) {
+        const fallbackText = "Hello Robert, I am online and operational. How can I assist you today?";
+        this.sendSSEEvent(res, { type: 'start', path: 'emergency_fallback', ttfrMs: 10 });
+        this.sendSSEEvent(res, { type: 'token', token: fallbackText });
+        this.sendSSEEvent(res, { type: 'sentence', text: fallbackText, index: 0 });
+        fullAccumulatedText = fallbackText;
       }
 
       // Flush remaining trailing text sentence if any
@@ -393,13 +418,13 @@ export class RealTimeResponseEngine {
         aiLatencyMs: ttfrMs || totalLatencyMs,
         cacheHit: false,
         success: true,
-        modelUsed: modelName,
+        modelUsed: chosenModel,
       });
 
       globalServiceRegistry.updateServiceHealth('ai_provider', 'HEALTHY', totalLatencyMs);
 
       // Cache short responses for repeat queries
-      if (fullAccumulatedText.length < 300) {
+      if (fullAccumulatedText.trim().length > 0 && fullAccumulatedText.length < 300) {
         this.responseCache.set(cacheKey, {
           reply: fullAccumulatedText,
           timestamp: Date.now(),

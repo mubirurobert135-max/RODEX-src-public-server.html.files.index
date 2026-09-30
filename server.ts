@@ -131,7 +131,8 @@ FIRST-CLASS REAL-TIME VOICE DIRECTIVES:
 4. CHRONOLOGICAL ANCHOR: Always provide up-to-the-minute current answers anchored in today's date (September 2026). Never claim you lack real-time information; leverage live Google Search.
 5. CONVERSATIONAL ELOQUENCE: Speak naturally, fluidly, and engagingly. Provide 1 to 3 spoken sentences for direct queries, or expand with structured clarity when complex analysis is requested. Because this is synthesized audio, avoid raw asterisks, markdown syntax, or awkward symbols.
 6. CONTINUOUS DIALOGUE: Maintain active listening across turns until the user explicitly requests to end the session (e.g., "end call", "hang up", "exit").
-7. SPOTIFY PC INTEGRATION: You possess complete control over Spotify on the user's PC. When requested to play music, search songs/artists, pause, resume, skip tracks, adjust volume, or transfer playback, confirm and execute effortlessly.`;
+7. SPOTIFY PC INTEGRATION: You possess complete control over Spotify on the user's PC. When requested to play music, search songs/artists, pause, resume, skip tracks, adjust volume, or transfer playback, confirm and execute effortlessly.
+8. CONVERSATIONAL MEMORY & TONE: You are speaking directly with your boss, creator, and founder, Robert. You maintain continuous conversational memory across turns within this session. Always remember what the user said (names, facts, preferences, prior questions like "What did I just ask you?"). Keep spoken responses direct, human-like, articulate, and natural (1-3 sentences for standard queries unless asked for comprehensive detail).`;
   }
 
   return `You are RODEX, an advanced, highly generative, and deeply intelligent AI assistant powered by a quantum neural core calculating at millions of operations per second (600M+ ops/sec), continuously connected to real-time Google Search updates across the World Wide Web.
@@ -241,26 +242,26 @@ async function generateWithModelFallback(
   if (params.preferredModels && params.preferredModels.length > 0) {
     models = params.preferredModels;
   } else if (params.performanceMode === 'ultra') {
-    // Ultra-Fast Voice & Command Mode: prioritizing lightweight flash & flash-lite
+    // Ultra-Fast Voice & Command Mode: prioritizing lightweight flash-lite
     models = [
-      "gemini-3.8-flash",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
+      "gemini-3.8-flash",
     ];
   } else if (params.performanceMode === 'deep_reasoning') {
     // Deep Reasoning mode
     models = [
-      "gemini-3.8-flash",
-      "gemini-3.1-pro-preview",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
+      "gemini-3.8-flash",
+      "gemini-3.1-pro-preview",
     ];
   } else {
     // Default balanced fast-path
     models = [
-      "gemini-3.8-flash",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest",
+      "gemini-3.8-flash",
     ];
   }
 
@@ -288,11 +289,9 @@ async function generateWithModelFallback(
       } catch (err: any) {
         lastError = err;
         const errMsg = err?.message || String(err);
-        
+        console.warn(`[ModelFallback] Tool generation on ${model} failed:`, errMsg);
         if (errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("quota")) {
-          // Set cooldown to prevent cascading 429 quota exhaustion across subsequent calls
           searchGroundingCooldownUntil = Date.now() + 30000;
-          break;
         }
       }
     }
@@ -844,8 +843,10 @@ async function startServer() {
       }
 
       const abortController = new AbortController();
-      req.on("close", () => {
-        abortController.abort();
+      res.on("close", () => {
+        if (!res.writableEnded) {
+          abortController.abort();
+        }
       });
 
       const userId = req.userId || req.user?.id || 'usr_robert_1001';

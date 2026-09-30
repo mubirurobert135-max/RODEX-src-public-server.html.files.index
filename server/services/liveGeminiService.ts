@@ -14,11 +14,87 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
   });
 
   wss.on("connection", async (clientWs: WebSocket) => {
-    console.log("[Gemini Live] Client connected for real-time Live API conversation (gemini-3.8-live)");
+    console.log("[Gemini Live Server] Connection received from client for real-time Live API (/api/live)");
     let session: any = null;
     let isClosed = false;
+    const pendingClientMessages: any[] = [];
+
+    // Attach message listener immediately so early messages are never dropped
+    clientWs.on("message", (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (!session) {
+          console.log("[Gemini Live Server] Upstream session initializing, queuing message:", msg.text ? `text: ${msg.text}` : msg.audio ? "audio chunk" : "other");
+          pendingClientMessages.push(msg);
+          return;
+        }
+        dispatchClientMessage(msg);
+      } catch (err: any) {
+        console.error("[Gemini Live Client Message Error]", err?.message || err);
+      }
+    });
+
+    const dispatchClientMessage = (msg: any) => {
+      if (!session) return;
+      try {
+        if (msg.audio) {
+          session.sendRealtimeInput({
+            audio: {
+              data: msg.audio,
+              mimeType: msg.mimeType || "audio/pcm;rate=16000",
+            },
+          });
+        } else if (msg.text) {
+          console.log(`[Gemini Live Server] CLIENT TEXT MESSAGE RECEIVED: "${msg.text}"`);
+          session.sendClientContent({
+            turns: [
+              {
+                role: "user",
+                parts: [{ text: msg.text }],
+              },
+            ],
+            turnComplete: true,
+          });
+        } else if (msg.video) {
+          session.sendRealtimeInput({
+            video: {
+              data: msg.video,
+              mimeType: msg.mimeType || "image/jpeg",
+            },
+          });
+        }
+      } catch (err: any) {
+        console.error("[Gemini Live Dispatch Error]", err?.message || err);
+      }
+    };
+
+    clientWs.on("close", () => {
+      isClosed = true;
+      console.log("[Gemini Live] Client WebSocket closed. Terminating upstream Live session.");
+      try {
+        session?.close();
+      } catch (_) {}
+    });
+
+    clientWs.on("error", (err) => {
+      console.error("[Gemini Live Client Socket Error]", err);
+    });
 
     try {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        console.warn("[Gemini Live Server] API key unconfigured. Responding with error.");
+        clientWs.send(
+          JSON.stringify({
+            type: "error",
+            error: "Gemini API key is unconfigured in server environment",
+          })
+        );
+        clientWs.close(1000, "API key unconfigured");
+        return;
+      }
+
+      console.log("[Gemini Live Server] Initializing upstream session with model gemini-3.8-live...");
       const ai = options.getAI();
       const systemInstruction = options.getSystemInstruction(true);
 
@@ -32,7 +108,6 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
             },
           },
           systemInstruction,
-          tools: [{ googleMaps: {} }],
           outputAudioTranscription: {},
           inputAudioTranscription: {},
         },
@@ -40,11 +115,26 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
           onmessage: (message: LiveServerMessage) => {
             if (isClosed || clientWs.readyState !== WebSocket.OPEN) return;
 
+            console.log("[Gemini Live Server] UPSTREAM MESSAGE RECEIVED:", Object.keys(message));
+
+            // Setup complete notification
+            if ((message as any).setupComplete) {
+              console.log("[Gemini Live Server] SETUP COMPLETE");
+              clientWs.send(JSON.stringify({ type: "setup_complete" }));
+            }
+
+            // Model turn notification
+            if (message.serverContent?.modelTurn) {
+              clientWs.send(JSON.stringify({ type: "model_turn" }));
+            }
+
             // 1. Check for audio chunks
             const parts = message.serverContent?.modelTurn?.parts;
             if (parts && parts.length > 0) {
               for (const part of parts) {
                 if (part.inlineData?.data) {
+                  const bytesCount = Buffer.from(part.inlineData.data, "base64").length;
+                  console.log(`[Gemini Live Server] UPSTREAM AUDIO BYTES: ${bytesCount} (mime: ${part.inlineData.mimeType})`);
                   clientWs.send(
                     JSON.stringify({
                       type: "audio",
@@ -52,6 +142,7 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
                       mimeType: part.inlineData.mimeType || "audio/pcm;rate=24000",
                     })
                   );
+                  console.log(`[Gemini Live Server] CLIENT AUDIO MESSAGE SENT (${bytesCount} bytes)`);
                 }
                 if (part.text) {
                   clientWs.send(
@@ -101,6 +192,7 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
 
             // 4. Turn Complete
             if (message.serverContent?.turnComplete) {
+              console.log("[Gemini Live Server] TURN COMPLETE");
               clientWs.send(
                 JSON.stringify({
                   type: "turn_complete",
@@ -128,13 +220,13 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
             }
           },
           onclose: () => {
-            console.log("[Gemini Live] Live API session closed by upstream");
+            console.log("[Gemini Live Server] Upstream Live API session closed");
             if (!isClosed && clientWs.readyState === WebSocket.OPEN) {
               clientWs.send(JSON.stringify({ type: "session_closed" }));
             }
           },
           onerror: (err: any) => {
-            console.error("[Gemini Live Upstream Error]", err);
+            console.error("[Gemini Live Server] Upstream session error:", err?.message || err);
             if (!isClosed && clientWs.readyState === WebSocket.OPEN) {
               clientWs.send(
                 JSON.stringify({
@@ -147,56 +239,24 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
         },
       });
 
-      // Inform client that Live session is connected & ready
+      console.log("[Gemini Live Server] Upstream session connected successfully.");
+
+      // Inform client that Live session is connected & verified ready
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(
           JSON.stringify({
             type: "connected",
             model: "gemini-3.8-live",
             voice: "Zephyr",
-            tools: ["googleMaps"],
           })
         );
       }
 
-      clientWs.on("message", (raw) => {
-        try {
-          const msg = JSON.parse(raw.toString());
-          if (msg.audio) {
-            session.sendRealtimeInput({
-              audio: {
-                data: msg.audio,
-                mimeType: msg.mimeType || "audio/pcm;rate=16000",
-              },
-            });
-          } else if (msg.text) {
-            session.sendRealtimeInput({
-              text: msg.text,
-            });
-          } else if (msg.video) {
-            session.sendRealtimeInput({
-              video: {
-                data: msg.video,
-                mimeType: msg.mimeType || "image/jpeg",
-              },
-            });
-          }
-        } catch (err: any) {
-          console.error("[Gemini Live Client Message Error]", err?.message || err);
-        }
-      });
-
-      clientWs.on("close", () => {
-        isClosed = true;
-        console.log("[Gemini Live] Client WebSocket closed. Terminating upstream Live session.");
-        try {
-          session?.close();
-        } catch (_) {}
-      });
-
-      clientWs.on("error", (err) => {
-        console.error("[Gemini Live Client Socket Error]", err);
-      });
+      // Flush any queued messages that arrived while upstream session was establishing
+      while (pendingClientMessages.length > 0) {
+        const nextMsg = pendingClientMessages.shift();
+        dispatchClientMessage(nextMsg);
+      }
     } catch (err: any) {
       console.error("[Gemini Live Setup Error]", err);
       if (clientWs.readyState === WebSocket.OPEN) {

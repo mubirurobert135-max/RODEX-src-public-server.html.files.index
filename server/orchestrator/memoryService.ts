@@ -114,7 +114,7 @@ export class MemoryService implements IMemoryRepository {
     if (!text) return false;
     const lower = text.toLowerCase();
     const sensitivePatterns = [
-      /(password|passwd|api[_\s-]?key|secret[_\s-]?key|auth[_\s-]?token|bearer\s+[a-z0-9_\-\.]{20,}|private[_\s-]?key|ssh-rsa|sk-[a-z0-9]{20,}|ghp_[a-z0-9]{20,})/i,
+      /(password|passwd|api[_\s-]?key|secret[_\s-]?key|auth[_\s-]?token|bearer\s+[a-z0-9_\-\.]{20,}|private[_\s-]?key|ssh-rsa|sk-[a-z0-9_-]{20,}|ghp_[a-z0-9]{20,})/i,
       /\b(\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})\b/, // Credit card format
       /(my password is|api key is|secret is|pin code is)\s*[:=]?\s*\S+/i,
     ];

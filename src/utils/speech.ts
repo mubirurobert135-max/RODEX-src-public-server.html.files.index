@@ -84,6 +84,7 @@ export class SpeechSynthesizer {
       onError?: (err: any) => void;
     } = {}
   ) {
+    console.info('[RODEX TRACE] TTS started');
     if (!this.synth) {
       console.warn('[RODEX TTS] Web Speech API (window.speechSynthesis) is not supported or unavailable in this browser.');
       options.onError?.({ error: 'not-supported', message: 'SpeechSynthesis unavailable' });
@@ -445,20 +446,45 @@ export class AudioMeter {
 }
 
 // Robust Spacing & Phonetic Normalizer for "RODEX" and Wake Word Variations
+export const STANDARD_WAKE_PHRASES = [
+  'hello rodex',
+  'hi rodex',
+  'hey rodex',
+  'hi whats up',
+  'hi what is up',
+  'ok rodex',
+  'okay rodex',
+  'good morning rodex',
+  'good afternoon rodex',
+  'good evening rodex',
+  'good morning',
+  'good afternoon',
+  'good evening',
+  'hello',
+  'hi',
+  'hey',
+  'yo rodex',
+  'yo',
+  'rodex',
+];
+
 export function normalizeForWakeWord(text: string): string {
   if (!text) return '';
   let clean = text.toLowerCase().trim();
 
-  // Replace hyphens and unnecessary punctuation with spaces
+  // Strip apostrophes and quotes: "what's" -> "whats"
+  clean = clean.replace(/['’"`]/g, '');
+
+  // Replace remaining punctuation with spaces
   clean = clean.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, ' ');
 
   // Collapse multiple spaces
   clean = clean.replace(/\s+/g, ' ').trim();
 
   // Normalize phonetic variations of RODEX: "rodes", "roddex", "radex", "rotex", "rhodex" -> "rodex"
-  clean = clean.replace(/\b(rodes|roddex|radex|rotex|rhodex|roadex|rowdex)\b/g, 'rodex');
+  clean = clean.replace(/\b(rodes|roddex|radex|rotex|rhodex|roadex|rowdex|rolex|rodix|rodeik|rodek)\b/g, 'rodex');
 
-  // Normalize phonetic variations of HELLO to a clean single term 'hello'
+  // Normalize phonetic variations of HELLO: "helo", "hallo", "hehllo", "hillo", "hillow", "hellow" -> "hello"
   clean = clean.replace(/\b(helo|hallo|hehllo|hillo|hillow|hellow)\b/g, 'hello');
 
   return clean;
@@ -467,77 +493,21 @@ export function normalizeForWakeWord(text: string): string {
 // Helpers for "Hello/Hey/Hi/Okay RODEX" & pure wake-call identification
 export function isHeyRodexCall(text: string): boolean {
   if (!text) return false;
-  const clean = normalizeForWakeWord(text);
-  return (
-    /^(rodex|hello\s+rodex|hey\s+rodex|hi\s+rodex|ok\s+rodex|okay\s+rodex|good\s+(morning|afternoon|evening)\s+rodex|call\s+hey\s+rodex|call\s+rodex|hello|hey|hi|yo\s+rodex|wake\s+up\s+rodex|wake\s+up|are\s+you\s+there(\s+rodex)?|can\s+you\s+hear\s+me(\s+rodex)?|talk\s+to\s+me(\s+rodex)?)$/i.test(
-      clean
-    )
-  );
+  const match = checkWakeWordMatch(text);
+  return match.isCall && match.isPureActivation;
 }
 
-// Ambient hotword detector: checks if speech contains "Hello RODEX", "Hey RODEX", "Hi RODEX", "Hello", "Hey", "Hi", etc.
+// Ambient hotword detector
 export function containsHeyRodexWakeWord(text: string): boolean {
   if (!text) return false;
-  const clean = normalizeForWakeWord(text);
-  return (
-    /\b(hey|hi|hello|ok|okay|good\s+morning|good\s+afternoon|good\s+evening|call\s+hey|call|live\s+call|start\s+call|yo)\s+rodex\b/i.test(clean) ||
-    /\b(hey|hi|hello)\b/i.test(clean) ||
-    /\brodex\b/i.test(clean) ||
-    /^rodex[,\s]+/i.test(clean) ||
-    /^rodex$/i.test(clean) ||
-    /\b(wake\s+up|talk\s+to\s+me|are\s+you\s+there)\s+rodex\b/i.test(clean)
-  );
+  const match = checkWakeWordMatch(text);
+  return match.isCall;
 }
 
 export function extractHeyRodexCommand(text: string): { isCall: boolean; command: string } {
   if (!text) return { isCall: false, command: '' };
-  
-  const clean = text.trim();
-  const normalizedText = normalizeForWakeWord(clean);
-  
-  // Pattern 1: Wake phrase followed by command: "Hey RODEX prepare my streaming setup", "Hello RODEX find me a restaurant"
-  const wakePattern = /^(hello\s+rodex|hey\s+rodex|hi\s+rodex|ok\s+rodex|okay\s+rodex|good\s+(morning|afternoon|evening)\s+rodex|rodex|hello|hey|hi|yo\s+rodex)[,\s:]*/i;
-  
-  if (wakePattern.test(normalizedText)) {
-    const match = normalizedText.match(wakePattern);
-    if (match) {
-      const rawWords = clean.split(/\s+/);
-      const triggerWordsCount = match[0].trim().split(/\s+/).length;
-      const commandWords = rawWords.slice(triggerWordsCount);
-      return { isCall: true, command: commandWords.join(' ').trim() };
-    }
-  }
-  
-  // Pattern 2: Embedded check: "can you hey RODEX prepare stream"
-  const embeddedPattern = /\b(hello\s+rodex|hey\s+rodex|hi\s+rodex|ok\s+rodex|okay\s+rodex|rodex)\b[,\s:]*/i;
-  if (embeddedPattern.test(normalizedText)) {
-    const match = normalizedText.match(embeddedPattern);
-    if (match) {
-      const normParts = normalizedText.split(embeddedPattern);
-      const command = normParts[normParts.length - 1]?.trim() || '';
-      return { isCall: true, command };
-    }
-  }
-
-  // Pattern 3: End pattern check: "prepare stream please RODEX"
-  const endPattern = /[,\s]+rodex[.!?]*$/i;
-  if (endPattern.test(normalizedText)) {
-    const match = normalizedText.match(endPattern);
-    if (match) {
-      const normParts = normalizedText.split(endPattern);
-      const command = normParts[0]?.trim() || '';
-      return { isCall: true, command };
-    }
-  }
-  
-  // Standalone "rodex" anywhere
-  if (/\brodex\b/i.test(normalizedText)) {
-    const parts = normalizedText.split(/\brodex\b/i);
-    const command = parts.find(p => p.trim())?.trim() || '';
-    return { isCall: true, command };
-  }
-
-  return { isCall: false, command: clean };
+  const match = checkWakeWordMatch(text);
+  return { isCall: match.isCall, command: match.command };
 }
 
 export interface WakeWordMatchResult {
@@ -553,74 +523,95 @@ export function checkWakeWordMatch(
   text: string,
   customWakeWord?: { phrase: string; enabled: boolean; isTrained?: boolean }
 ): WakeWordMatchResult {
-  if (!text) {
+  if (!text || !text.trim()) {
     return { isCall: false, isPureActivation: false, command: '', matchedWakeWord: '', isCustom: false };
   }
 
-  // 1. Check custom wake word if enabled and configured
+  const raw = text.trim();
+  const normalized = normalizeForWakeWord(raw);
+
+  let detected = false;
+  let matchedPhrase = '';
+  let commandText = '';
+  let isCustom = false;
+
+  // 1. Check custom wake word if enabled
   if (customWakeWord?.enabled && customWakeWord?.phrase?.trim()) {
-    const rawPhrase = customWakeWord.phrase.trim();
-    const escaped = rawPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const clean = text.trim();
-    const cleanLower = clean.toLowerCase().replace(/[.,!?;:]/g, '');
-    const phraseLower = rawPhrase.toLowerCase().replace(/[.,!?;:]/g, '');
-
-    // Check pure match: e.g. "Commander", "Hey Commander", "Hi Commander"
-    const pureRegex = new RegExp(`^(hey|hi|hello|ok|hlo|yo)?\\s*${escaped}$`, 'i');
-    if (pureRegex.test(cleanLower) || cleanLower === phraseLower) {
-      return {
-        isCall: true,
-        isPureActivation: true,
-        command: '',
-        matchedWakeWord: rawPhrase,
-        isCustom: true,
-      };
-    }
-
-    // Check command starting with custom wake word: e.g. "Commander what time is it", "Hey Commander tell me news"
-    const cmdRegex = new RegExp(`^(?:(?:hey|hi|hello|ok|hlo|yo)\\s+)?(?:${escaped})[\\s,:-]+(.*)$`, 'i');
-    const match = clean.match(cmdRegex);
-    if (match && match[1]?.trim()) {
-      return {
-        isCall: true,
-        isPureActivation: false,
-        command: match[1].trim(),
-        matchedWakeWord: rawPhrase,
-        isCustom: true,
-      };
-    }
-
-    // Check command with wake word addressed at end: e.g. "What time is it Commander"
-    const endRegex = new RegExp(`^(.*)[,\\s]+(?:${escaped})[.!?]*$`, 'i');
-    const endMatch = clean.match(endRegex);
-    if (endMatch && endMatch[1]?.trim()) {
-      return {
-        isCall: true,
-        isPureActivation: false,
-        command: endMatch[1].trim(),
-        matchedWakeWord: rawPhrase,
-        isCustom: true,
-      };
+    const customRaw = customWakeWord.phrase.trim();
+    const customNorm = normalizeForWakeWord(customRaw);
+    if (customNorm) {
+      if (normalized === customNorm) {
+        detected = true;
+        matchedPhrase = customRaw;
+        isCustom = true;
+        commandText = '';
+      } else if (normalized.startsWith(customNorm + ' ')) {
+        detected = true;
+        matchedPhrase = customRaw;
+        isCustom = true;
+        commandText = raw.substring(customRaw.length).trim();
+      }
     }
   }
 
-  // 2. Check default "Hello" triggers
-  const { isCall, command } = extractHeyRodexCommand(text);
-  const isPure = isHeyRodexCall(text) || (isCall && !command.trim());
-  if (isCall || isPure) {
+  // 2. Check standard wake phrase list if custom was not matched
+  if (!detected) {
+    // Sort standard phrases by length descending so "hello rodex" matches before "hello"
+    const sortedPhrases = [...STANDARD_WAKE_PHRASES].sort((a, b) => b.length - a.length);
+
+    for (const phrase of sortedPhrases) {
+      if (normalized === phrase) {
+        detected = true;
+        matchedPhrase = phrase;
+        commandText = '';
+        break;
+      } else if (normalized.startsWith(phrase + ' ')) {
+        detected = true;
+        matchedPhrase = phrase;
+        const prefixRegex = new RegExp(`^${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[,\\s:]*`, 'i');
+        const match = raw.match(prefixRegex);
+        if (match) {
+          commandText = raw.substring(match[0].length).trim();
+        } else {
+          commandText = normalized.substring(phrase.length).trim();
+        }
+        break;
+      } else if (normalized.endsWith(' ' + phrase)) {
+        detected = true;
+        matchedPhrase = phrase;
+        const suffixRegex = new RegExp(`[,\\s:]*${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        const match = raw.match(suffixRegex);
+        if (match) {
+          commandText = raw.substring(0, match.index).trim();
+        } else {
+          commandText = normalized.substring(0, normalized.length - phrase.length).trim();
+        }
+        break;
+      }
+    }
+  }
+
+  // Mandatory Debug Logging as explicitly requested
+  console.info(`[RODEX DEBUG] raw transcript: "${raw}"`);
+  console.info(`[RODEX DEBUG] normalized transcript: "${normalized}"`);
+  console.info(`[RODEX DEBUG] wake phrase detected: ${detected}`);
+  console.info(`[RODEX DEBUG] matched wake phrase: "${matchedPhrase}"`);
+
+  if (detected) {
+    const isPure = !commandText || !commandText.trim();
     return {
       isCall: true,
       isPureActivation: isPure,
-      command,
-      matchedWakeWord: 'Hello',
-      isCustom: false,
+      command: commandText,
+      matchedWakeWord: matchedPhrase,
+      isCustom,
     };
   }
 
   return {
     isCall: false,
     isPureActivation: false,
-    command: text.trim(),
+    command: raw,
     matchedWakeWord: '',
     isCustom: false,
   };

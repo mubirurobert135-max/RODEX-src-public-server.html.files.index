@@ -811,6 +811,20 @@ export class IntentClassifier {
       };
     }
 
+    // MEMORY OPERATIONS ("Remember that...", "Remember my preference...", "Store in memory")
+    if (/\b(remember that|remember my|remember I|remember me|store in memory|save to memory|forget that|forget my|what do you remember)\b/i.test(lower)) {
+      return {
+        primaryIntent: 'memory_operation',
+        confidence: 0.98,
+        extractedEntities: { rawMemory: text },
+        suggestedTools: ['memory_service'],
+        requiresPlanning: true,
+        riskLevel: 'safe',
+        interactionType: 'action_command',
+        detailLevel,
+      };
+    }
+
     // 16. TOORO KINGDOM KNOWLEDGE
     if (/\b(tooro kingdom|toro kingdom|king oyo|omukama oyo|fort portal|queen best kemigisa|princess komuntale|kijanangoma)\b/i.test(lower)) {
       return {

@@ -59,6 +59,7 @@ import { AndroidFrame } from './components/AndroidFrame';
 import { getCachedGmailAccessToken } from './services/firebase';
 import { globalAuthClient, AuthenticatedUser } from './services/authClient';
 import { TaskCard } from './components/TaskCard';
+import { VoiceDiagnosticPanel } from './components/VoiceDiagnosticPanel';
 import { globalTaskEngine } from './services/TaskEngine';
 import {
   AssistantState,
@@ -87,6 +88,7 @@ import {
 import { triggerHaptic, setHapticsEnabled, triggerSubtlePulse } from './utils/haptics';
 import { rodexBeatbox } from './utils/beatbox';
 import { globalSpeechManager } from './utils/speechManager';
+import { globalVoiceManager } from './utils/voiceLifecycleManager';
 import { globalVoiceTransitionEngine } from './utils/voiceTransitionEngine';
 import { globalLiveConversationService } from './services/liveConversationService';
 import {
@@ -237,6 +239,12 @@ export default function App() {
   const [diagCurrentState, setDiagCurrentState] = useState('idle');
   const [showDiagPanel, setShowDiagPanel] = useState(false);
 
+  // Live Pipeline Trace States for Voice Diagnostic Panel
+  const [aiRequestState, setAiRequestState] = useState<string>('idle');
+  const [aiResponseState, setAiResponseState] = useState<string>('idle');
+  const [ttsState, setTtsState] = useState<string>('idle');
+  const [capturedCommand, setCapturedCommand] = useState<string>('');
+
   useEffect(() => {
     setDiagCurrentState(state);
   }, [state]);
@@ -253,6 +261,10 @@ export default function App() {
     webSearchEnabled: true,
     hapticFeedbackEnabled: true,
   });
+  const voiceSettingsRef = useRef(voiceSettings);
+  useEffect(() => {
+    voiceSettingsRef.current = voiceSettings;
+  }, [voiceSettings]);
   const [themeAccent, setThemeAccent] = useState<ThemeAccent>(() => {
     return (localStorage.getItem('rodex_theme_accent') as ThemeAccent) || 'auto';
   });
@@ -729,8 +741,10 @@ export default function App() {
         volume: voiceSettings.volume,
         onStart: () => {
           setState('speaking');
+          setTtsState('speaking');
         },
         onEnd: () => {
+          setTtsState('idle');
           if (bargeInAnimationFrameRef.current) {
             cancelAnimationFrame(bargeInAnimationFrameRef.current);
             bargeInAnimationFrameRef.current = null;
@@ -899,24 +913,20 @@ export default function App() {
         },
         onError: (err) => {
           console.warn('[Gemini Live Error]', err);
-          setLastResponse(`Live connection note: ${err}`);
+          setLastResponse(`LIVE VOICE ERROR: ${err}`);
+          setState('error');
         },
       });
 
+      globalVoiceManager.setLiveVoiceMode(true);
       await globalLiveConversationService.start();
       setState('listening');
       playToneChime('listen');
     } catch (err: any) {
       console.error('[Gemini Live Start Failure]', err);
-      // Fallback to standard voice turn
-      setState('idle');
-      const fallbackSpeech = 'Live connection unavailable. Falling back to high-velocity neural orchestrator.';
-      setLastResponse(fallbackSpeech);
-      speakResponse(fallbackSpeech, () => {
-        if (isLiveConversationRef.current) {
-          startListening();
-        }
-      });
+      setState('error');
+      const errorSpeech = `LIVE VOICE ERROR: ${err?.message || err}`;
+      setLastResponse(errorSpeech);
     }
   };
 
@@ -958,6 +968,9 @@ export default function App() {
     imagePayload?: { data: string; mimeType: string }
   ) => {
     if (!userText.trim() && !imagePayload) return;
+
+    console.info('[RODEX TRACE] CHAT INPUT RECEIVED:', userText);
+    console.info('[RODEX TRACE] CHAT SEND HANDLER CALLED');
 
     // If already in an active live conversation and user says wake word again, just listen and nudge without greeting/API call
     if (isLiveConversationRef.current && (isHeyRodexCall(userText) || userText.toLowerCase().trim() === 'hello')) {
@@ -1055,7 +1068,7 @@ export default function App() {
       return;
     }
 
-    // Check if user called or activated RODEX ("Hey RODEX", "RODEX", "Hey RODEX what is the latest world news?", custom wake-word, etc.)
+    // Check if user called or activated RODEX ("Hey RODEX", "RODEX", etc.)
     const wakeMatch = checkWakeWordMatch(userText, voiceSettings.customWakeWord);
     const { isCall, isPureActivation, command } = wakeMatch;
 
@@ -1075,8 +1088,8 @@ export default function App() {
         speakerVerified: true,
       };
 
-      const greetingSpeech = 'I am here. How can I assist you?';
-      const greetingFullText = 'I am listening. How can I assist you today?';
+      const greetingSpeech = 'Boss, watsap today?';
+      const greetingFullText = 'Boss, watsap today?';
 
       const assistantMsg: ChatMessage = {
         id: createId('assistant'),
@@ -1087,13 +1100,6 @@ export default function App() {
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setLastResponse(greetingSpeech);
-      setVoiceProfile((prev) => ({
-        ...prev,
-        voiceprintStatus: 'matched',
-        confidence: 99.4,
-      }));
-
-      // Speak back immediately, and right after speaking AUTO-LISTEN for real-time human conversation!
       speakResponse(greetingSpeech, () => {
         if (isLiveConversationRef.current) {
           playToneChime('listen');
@@ -1103,30 +1109,8 @@ export default function App() {
       return;
     }
 
-    // Strict Activation Gate: RODEX is ONLY active when called!
-    if (!isLiveConversationRef.current) {
-      const isExplicitModalOrChat =
-        activeMode === 'chat' ||
-        Boolean(imagePayload) ||
-        activeMode === 'code' ||
-        activeMode === 'image' ||
-        activeMode === 'web';
-
-      if (!isCall && !isPureActivation && !isExplicitModalOrChat) {
-        // STRICT ACTIVATION GATE ENFORCED:
-        // RODEX was not called by name or wake-word! Remain completely dormant on standby!
-        setState('idle');
-        setLastResponse('RODEX is dormant on standby. Call "Hey RODEX" to activate.');
-        triggerHaptic('tap');
-        return;
-      }
-    }
-
-    // Activated with command: enter live conversation and talk back!
+    // Process user input as an active turn
     triggerHaptic('activate');
-    isLiveConversationRef.current = true;
-    setIsLiveConversation(true);
-    consecutiveSilenceCountRef.current = 0;
     if (isCall) {
       playToneChime('wake');
     }
@@ -1142,6 +1126,7 @@ export default function App() {
     };
 
     setMessages((prev) => [...prev, userMsg]);
+    console.info('[RODEX TRACE] CHAT REQUEST CREATED');
     setState('thinking');
     setLastResponse('RODEX is thinking...');
 
@@ -1168,7 +1153,9 @@ export default function App() {
       const queryToSend = isCall && command ? command : userText;
       const lowerQ = queryToSend.toLowerCase();
 
+      console.info('[RODEX TRACE] AI request started');
       console.info('[RODEX DIAGNOSTICS] AI REQUEST START:', queryToSend);
+      setAiRequestState('requested');
 
       // 1. Check if user is confirming or declining an active pending task
       const currentTask = globalTaskEngine.getActiveTask();
@@ -1469,6 +1456,7 @@ export default function App() {
       setMessages((prev) => [...prev, initialAssistantMsg]);
 
       const gmailToken = getCachedGmailAccessToken();
+      console.info('[RODEX TRACE] CHAT API REQUEST SENT');
       const streamRes = await fetch('/api/rodex/stream', {
         method: 'POST',
         headers: {
@@ -1484,6 +1472,8 @@ export default function App() {
           isLiveCall: isLiveConversationRef.current,
         }),
       });
+
+      console.info('[RODEX TRACE] CHAT API RESPONSE RECEIVED');
 
       if (!streamRes.ok || !streamRes.body) {
         throw new Error(`Streaming request failed (${streamRes.status})`);
@@ -1510,10 +1500,15 @@ export default function App() {
             const data = JSON.parse(jsonStr);
 
             if (data.type === 'start') {
+              console.info('[RODEX TRACE] AI response received');
               console.info('[RODEX DIAGNOSTICS] AI RESPONSE START (Stream initiated)');
+              setAiRequestState('receiving_stream');
+              setAiResponseState('received');
               setState('speaking');
             } else if (data.type === 'token') {
               accumulatedText += data.token;
+              console.info('[RODEX TRACE] CHAT RESPONSE TEXT RECEIVED');
+              console.info('[RODEX TRACE] CHAT MESSAGE STATE UPDATED');
               setMessages((prev) =>
                 prev.map((m) => (m.id === assistantMsgId ? { ...m, text: accumulatedText } : m))
               );
@@ -1629,6 +1624,7 @@ export default function App() {
   // Wake-word recognition handler for pure activation vs full voice command
   const handleWakeWordDetected = useCallback(
     (pureActivation: boolean, command: string) => {
+      console.info('[RODEX TRACE] wake handler called');
       triggerHaptic('activate');
       setDiagWakeMatched(true);
 
@@ -1680,156 +1676,154 @@ export default function App() {
     [currentUser, speakResponse, handleSendMessage]
   );
 
-  // Synchronize Unified Speech Recognition Manager (Wake Word & Command Listening)
+  // Automatically Boot Production Live Voice Engine for Normal Orb on Mount
   useEffect(() => {
-    globalSpeechManager.setCallbacks({
-      onStateChange: (recState: any) => {
-        console.info('[RODEX SpeechManager] State changed:', recState);
-        if (
-          recState === 'LISTENING' ||
-          recState === 'listening_command' ||
-          recState === 'ready_for_followup' ||
-          recState === 'FOLLOW_UP_READY'
-        ) {
-          setState('listening');
-          setDiagRunning(
-            recState === 'ready_for_followup' || recState === 'FOLLOW_UP_READY'
-              ? 'Follow-Up Active (Listening)'
-              : 'Listening (Active Command)'
-          );
-        } else if (recState === 'WAKE_DETECTED' || recState === 'wake_detected') {
-          setState('wake_detected');
-          setDiagRunning('Wake Word Detected');
-        } else if (recState === 'PROCESSING' || recState === 'processing') {
-          setState('thinking');
-          setDiagRunning('Processing Intent');
-        } else if (recState === 'EXECUTING' || recState === 'executing') {
-          setState('executing');
-          setDiagRunning('Executing Action');
-        } else if (recState === 'SPEAKING' || recState === 'speaking') {
+    console.info('[RODEX BOOT] Initializing Live Voice Engine for Normal Orb Operation...');
+
+    globalLiveConversationService.setCallbacks({
+      onStatusChange: (newStatus) => {
+        console.info('[RODEX Live Voice Engine Status]', newStatus);
+        if (newStatus === 'speaking') {
           setState('speaking');
           setDiagRunning('Speaking Response');
-        } else if (recState === 'IDLE_LISTENING' || recState === 'listening_wake') {
-          setDiagRunning('Listening (Wake Word)');
-          if (stateRef.current === 'listening' || stateRef.current === 'wake_detected') {
-            setState('idle');
-          }
-        } else if (recState === 'MIC_PERMISSION_REQUIRED' || recState === 'PERMISSION_REVOKED') {
-          setMicPermissionGranted(false);
-          setDiagPermission('denied');
-          if (stateRef.current === 'listening') {
-            setState('idle');
-          }
-        } else if (recState === 'MIC_UNAVAILABLE') {
-          setDiagRunning('Mic Unavailable');
-        } else if (recState === 'idle' || recState === 'MIC_READY' || recState === 'PAUSED') {
-          if (stateRef.current === 'listening' || stateRef.current === 'wake_detected') {
-            setState('idle');
-          }
-          setDiagRunning('Idle');
+        } else if (newStatus === 'listening') {
+          setState('listening');
+          setDiagRunning('Listening (Active Command)');
+        } else if (newStatus === 'thinking') {
+          setState('thinking');
+          setDiagRunning('Processing Intent');
+        } else if (newStatus === 'wake_detected') {
+          setState('wake_detected');
+          setDiagRunning('Wake Word Detected');
+        } else if (newStatus === 'idle') {
+          setState('idle');
+          setDiagRunning('Wake Listener Active');
+        } else if (newStatus === 'error') {
+          setState('error');
+          setDiagRunning('Error');
         }
       },
-      onTranscript: (text, isFinal) => {
-        setTranscript(text);
-        setDiagLastTranscript(text);
-        if (isFinal) {
-          setDiagLastEvent('onresult');
+      onAudioLevel: (inputLevel, outputLevel) => {
+        const activeLevel = outputLevel > 0 ? outputLevel : inputLevel;
+        setAudioLevel(activeLevel);
+        if (activeLevel > 0.35) {
+          triggerSubtlePulse(8);
         }
       },
-      onWakeDetected: (pureActivation, command) => {
-        console.info('[RODEX SpeechManager] Wake detected, pure:', pureActivation, 'cmd:', command);
-        handleWakeWordDetected(pureActivation, command);
+      onWakeDetected: (wakeText) => {
+        console.info('[RODEX Live Wake Detected]', wakeText);
+        triggerHaptic('activate');
+        playToneChime('wake');
+        setTranscript(wakeText);
+        setDiagWakeMatched(true);
+        setDiagLastTranscript(wakeText);
       },
-      onCommandCaptured: (command) => {
-        console.info('[RODEX SpeechManager] Command captured:', command);
-        setState('thinking');
-        handleSendMessage(command);
+      onGreetingStarted: () => {
+        setState('speaking');
+        setLastResponse('Boss, watsap today?');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `greet-${Date.now()}`,
+            sender: 'assistant',
+            text: 'Boss, watsap today?',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            speakerVerified: true,
+          },
+        ]);
       },
-      onError: (error, fatal) => {
-        if (error === 'Microphone permission denied' || error.includes('permission')) {
-          console.warn('[RODEX SpeechManager] Microphone access requires user permission.');
-          setMicPermissionGranted(false);
-          setDiagPermission('denied');
-          if (stateRef.current === 'listening') {
-            setState('idle');
+      onGreetingEnded: () => {
+        setState('listening');
+        setDiagRunning('Listening (Active Command)');
+      },
+      onInputTranscript: (userText) => {
+        setTranscript(userText);
+        setDiagLastTranscript(userText);
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg && lastMsg.sender === 'user' && lastMsg.id.startsWith('live-user-')) {
+            return [...prev.slice(0, -1), { ...lastMsg, text: userText }];
           }
-          return;
-        }
-        console.warn('[RODEX SpeechManager] Voice engine note:', error);
-      },
-      onAudioMetrics: (metrics) => {
-        setAudioLevel(metrics.level * (voiceSettings.audioSens * 0.7));
-        if (metrics.pitchHz > 0) {
-          setPitchHz(metrics.pitchHz);
-        }
-        if (metrics.isSpeech) {
-          setVoiceProfile((prev) => ({
+          return [
             ...prev,
-            pitchHz: metrics.pitchHz,
-            confidence: Math.max(prev.confidence, metrics.confidence || 95),
-            voiceprintStatus: 'matched',
-          }));
-        }
+            {
+              id: `live-user-${Date.now()}`,
+              sender: 'user',
+              text: userText,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              speaker: 'User',
+              speakerVerified: true,
+            },
+          ];
+        });
+      },
+      onOutputTranscript: (modelText) => {
+        setLastResponse(modelText);
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg && lastMsg.sender === 'assistant' && lastMsg.id.startsWith('live-asst-')) {
+            return [...prev.slice(0, -1), { ...lastMsg, text: modelText }];
+          }
+          return [
+            ...prev,
+            {
+              id: `live-asst-${Date.now()}`,
+              sender: 'assistant',
+              text: modelText,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              speakerVerified: true,
+              webGrounded: true,
+            },
+          ];
+        });
+      },
+      onInterrupted: () => {
+        playToneChime('bargein');
+        setState('listening');
+      },
+      onError: (err) => {
+        console.warn('[RODEX Live Voice Error]', err);
+        setDiagLastError(String(err));
       },
     });
 
-    globalSpeechManager.setCustomWakeWord(voiceSettings.customWakeWord);
-    globalSpeechManager.autoInitialize();
+    // Auto-boot normal voice mode without requiring Orb click
+    globalLiveConversationService.startNormalOrbVoice().catch((err) => {
+      console.warn('[Auto-Start Live Voice Notice]', err);
+    });
 
-    if (micPermissionGranted && voiceSettings.wakeWordEnabled && state === 'idle' && !isLiveConversation) {
-      globalSpeechManager.startContinuousWakeListening(true);
-    } else if (!voiceSettings.wakeWordEnabled && state === 'idle') {
-      globalSpeechManager.stopAll();
-    }
-  }, [
-    micPermissionGranted,
-    voiceSettings.wakeWordEnabled,
-    voiceSettings.customWakeWord,
-    voiceSettings.audioSens,
-    state,
-    isLiveConversation,
-    handleWakeWordDetected,
-    handleSendMessage,
-  ]);
+    return () => {
+      globalLiveConversationService.stop();
+    };
+  }, []);
 
   // Unified Orb Click Handler (Seamlessly Integrates Real-Time Live Voice with the Orb)
   const handleOrbClick = async () => {
+    console.info('[RODEX TRACE] ORB CLICKED');
+    console.info('[RODEX TRACE] ORB VOICE START REQUESTED');
     rodexSynth.prime();
     triggerHaptic('tap');
 
     // 1. Natural Barge-In: If speaking, immediately interrupt and listen
     if (state === 'speaking') {
-      if (isLiveConversation && globalLiveConversationService.isConnected()) {
-        globalLiveConversationService.stopAllPlayback();
-        setState('listening');
-        playToneChime('bargein');
-        return;
-      }
+      globalLiveConversationService.stopAllPlayback();
       rodexSynth.stop();
       playToneChime('bargein');
       setState('listening');
-      globalSpeechManager.startCommandCapture();
       return;
     }
 
-    // 2. If already in live conversation, keep listening
-    if (isLiveConversation && globalLiveConversationService.isConnected()) {
-      playToneChime('listen');
-      setState('listening');
+    // 2. If voice engine is not connected or mic is not active, start it
+    if (!globalLiveConversationService.isConnected() || !globalLiveConversationService.getIsMicLive()) {
+      await globalLiveConversationService.startNormalOrbVoice().catch((err) => {
+        console.warn('[Orb Voice Start Error]', err);
+      });
       return;
     }
 
-    // 3. Request mic permission if not granted
-    if (!micPermissionGranted) {
-      const granted = await requestMicPermission();
-      if (!granted) {
-        setLastResponse('Microphone access is required for voice interaction. Please allow microphone access.');
-        return;
-      }
-    }
-
-    // 4. Connect real-time Live Voice conversation directly through the Orb
-    await startLiveCall();
+    // 3. If already running, activate immediate command listening
+    playToneChime('listen');
+    setState('listening');
   };
 
   // Start Voice Recognition (Fallback or Secondary Trigger)
@@ -2294,9 +2288,9 @@ export default function App() {
             <div className="flex items-start gap-2.5">
               <span className="text-xl">🎙️</span>
               <div className="text-left">
-                <p className="text-xs font-bold text-white tracking-wide">RODEX Hands-Free Active</p>
+                <p className="text-xs font-bold text-white tracking-wide">RODEX Voice Interface</p>
                 <p className="text-[10px] text-neutral-400 mt-0.5 leading-relaxed">
-                  To wake RODEX simply by saying her name, please grant microphone permissions.
+                  To communicate with RODEX naturally using your voice, please grant microphone permissions.
                 </p>
               </div>
             </div>
@@ -2550,6 +2544,17 @@ export default function App() {
           onNotification={(text) => {
             rodexSynth.speak(text);
           }}
+        />
+
+        {/* Live On-Screen Developer Voice Pipeline Diagnostic Panel */}
+        <VoiceDiagnosticPanel
+          assistantState={state}
+          lastTranscript={transcript}
+          wakeMatched={diagWakeMatched}
+          capturedCommand={capturedCommand}
+          aiRequestState={aiRequestState}
+          aiResponseState={aiResponseState}
+          ttsState={ttsState}
         />
       </main>
     </AndroidFrame>

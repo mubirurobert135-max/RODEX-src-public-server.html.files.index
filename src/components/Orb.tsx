@@ -642,7 +642,11 @@ export const Orb: React.FC<OrbProps> = ({
         borderRadius: '50%',
         perspective: 900,
       }}
-      onClick={onClick}
+      onClick={(e) => {
+        console.info('[RODEX TRACE] ORB CLICKED');
+        console.info('[RODEX TRACE] ORB VOICE START REQUESTED');
+        onClick?.();
+      }}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
       role="button"
