@@ -19,10 +19,12 @@ export type LiveSessionStatus =
   | 'connected'
   | 'idle'
   | 'wake_listening'
+  | 'input_detected'
   | 'wake_detected'
   | 'greeting'
   | 'listening'
   | 'thinking'
+  | 'executing'
   | 'speaking'
   | 'interrupted'
   | 'error';
@@ -608,11 +610,15 @@ export class LiveConversationService {
       const rms = Math.sqrt(sum / inputChannelData.length);
       this.currentInputLevel = Math.min(1, rms * 4.5);
 
-      // Audio Activity Detection
+      // Real-Time Audio Activity Detection
       if (rms > 0.038) {
         if (!this.inputActivityDetected) {
           this.inputActivityDetected = true;
           this.addTrace('AUDIO INPUT DETECTED');
+          if (this.status === 'idle' || this.status === 'wake_listening') {
+            this.diag.orbVoiceState = 'INPUT_DETECTED';
+            this.setStatus('input_detected');
+          }
         }
 
         // Barge-in detection while RODEX is speaking
@@ -624,7 +630,13 @@ export class LiveConversationService {
           }
         }
       } else {
-        this.inputActivityDetected = false;
+        if (this.inputActivityDetected) {
+          this.inputActivityDetected = false;
+          if (this.status === 'input_detected') {
+            this.diag.orbVoiceState = 'WAKE_LISTENING';
+            this.setStatus('idle');
+          }
+        }
         this.consecutiveBargeInFrames = 0;
       }
 

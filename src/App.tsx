@@ -1683,19 +1683,28 @@ export default function App() {
     globalLiveConversationService.setCallbacks({
       onStatusChange: (newStatus) => {
         console.info('[RODEX Live Voice Engine Status]', newStatus);
-        if (newStatus === 'speaking') {
+        if (newStatus === 'speaking' || newStatus === 'greeting') {
           setState('speaking');
           setDiagRunning('Speaking Response');
+        } else if (newStatus === 'input_detected') {
+          setState('input_detected');
+          setDiagRunning('Input Audio Detected');
+        } else if (newStatus === 'wake_detected') {
+          setState('wake_detected');
+          setDiagRunning('Wake Word Detected');
         } else if (newStatus === 'listening') {
           setState('listening');
           setDiagRunning('Listening (Active Command)');
         } else if (newStatus === 'thinking') {
           setState('thinking');
           setDiagRunning('Processing Intent');
-        } else if (newStatus === 'wake_detected') {
-          setState('wake_detected');
-          setDiagRunning('Wake Word Detected');
-        } else if (newStatus === 'idle') {
+        } else if (newStatus === 'executing') {
+          setState('executing');
+          setDiagRunning('Executing Action');
+        } else if (newStatus === 'interrupted') {
+          setState('interrupted');
+          setDiagRunning('Interrupted');
+        } else if (newStatus === 'idle' || newStatus === 'wake_listening') {
           setState('idle');
           setDiagRunning('Wake Listener Active');
         } else if (newStatus === 'error') {
@@ -2111,13 +2120,17 @@ export default function App() {
               scale:
                 state === 'wake_detected'
                   ? [1, 1.12, 0.98, 1.1]
+                  : state === 'input_detected'
+                  ? [1, 1.05, 1]
                   : state === 'listening'
                   ? [1, 1.04, 1]
                   : state === 'speaking'
                   ? [1, 1.03, 1]
-                  : state === 'thinking' || state === 'processing'
+                  : state === 'thinking' || state === 'processing' || state === 'planning'
                   ? [0.97, 1.02, 0.97]
-                  : state === 'executing_tool'
+                  : state === 'executing' || state === 'executing_tool'
+                  ? [1, 1.06, 1]
+                  : state === 'interrupted'
                   ? [1, 1.06, 1]
                   : 1,
               opacity: 1,
@@ -2126,14 +2139,18 @@ export default function App() {
               duration:
                 state === 'wake_detected'
                   ? 0.35
+                  : state === 'input_detected'
+                  ? 0.4
                   : state === 'listening'
                   ? 1.2
                   : state === 'speaking'
                   ? 1.0
-                  : state === 'thinking' || state === 'processing' || state === 'executing_tool'
+                  : state === 'thinking' || state === 'processing' || state === 'planning' || state === 'executing' || state === 'executing_tool'
                   ? 0.8
+                  : state === 'interrupted'
+                  ? 0.25
                   : 2.5,
-              repeat: state === 'idle' ? 0 : Infinity,
+              repeat: state === 'idle' || state === 'wake_listening' ? 0 : Infinity,
               ease: 'easeInOut',
             }}
           >

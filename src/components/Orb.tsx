@@ -246,21 +246,26 @@ export const Orb: React.FC<OrbProps> = ({
 
       const normPitch = Math.max(0, Math.min(1, (smoothedPitch - 85) / 155));
       const elapsed = (now - startTime) / 1000;
-      const isListening = currentState === 'listening';
+      const isListening = currentState === 'listening' || currentState === 'input_detected';
       const isSpeaking = currentState === 'speaking';
-      const isThinking = currentState === 'thinking';
-      const isActiveVoice = isListening || isSpeaking;
+      const isThinking = currentState === 'thinking' || currentState === 'planning' || currentState === 'processing';
+      const isExecuting = currentState === 'executing' || currentState === 'executing_tool';
+      const isActiveVoice = isListening || isSpeaking || currentState === 'wake_detected' || currentState === 'input_detected';
 
-      // Calculate dynamic orb scale
+      // Calculate dynamic orb scale based on real audio level and assistant state
       let currentOrbScale = 1.0;
       if (currentState === 'wake_detected') {
-        currentOrbScale = 1.08 + Math.sin(elapsed * 18) * 0.06;
+        currentOrbScale = 1.10 + Math.sin(elapsed * 18) * 0.06;
+      } else if (currentState === 'input_detected') {
+        currentOrbScale = 1.04 + smoothedLevel * 0.28;
       } else if (isListening) {
-        currentOrbScale = 1.0 + smoothedLevel * 0.22;
+        currentOrbScale = 1.0 + smoothedLevel * 0.24;
       } else if (isSpeaking) {
-        currentOrbScale = 1.0 + Math.sin(elapsed * 7) * 0.06 + smoothedLevel * 0.14;
+        currentOrbScale = 1.0 + Math.sin(elapsed * 7) * 0.05 + smoothedLevel * 0.18;
+      } else if (isExecuting) {
+        currentOrbScale = 1.06 + Math.sin(elapsed * 10) * 0.04;
       } else if (isThinking) {
-        currentOrbScale = 1.03;
+        currentOrbScale = 1.04 + Math.sin(elapsed * 5) * 0.02;
       }
 
       const orbRadius = (currentSize / 2) * currentOrbScale;
@@ -614,17 +619,27 @@ export const Orb: React.FC<OrbProps> = ({
     };
   }, []);
 
-  // Calculate dynamic scale based on state and audio level
+  // Calculate dynamic scale based on state and real audio level
   const dynamicScale = useMemo(() => {
     switch (state) {
       case 'wake_detected':
-        return 1.12;
+        return 1.14;
+      case 'input_detected':
+        return 1.04 + audioLevel * 0.28;
       case 'listening':
-        return 1.0 + audioLevel * 0.22;
+        return 1.0 + audioLevel * 0.24;
       case 'thinking':
-        return 1.04;
+      case 'planning':
+      case 'processing':
+        return 1.05;
+      case 'executing':
+      case 'executing_tool':
+        return 1.08;
       case 'speaking':
-        return 1.0 + Math.sin(Date.now() / 150) * 0.07 + audioLevel * 0.15;
+        return 1.0 + Math.sin(Date.now() / 150) * 0.05 + audioLevel * 0.20;
+      case 'interrupted':
+        return 1.08;
+      case 'wake_listening':
       case 'idle':
       default:
         return 1.0;

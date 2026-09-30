@@ -1,5 +1,8 @@
 export type AssistantState =
   | 'idle'
+  | 'wake_listening'
+  | 'input_detected'
+  | 'wake_detected'
   | 'listening'
   | 'thinking'
   | 'planning'
@@ -7,11 +10,11 @@ export type AssistantState =
   | 'processing'
   | 'executing_tool'
   | 'speaking'
+  | 'interrupted'
   | 'success'
   | 'warning'
   | 'error'
-  | 'permission_required'
-  | 'wake_detected';
+  | 'permission_required';
 
 export type VoiceEngineState =
   | 'INITIALIZING'
