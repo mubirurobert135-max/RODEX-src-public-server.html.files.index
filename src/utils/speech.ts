@@ -173,6 +173,7 @@ export class SpeechSynthesizer {
     // Build utterance queue
     this.activeQueue = chunks.map((chunk) => {
       const utt = new SpeechSynthesisUtterance(chunk);
+      utt.lang = selectedVoice?.lang || 'en-US';
       if (selectedVoice) utt.voice = selectedVoice;
       utt.rate = options.rate ?? 1.0;
       utt.pitch = options.pitch ?? 1.0;

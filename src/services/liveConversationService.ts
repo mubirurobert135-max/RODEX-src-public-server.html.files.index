@@ -11,7 +11,7 @@
  * - Strict Stage-by-Stage Observable Traces
  */
 
-import { rodexSynth } from '../utils/speech';
+import { rodexSynth, normalizeForWakeWord, STANDARD_WAKE_PHRASES } from '../utils/speech';
 
 export type LiveSessionStatus =
   | 'disconnected'
@@ -104,28 +104,14 @@ export interface LiveServiceCallbacks {
   onGrounding?: (metadata: any) => void;
 }
 
-// 6 Required Wake Words (Sorted longest first)
-const WAKE_PHRASES = [
-  'hello rodex',
-  'hey rodex',
-  'rodex',
-  'hello',
-  'hey',
-  'hi',
-];
-
 export function normalizeTranscript(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return normalizeForWakeWord(text);
 }
 
 export function matchWakePhrase(text: string): { matched: boolean; phrase: string | null; command: string } {
-  const norm = normalizeTranscript(text);
+  const norm = normalizeForWakeWord(text);
 
-  for (const phrase of WAKE_PHRASES) {
+  for (const phrase of STANDARD_WAKE_PHRASES) {
     if (norm === phrase) {
       return { matched: true, phrase, command: '' };
     }
@@ -153,6 +139,12 @@ export class LiveConversationService {
   private mediaStream: MediaStream | null = null;
   private audioProcessor: ScriptProcessorNode | null = null;
   private micSource: MediaStreamAudioSourceNode | null = null;
+
+  // Singleton initialization guards & Session Resumption
+  private initializationInProgress = false;
+  private engineStarted = false;
+  private wakeRecognizer: any = null;
+  private sessionResumptionHandle: string | null = null;
 
   // Single Dedicated Output AudioContext & Graph
   private outputAudioCtx: AudioContext | null = null;
@@ -389,11 +381,17 @@ export class LiveConversationService {
    * Starts exclusive microphone stream and connects upstream Live session.
    */
   public async startNormalOrbVoice(): Promise<void> {
-    if (this.isConnected() && this.isMicLive) {
-      this.addTrace('NORMAL VOICE ALREADY RUNNING');
+    if (this.engineStarted || (this.isConnected() && this.isMicLive)) {
+      console.info('[RODEX ENGINE] SINGLETON_ACTIVE / DUPLICATE_START_BLOCKED');
+      this.addTrace('[RODEX ENGINE] DUPLICATE_START_BLOCKED');
+      return;
+    }
+    if (this.initializationInProgress) {
+      console.info('[RODEX ENGINE] INIT_IN_PROGRESS');
       return;
     }
 
+    this.initializationInProgress = true;
     this.diag.lastAction = 'VOICE ENGINE STARTED';
     this.diag.lastErrorMessage = null;
     this.addTrace('ORB READY');
@@ -432,9 +430,12 @@ export class LiveConversationService {
       });
 
       this.isMicLive = true;
+      this.engineStarted = true;
+      this.initializationInProgress = false;
+
       const audioTrack = this.mediaStream.getAudioTracks()[0];
       this.diag.micStreamId = audioTrack ? audioTrack.id.substring(0, 8) : 'mic-active';
-      this.addTrace(`MIC LIVE (Track ID: ${this.diag.micStreamId})`);
+      this.addTrace(`[RODEX AUDIO] SINGLE_STREAM_ACTIVE (Track ID: ${this.diag.micStreamId})`);
 
       // 2. Establish Live connection
       this.diag.liveConnection = 'RUNNING';
@@ -446,8 +447,14 @@ export class LiveConversationService {
       this.diag.orbVoiceState = 'IDLE';
       this.setStatus('idle');
       this.addTrace('LIVE VOICE CONNECTED');
-      this.addTrace('WAKE LISTENER ACTIVE');
+      console.info('[RODEX GATE] WAKE_LISTENING_ACTIVE');
+      this.addTrace('[RODEX GATE] WAKE_LISTENING_ACTIVE');
+
+      // 3. Start local wake word recognizer for WAKE_LISTENING mode
+      this.startWakeRecognizer();
     } catch (err: any) {
+      this.initializationInProgress = false;
+      this.engineStarted = false;
       const errMsg = err?.message || String(err);
       this.addTrace(`MIC ERROR: ${errMsg}`);
       this.diag.lastErrorMessage = `MIC ERROR: ${errMsg}`;
@@ -539,7 +546,11 @@ export class LiveConversationService {
         this.diag.isConversationActive = false;
         this.diag.orbVoiceState = 'IDLE';
         this.setStatus('idle');
-        this.addTrace('RETURNED TO WAKE LISTENING');
+        console.info('[RODEX GATE] RETURNED_TO_WAKE_LISTENING');
+        this.addTrace('[RODEX GATE] RETURNED_TO_WAKE_LISTENING');
+        console.info('[RODEX GATE] WAKE_LISTENING_ACTIVE');
+        this.addTrace('[RODEX GATE] WAKE_LISTENING_ACTIVE');
+        this.startWakeRecognizer();
       }
     }, 9000);
   }
@@ -640,21 +651,24 @@ export class LiveConversationService {
         this.consecutiveBargeInFrames = 0;
       }
 
-      const pcm16Buffer = this.float32ToPcm16(inputChannelData);
-      const base64Audio = this.arrayBufferToBase64(pcm16Buffer);
+      // Stream microphone PCM audio frames to real-time speech engine whenever not actively speaking
+      if (!this.isSpeaking && !this.isGreetingPlaying) {
+        const pcm16Buffer = this.float32ToPcm16(inputChannelData);
+        const base64Audio = this.arrayBufferToBase64(pcm16Buffer);
 
-      this.ws.send(
-        JSON.stringify({
-          audio: base64Audio,
-          mimeType: 'audio/pcm;rate=16000',
-        })
-      );
+        this.ws.send(
+          JSON.stringify({
+            audio: base64Audio,
+            mimeType: 'audio/pcm;rate=16000',
+          })
+        );
 
-      this.audioChunksSent++;
-      this.bytesSent += pcm16Buffer.byteLength;
+        this.audioChunksSent++;
+        this.bytesSent += pcm16Buffer.byteLength;
 
-      if (this.audioChunksSent === 1 || this.audioChunksSent % 35 === 0) {
-        this.addTrace(`AUDIO CHUNK SENT (#${this.audioChunksSent}, ${this.bytesSent} bytes)`);
+        if (this.audioChunksSent === 1 || this.audioChunksSent % 35 === 0) {
+          this.addTrace(`AUDIO CHUNK SENT (#${this.audioChunksSent}, ${this.bytesSent} bytes)`);
+        }
       }
     };
 
@@ -689,6 +703,10 @@ export class LiveConversationService {
         break;
 
       case 'model_turn':
+        if (!this.isConversationActive) {
+          // Hard Wake Gate: Discard unsolicited model turns when no wake phrase has been confirmed
+          return;
+        }
         this.addTrace('MODEL RESPONSE RECEIVED');
         break;
 
@@ -703,6 +721,10 @@ export class LiveConversationService {
       }
 
       case 'audio':
+        if (!this.isConversationActive) {
+          // Hard Wake Gate: Discard unsolicited response audio when no wake phrase has been confirmed
+          return;
+        }
         if (data.audio) {
           this.audioChunksReceived++;
           this.addTrace('OUTPUT AUDIO RECEIVED');
@@ -725,6 +747,10 @@ export class LiveConversationService {
         break;
 
       case 'output_transcript':
+        if (!this.isConversationActive) {
+          // Hard Wake Gate: Discard unsolicited output transcripts when no wake phrase has been confirmed
+          return;
+        }
         if (data.text) {
           this.addTrace(`MODEL RESPONSE: "${data.text.substring(0, 60)}"`);
           this.diag.orbVoiceState = 'SPEAKING';
@@ -769,22 +795,83 @@ export class LiveConversationService {
   }
 
   /**
-   * Process Real-Time Input Transcript for Wake Words and Conversational Commands
+   * Lightweight Local Wake Word Recognizer for WAKE_LISTENING Mode
+   */
+  private startWakeRecognizer() {
+    if (typeof window === 'undefined') return;
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) return;
+
+    if (this.wakeRecognizer) {
+      try { this.wakeRecognizer.abort(); } catch (_) {}
+      this.wakeRecognizer = null;
+    }
+
+    try {
+      const rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+
+      rec.onresult = (e: any) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const transcript = e.results[i][0].transcript;
+          if (transcript && transcript.trim().length > 0) {
+            this.handleInputTranscript(transcript);
+          }
+        }
+      };
+
+      rec.onerror = (e: any) => {
+        if (e.error !== 'no-speech' && e.error !== 'aborted') {
+          console.warn('[RODEX WAKE RECOGNIZER] Non-fatal error:', e.error);
+        }
+      };
+
+      rec.onend = () => {
+        if (!this.isConversationActive && this.isMicLive) {
+          setTimeout(() => {
+            if (!this.isConversationActive && this.isMicLive) {
+              try { rec.start(); } catch (_) {}
+            }
+          }, 350);
+        }
+      };
+
+      rec.start();
+      this.wakeRecognizer = rec;
+      console.info('[RODEX GATE] WAKE_LISTENING');
+      this.addTrace('[RODEX GATE] WAKE_LISTENING');
+    } catch (err) {
+      console.warn('[RODEX WAKE RECOGNIZER] Failed initializing local wake recognizer:', err);
+    }
+  }
+
+  private stopWakeRecognizer() {
+    if (this.wakeRecognizer) {
+      try {
+        this.wakeRecognizer.stop();
+      } catch (_) {}
+      this.wakeRecognizer = null;
+    }
+  }
+
+  /**
+   * Process Real-Time Input Transcript with HARD Application-Level Wake Gate
    */
   private async handleInputTranscript(userText: string) {
-    this.addTrace(`NORMALIZED TRANSCRIPT: "${normalizeTranscript(userText)}"`);
     this.callbacks.onInputTranscript?.(userText);
 
-    // If an active conversational session is already underway, capture command directly
+    // 1. If an active conversational turn is already underway, capture user command directly
     if (this.isConversationActive) {
       if (this.followUpSilenceTimer) {
         clearTimeout(this.followUpSilenceTimer);
         this.followUpSilenceTimer = null;
       }
       this.diag.lastCommand = userText;
-      this.addTrace(`COMMAND RECEIVED: "${userText}"`);
+      console.info('[RODEX TURN] COMMAND_STARTED:', userText);
+      this.addTrace(`[RODEX TURN] COMMAND_STARTED: "${userText}"`);
       this.addTrace('ORB COMMAND RECEIVED');
-      this.addTrace('ORB ASSISTANT REQUEST CREATED');
       this.addTrace('LIVE REQUEST SENT');
       this.diag.orbVoiceState = 'THINKING';
       this.setStatus('thinking');
@@ -794,40 +881,55 @@ export class LiveConversationService {
       return;
     }
 
-    // Inspect transcript for the 6 required wake words
+    // 2. System is in WAKE_LISTENING mode. Evaluate transcript against HARD wake gate
+    console.info('[RODEX GATE] WAKE_AUDIO_RECEIVED');
+    this.addTrace('[RODEX GATE] WAKE_AUDIO_RECEIVED');
+    console.info(`[RODEX GATE] WAKE_TRANSCRIPT: "${userText}"`);
+    this.addTrace(`[RODEX GATE] WAKE_TRANSCRIPT: "${userText}"`);
+
     const match = matchWakePhrase(userText);
+
     if (match.matched && match.phrase) {
+      console.info('[RODEX GATE] WAKE_MATCH: TRUE');
+      this.addTrace('[RODEX GATE] WAKE_MATCH: TRUE');
+      console.info('[RODEX GATE] WAKE_DETECTED');
+      this.addTrace('[RODEX GATE] WAKE_DETECTED');
+      console.info('[RODEX GATE] COMMAND_LISTENING');
+      this.addTrace('[RODEX GATE] COMMAND_LISTENING');
+
       this.diag.wakeMatch = true;
       this.diag.lastWakeTranscript = userText;
-      this.addTrace(`WAKE MATCH TRUE ("${match.phrase}")`);
-      this.addTrace('WAKE DETECTED');
-      this.addTrace('ORB WAKE DETECTED');
       this.diag.orbVoiceState = 'WAKE_DETECTED';
       this.setStatus('wake_detected');
       this.callbacks.onWakeDetected?.(userText);
 
-      // Start active conversational session
+      // Enter active conversational session
       this.isConversationActive = true;
       this.diag.isConversationActive = true;
 
-      // Play immediate greeting: "Boss, watsap today?"
-      await this.playCatchPhraseGreeting();
+      // Stop local wake recognizer so it doesn't run during active command turn
+      this.stopWakeRecognizer();
 
-      // If user simultaneously spoke a command, send it immediately
-      if (match.command.length > 0) {
+      // RULE 3 FIX: If command text follows wake phrase (e.g. "Hello Rodex, what is the weather?")
+      // Extract command, DO NOT play separate generic greeting, send command as single turn!
+      if (match.command && match.command.trim().length > 0) {
+        console.info('[RODEX GATE] COMMAND_ACCEPTED:', match.command);
+        this.addTrace(`[RODEX GATE] COMMAND_ACCEPTED: "${match.command}"`);
         this.diag.lastCommand = match.command;
-        this.addTrace(`COMMAND RECEIVED: "${match.command}"`);
-        this.addTrace('ORB COMMAND RECEIVED');
-        this.addTrace('ORB ASSISTANT REQUEST CREATED');
-        this.addTrace('LIVE REQUEST SENT');
         this.diag.orbVoiceState = 'THINKING';
         this.setStatus('thinking');
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({ text: match.command }));
         }
+      } else {
+        // Bare wake phrase ("Hello Rodex") -> play single short local greeting
+        await this.playCatchPhraseGreeting();
       }
     } else {
-      this.addTrace('WAKE MATCH FALSE');
+      console.info('[RODEX GATE] WAKE_MATCH: FALSE');
+      this.addTrace('[RODEX GATE] WAKE_MATCH: FALSE');
+      console.info('[RODEX GATE] NON_WAKE_SPEECH_IGNORED');
+      this.addTrace('[RODEX GATE] NON_WAKE_SPEECH_IGNORED');
     }
   }
 
@@ -1095,8 +1197,11 @@ export class LiveConversationService {
   }
 
   public stop() {
+    this.stopWakeRecognizer();
     this.stopAllPlayback();
     rodexSynth.stop();
+    this.initializationInProgress = false;
+    this.engineStarted = false;
     if (this.followUpSilenceTimer) {
       clearTimeout(this.followUpSilenceTimer);
       this.followUpSilenceTimer = null;

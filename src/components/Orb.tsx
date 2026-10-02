@@ -152,6 +152,7 @@ export const Orb: React.FC<OrbProps> = ({
 
     let animId: number;
     let smoothedLevel = 0;
+    let smoothedScale = 1.0;
     let smoothedPitch = pitchHzRef.current || 124;
     let hudRotation = 0;
     const startTime = performance.now();
@@ -252,23 +253,24 @@ export const Orb: React.FC<OrbProps> = ({
       const isExecuting = currentState === 'executing' || currentState === 'executing_tool';
       const isActiveVoice = isListening || isSpeaking || currentState === 'wake_detected' || currentState === 'input_detected';
 
-      // Calculate dynamic orb scale based on real audio level and assistant state
-      let currentOrbScale = 1.0;
+      // Calculate dynamic orb scale based on real audio level and assistant state with smooth lerp
+      let targetScale = 1.0;
       if (currentState === 'wake_detected') {
-        currentOrbScale = 1.10 + Math.sin(elapsed * 18) * 0.06;
+        targetScale = 1.08 + Math.sin(elapsed * 12) * 0.04;
       } else if (currentState === 'input_detected') {
-        currentOrbScale = 1.04 + smoothedLevel * 0.28;
+        targetScale = 1.03 + smoothedLevel * 0.22;
       } else if (isListening) {
-        currentOrbScale = 1.0 + smoothedLevel * 0.24;
+        targetScale = 1.0 + smoothedLevel * 0.20;
       } else if (isSpeaking) {
-        currentOrbScale = 1.0 + Math.sin(elapsed * 7) * 0.05 + smoothedLevel * 0.18;
+        targetScale = 1.0 + Math.sin(elapsed * 6) * 0.03 + smoothedLevel * 0.15;
       } else if (isExecuting) {
-        currentOrbScale = 1.06 + Math.sin(elapsed * 10) * 0.04;
+        targetScale = 1.04 + Math.sin(elapsed * 8) * 0.02;
       } else if (isThinking) {
-        currentOrbScale = 1.04 + Math.sin(elapsed * 5) * 0.02;
+        targetScale = 1.03 + Math.sin(elapsed * 4) * 0.02;
       }
+      smoothedScale += (targetScale - smoothedScale) * 0.15;
 
-      const orbRadius = (currentSize / 2) * currentOrbScale;
+      const orbRadius = (currentSize / 2) * smoothedScale;
       const innerRadius = orbRadius + 4;
 
       // Smooth organic RGB transitions towards active theme colors (e.g. Gold, Cyan, Ruby)

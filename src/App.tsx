@@ -2115,43 +2115,28 @@ export default function App() {
 
           {/* Central Orb Identity */}
           <motion.div
-            className="relative flex flex-col items-center cursor-pointer select-none m-0 p-0"
+            className="relative flex flex-col items-center justify-center cursor-pointer select-none m-0 p-0"
             animate={{
               scale:
                 state === 'wake_detected'
-                  ? [1, 1.12, 0.98, 1.1]
+                  ? 1.08
                   : state === 'input_detected'
-                  ? [1, 1.05, 1]
+                  ? 1.04
                   : state === 'listening'
-                  ? [1, 1.04, 1]
+                  ? 1.02
                   : state === 'speaking'
-                  ? [1, 1.03, 1]
+                  ? 1.03
                   : state === 'thinking' || state === 'processing' || state === 'planning'
-                  ? [0.97, 1.02, 0.97]
+                  ? 1.02
                   : state === 'executing' || state === 'executing_tool'
-                  ? [1, 1.06, 1]
-                  : state === 'interrupted'
-                  ? [1, 1.06, 1]
-                  : 1,
+                  ? 1.05
+                  : 1.0,
               opacity: 1,
             }}
             transition={{
-              duration:
-                state === 'wake_detected'
-                  ? 0.35
-                  : state === 'input_detected'
-                  ? 0.4
-                  : state === 'listening'
-                  ? 1.2
-                  : state === 'speaking'
-                  ? 1.0
-                  : state === 'thinking' || state === 'processing' || state === 'planning' || state === 'executing' || state === 'executing_tool'
-                  ? 0.8
-                  : state === 'interrupted'
-                  ? 0.25
-                  : 2.5,
-              repeat: state === 'idle' || state === 'wake_listening' ? 0 : Infinity,
-              ease: 'easeInOut',
+              type: 'spring',
+              stiffness: 260,
+              damping: 24,
             }}
           >
             <Orb
