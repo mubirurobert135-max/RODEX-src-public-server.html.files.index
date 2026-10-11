@@ -145,6 +145,11 @@ export class LiveConversationService {
   private engineStarted = false;
   private wakeRecognizer: any = null;
   private sessionResumptionHandle: string | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private explicitShutdown = false;
+  private eventTimeline: Array<{ timestamp: string; category: string; message: string; sessionId?: string }> = [];
 
   // Single Dedicated Output AudioContext & Graph
   private outputAudioCtx: AudioContext | null = null;
@@ -315,6 +320,22 @@ export class LiveConversationService {
     const logItem = { id: `trace-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, time, text: msg };
     this.diagnosticLogs = [logItem, ...this.diagnosticLogs].slice(0, 50);
     console.info(`[RODEX LIVE TRACE ${time}] ${msg}`);
+  }
+
+  public addEventTimeline(category: string, message: string) {
+    const timestamp = new Date().toISOString();
+    const item = {
+      timestamp,
+      category,
+      message,
+      sessionId: this.diag.voiceSessionId,
+    };
+    this.eventTimeline = [item, ...this.eventTimeline].slice(0, 100);
+    console.info(`[RODEX EVENT TIMELINE ${timestamp}] [${category}] ${message}`);
+  }
+
+  public getEventTimeline(): Array<{ timestamp: string; category: string; message: string; sessionId?: string }> {
+    return this.eventTimeline;
   }
 
   public getDiagnosticLogs(): Array<{ id: string; time: string; text: string }> {
@@ -556,11 +577,13 @@ export class LiveConversationService {
   }
 
   /**
-   * Connect WebSocket without starting microphone processing
+   * Connect WebSocket with exponential backoff, jitter, and event timeline logging
    */
   private async connectWebSocketOnly(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        this.explicitShutdown = false;
+        this.addEventTimeline('SESSION_CONNECTING', 'Initiating WebSocket connection to /api/live');
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/api/live`;
 
@@ -569,6 +592,8 @@ export class LiveConversationService {
         this.ws.onopen = () => {
           this.addTrace('LIVE WS OPEN');
           this.diag.liveConnection = 'PASS';
+          this.reconnectAttempts = 0;
+          this.addEventTimeline('SESSION_CONNECTED', 'WebSocket connection established successfully');
           resolve();
         };
 
@@ -581,18 +606,48 @@ export class LiveConversationService {
           }
         };
 
-        this.ws.onclose = () => {
-          this.addTrace('LIVE WS CLOSED');
-          this.stop();
+        this.ws.onclose = (event) => {
+          this.addTrace(`LIVE WS CLOSED (code: ${event.code}, reason: ${event.reason})`);
+          this.addEventTimeline('SESSION_DISCONNECTED', `WebSocket closed with code ${event.code}`);
+
+          if (this.explicitShutdown) {
+            this.stop();
+            return;
+          }
+
+          // Attempt recovery with exponential backoff + jitter if under max attempts
+          if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const backoffMs = Math.min(10000, Math.pow(2, this.reconnectAttempts) * 400 + Math.random() * 300);
+            this.addEventTimeline('SESSION_RECONNECTING', `Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${Math.round(backoffMs)}ms`);
+
+            if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = setTimeout(() => {
+              if (!this.explicitShutdown && this.isMicLive) {
+                this.connectWebSocketOnly().then(() => {
+                  if (this.mediaStream) {
+                    this.startMicProcessing();
+                  }
+                }).catch((err) => {
+                  console.warn('[RODEX Live] Reconnection attempt failed:', err);
+                });
+              }
+            }, backoffMs);
+          } else {
+            this.addEventTimeline('SESSION_FATAL', 'Max reconnection attempts exceeded. Stopping live session.');
+            this.stop();
+          }
         };
 
         this.ws.onerror = (err) => {
           this.addTrace('LIVE WS ERROR');
           this.diag.liveConnection = 'FAIL';
+          this.addEventTimeline('SESSION_ERROR', 'WebSocket error encountered');
           reject(err);
         };
       } catch (e) {
         this.diag.liveConnection = 'FAIL';
+        this.addEventTimeline('SESSION_ERROR', `WebSocket connection exception: ${e}`);
         reject(e);
       }
     });
@@ -1197,6 +1252,11 @@ export class LiveConversationService {
   }
 
   public stop() {
+    this.explicitShutdown = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.stopWakeRecognizer();
     this.stopAllPlayback();
     rodexSynth.stop();
