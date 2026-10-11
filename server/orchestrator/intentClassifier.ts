@@ -378,7 +378,7 @@ export class IntentClassifier {
     }
 
     // Check new emails: "check emails", "check my email", "check gmail", "check my gmail", "do i have any new emails", "do i have new messages"
-    if (/\b(check emails|check my email|check email|check gmail|check my gmail|check for new emails|new emails|unread emails|any new emails|do i have (?:any\s+)?(?:new\s+)?(?:emails|messages)|do i have new messages|check my inbox|check inbox)\b/i.test(lower)) {
+    if (/\b(check emails|check my email|check email|check gmail|check my gmail|check for new emails|new emails|unread emails|check my latest emails|check my unread emails|latest emails|any new emails|do i have (?:any\s+)?(?:new\s+)?(?:emails|messages)|do i have new messages|check my inbox|check inbox)\b/i.test(lower)) {
       return {
         primaryIntent: 'email_operation',
         confidence: 0.97,
@@ -392,8 +392,8 @@ export class IntentClassifier {
       };
     }
 
-    // Read latest email: "read my latest email", "read the latest email", "read the latest one"
-    if (/\b(read (?:my\s+|the\s+)?latest email|read (?:the\s+)?latest one|read (?:the\s+)?latest message)\b/i.test(lower)) {
+    // Read latest email: "read my latest email", "read the latest email", "read the latest one", "check my latest emails"
+    if (/\b(read (?:my\s+|the\s+)?latest email|read (?:the\s+)?latest one|read (?:the\s+)?latest message|check my latest emails|check my unread emails)\b/i.test(lower)) {
       return {
         primaryIntent: 'email_operation',
         confidence: 0.98,

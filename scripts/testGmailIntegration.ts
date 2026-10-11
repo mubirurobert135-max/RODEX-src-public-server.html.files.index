@@ -159,13 +159,14 @@ async function runTests() {
 
   // TEST 6: Tool Execution Engine Integration
   console.log('\n6. Testing Tool Execution Engine Integration (email_service & gmail_*)...');
+  globalGmailAuth.setAccessToken('ya29.mock_test_token', { name: 'Robert', email: 'robert@test.com' }, 'usr_robert_1001');
   const toolExecResult = await globalActionEngine.executeAction(
     'email_service',
     {
       action: 'draft_reply',
       replyContent: "I'll join at 10 AM.",
     },
-    { userName: 'Robert', hasElevatedPermission: true }
+    { userName: 'Robert', userId: 'usr_robert_1001', gmailAccessToken: 'ya29.mock_test_token', hasElevatedPermission: true }
   );
 
   assert(toolExecResult.success === true, 'Action engine successfully executes draft_reply');

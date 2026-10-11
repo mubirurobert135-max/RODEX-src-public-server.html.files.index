@@ -1088,8 +1088,8 @@ export default function App() {
         speakerVerified: true,
       };
 
-      const greetingSpeech = 'Boss, watsap today?';
-      const greetingFullText = 'Boss, watsap today?';
+      const greetingSpeech = "Hello, I'm here and ready to help.";
+      const greetingFullText = "Hello, I'm here and ready to help.";
 
       const assistantMsg: ChatMessage = {
         id: createId('assistant'),
@@ -1354,13 +1354,7 @@ export default function App() {
         return;
       }
 
-      if (lowerQ.includes('open youtube') || lowerQ.includes('go to youtube') || lowerQ.includes('launch youtube')) {
-        handleOpenUrlInBrowser('https://www.youtube.com', 'YouTube', 'youtube');
-      } else if (lowerQ.includes('open chrome') || lowerQ.includes('open google') || lowerQ.includes('go to google')) {
-        handleOpenUrlInBrowser('https://www.google.com', 'Google', 'google');
-      } else if (lowerQ.includes('open gmail') || lowerQ.includes('check my email') || lowerQ.includes('check gmail')) {
-        setIsGmailOpen(true);
-      } else if (lowerQ.includes('schedule') || lowerQ.includes('set reminder') || lowerQ.includes('remind me')) {
+      else if (lowerQ.includes('schedule') || lowerQ.includes('set reminder') || lowerQ.includes('remind me')) {
         setIsScheduleOpen(true);
       } else if (lowerQ.includes('who created you') || lowerQ.includes('who made you') || lowerQ.includes('who is your creator')) {
         const creatorSpeech = 'I was created by Mubiru Robert as an advanced autonomous AI assistant.';
@@ -1729,13 +1723,13 @@ export default function App() {
       },
       onGreetingStarted: () => {
         setState('speaking');
-        setLastResponse('Boss, watsap today?');
+        setLastResponse("Hello, I'm here and ready to help.");
         setMessages((prev) => [
           ...prev,
           {
             id: `greet-${Date.now()}`,
             sender: 'assistant',
-            text: 'Boss, watsap today?',
+            text: "Hello, I'm here and ready to help.",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             speakerVerified: true,
           },

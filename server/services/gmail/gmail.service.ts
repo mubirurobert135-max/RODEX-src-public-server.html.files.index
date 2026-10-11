@@ -29,8 +29,8 @@ export class GmailService {
   /**
    * Helper to fetch authenticated Gmail API.
    */
-  private async fetchGmailApi(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = globalGmailAuth.getAccessToken();
+  private async fetchGmailApi(endpoint: string, options: RequestInit = {}, userId: string = 'default_user'): Promise<any> {
+    const token = globalGmailAuth.getAccessToken(userId);
     if (!token) {
       throw new Error('GMAIL_NOT_CONNECTED: No active Gmail access token found. Please connect your Gmail account.');
     }
@@ -82,15 +82,15 @@ export class GmailService {
   /**
    * Get Gmail connection status.
    */
-  public async getGmailConnectionStatus(): Promise<GmailConnectionStatus> {
-    return globalGmailAuth.verifyAndGetStatus();
+  public async getGmailConnectionStatus(userId: string = 'default_user'): Promise<GmailConnectionStatus> {
+    return globalGmailAuth.verifyAndGetStatus(userId);
   }
 
   /**
    * Disconnect Gmail and clear session state.
    */
-  public disconnectGmail(): void {
-    globalGmailAuth.disconnect();
+  public disconnectGmail(userId: string = 'default_user'): void {
+    globalGmailAuth.disconnect(userId);
     this.activeReferencedEmail = null;
     this.notifiedMessageIds.clear();
   }
@@ -98,7 +98,7 @@ export class GmailService {
   /**
    * List recent email summaries.
    */
-  public async listEmails(options: { maxResults?: number; query?: string; labelIds?: string[] } = {}): Promise<GmailMessageSummary[]> {
+  public async listEmails(options: { maxResults?: number; query?: string; labelIds?: string[] } = {}, userId: string = 'default_user'): Promise<GmailMessageSummary[]> {
     const maxResults = Math.min(options.maxResults || 10, 25);
     const queryParams = new URLSearchParams();
     queryParams.set('maxResults', String(maxResults));
@@ -107,7 +107,7 @@ export class GmailService {
       options.labelIds.forEach((label) => queryParams.append('labelIds', label));
     }
 
-    const listData = await this.fetchGmailApi(`/messages?${queryParams.toString()}`);
+    const listData = await this.fetchGmailApi(`/messages?${queryParams.toString()}`, {}, userId);
     if (!listData.messages || !Array.isArray(listData.messages)) {
       return [];
     }
@@ -115,7 +115,7 @@ export class GmailService {
     // Fetch message details in parallel with concurrency limit
     const detailPromises = listData.messages.map(async (msg: { id: string }) => {
       try {
-        const rawMsg = await this.fetchGmailApi(`/messages/${msg.id}?format=full`);
+        const rawMsg = await this.fetchGmailApi(`/messages/${msg.id}?format=full`, {}, userId);
         return GmailParser.parseSummary(rawMsg);
       } catch (err) {
         console.warn(`[GmailService] Failed fetching summary for ${msg.id}`, err);
@@ -130,7 +130,7 @@ export class GmailService {
   /**
    * Check for new/unread emails and prevent duplicate notifications.
    */
-  public async checkNewEmails(options: { maxResults?: number } = {}): Promise<GmailCheckNewResult> {
+  public async checkNewEmails(options: { maxResults?: number } = {}, userId: string = 'default_user'): Promise<GmailCheckNewResult> {
     const maxResults = options.maxResults || 5;
     // Query for unread emails in inbox
     const queryParams = new URLSearchParams({
@@ -138,7 +138,7 @@ export class GmailService {
       maxResults: String(maxResults),
     });
 
-    const listData = await this.fetchGmailApi(`/messages?${queryParams.toString()}`);
+    const listData = await this.fetchGmailApi(`/messages?${queryParams.toString()}`, {}, userId);
     const messageRefs = listData.messages || [];
     const totalUnreadCount = listData.resultSizeEstimate || messageRefs.length;
 
@@ -155,7 +155,7 @@ export class GmailService {
     const summaries: GmailMessageSummary[] = [];
     for (const ref of messageRefs.slice(0, maxResults)) {
       try {
-        const raw = await this.fetchGmailApi(`/messages/${ref.id}?format=full`);
+        const raw = await this.fetchGmailApi(`/messages/${ref.id}?format=full`, {}, userId);
         const parsed = GmailParser.parseSummary(raw);
         summaries.push(parsed);
       } catch (err) {
@@ -170,7 +170,7 @@ export class GmailService {
     // Remember the top message as referenced in conversation context
     if (summaries.length > 0) {
       try {
-        const fullLatest = await this.getEmail(summaries[0].id);
+        const fullLatest = await this.getEmail(summaries[0].id, userId);
         this.setActiveReferencedEmail(fullLatest);
       } catch {
         // Fallback
@@ -200,8 +200,8 @@ export class GmailService {
   /**
    * Get single email message detail by ID.
    */
-  public async getEmail(id: string): Promise<GmailMessageDetail> {
-    const raw = await this.fetchGmailApi(`/messages/${id}?format=full`);
+  public async getEmail(id: string, userId: string = 'default_user'): Promise<GmailMessageDetail> {
+    const raw = await this.fetchGmailApi(`/messages/${id}?format=full`, {}, userId);
     const parsed = GmailParser.parseMessage(raw);
     this.setActiveReferencedEmail(parsed);
     return parsed;
@@ -210,7 +210,7 @@ export class GmailService {
   /**
    * Search emails with natural language query mapping.
    */
-  public async searchEmails(query: string, maxResults: number = 8): Promise<GmailMessageSummary[]> {
+  public async searchEmails(query: string, maxResults: number = 8, userId: string = 'default_user'): Promise<GmailMessageSummary[]> {
     // Clean and normalize query for Gmail syntax
     let gmailQuery = query.trim();
 
@@ -225,18 +225,18 @@ export class GmailService {
       gmailQuery = `${gmailQuery} is:unread`;
     }
 
-    return this.listEmails({ query: gmailQuery, maxResults });
+    return this.listEmails({ query: gmailQuery, maxResults }, userId);
   }
 
   /**
    * Read email aloud or in chat.
    */
-  public async readEmail(emailId?: string, query?: string): Promise<{ message: GmailMessageDetail; spokenText: string }> {
+  public async readEmail(emailId?: string, query?: string, userId: string = 'default_user'): Promise<{ message: GmailMessageDetail; spokenText: string }> {
     let targetId = emailId;
 
     if (!targetId && query) {
       // Find matching email
-      const searchResults = await this.searchEmails(query, 1);
+      const searchResults = await this.searchEmails(query, 1, userId);
       if (searchResults.length > 0) {
         targetId = searchResults[0].id;
       }
@@ -244,7 +244,7 @@ export class GmailService {
 
     if (!targetId) {
       // Default to the latest email in inbox
-      const recent = await this.listEmails({ maxResults: 1 });
+      const recent = await this.listEmails({ maxResults: 1 }, userId);
       if (recent.length > 0) {
         targetId = recent[0].id;
       } else {

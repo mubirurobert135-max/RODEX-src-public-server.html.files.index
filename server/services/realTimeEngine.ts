@@ -389,7 +389,7 @@ export class RealTimeResponseEngine {
       }
 
       if (!streamSucceeded && fullAccumulatedText.length === 0) {
-        const fallbackText = "Hello Robert, I am online and operational. How can I assist you today?";
+        const fallbackText = "I am online and operational. How can I assist you today?";
         this.sendSSEEvent(res, { type: 'start', path: 'emergency_fallback', ttfrMs: 10 });
         this.sendSSEEvent(res, { type: 'token', token: fallbackText });
         this.sendSSEEvent(res, { type: 'sentence', text: fallbackText, index: 0 });

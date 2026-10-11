@@ -488,7 +488,7 @@ export class LiveConversationService {
   }
 
   /**
-   * PLAY IMMEDIATE CATCH-PHRASE GREETING: "Boss, watsap today?"
+   * PLAY IMMEDIATE CATCH-PHRASE GREETING: "Hello, I'm here and ready to help."
    */
   public async playCatchPhraseGreeting(): Promise<void> {
     this.addTrace('GREETING STARTED');
@@ -514,8 +514,8 @@ export class LiveConversationService {
         resolve();
       };
 
-      // Synthesize "Boss, watsap today?"
-      rodexSynth.speak('Boss, watsap today?', {
+      // Synthesize "Hello, I'm here and ready to help."
+      rodexSynth.speak("Hello, I'm here and ready to help.", {
         rate: 1.05,
         pitch: 1.0,
         volume: 1.0,

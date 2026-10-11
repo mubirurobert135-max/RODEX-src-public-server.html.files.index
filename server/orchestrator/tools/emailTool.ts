@@ -122,135 +122,85 @@ export const emailTool: ToolDefinition = {
     },
   },
   handler: async (params, context) => {
+    const userId = context?.userId || 'default_user';
     if (context?.gmailAccessToken) {
-      globalGmailAuth.setAccessToken(context.gmailAccessToken, { name: context.userName });
+      globalGmailAuth.setAccessToken(context.gmailAccessToken, { name: context.userName, email: context.userEmail }, userId);
     }
-    const isGmailActive = !!globalGmailAuth.getAccessToken();
+    const connectionStatus = await globalGmailAuth.verifyAndGetStatus(userId);
+    const isGmailActive = connectionStatus.isConnected;
     const action = params?.action;
+
+    if (!isGmailActive) {
+      return {
+        success: false,
+        output: null,
+        error: connectionStatus.error || 'GMAIL_NOT_CONNECTED: No active Gmail connection found. Please connect your Gmail account.',
+        message: connectionStatus.error || 'Your Gmail account is not connected. Please connect Gmail to check your inbox.',
+      };
+    }
 
     switch (action) {
       case 'check_new': {
-        if (isGmailActive) {
-          try {
-            const result = await globalGmailService.checkNewEmails();
-            return {
-              success: true,
-              output: result,
-              message: result.spokenSummary,
-            };
-          } catch (err: any) {
-            console.warn('[email_service:check_new Gmail error]', err);
-          }
-        }
-
-        const unread = mockEmailDatabase.filter((e) => !e.isRead);
-        if (unread.length === 0) {
+        try {
+          const result = await globalGmailService.checkNewEmails({}, userId);
           return {
             success: true,
-            output: { count: 0, emails: [] },
-            message: 'You have no new unread emails.',
+            output: result,
+            message: result.spokenSummary,
           };
-        }
-
-        const summaryList = unread.map(
-          (e, idx) => `${idx + 1}. From ${e.senderName}: "${e.subject}"`
-        ).join('\n');
-
-        return {
-          success: true,
-          output: { count: unread.length, emails: unread },
-          message: `You have ${unread.length} new unread email${unread.length > 1 ? 's' : ''}:\n${summaryList}`,
-        };
-      }
-
-      case 'list_summaries': {
-        if (isGmailActive) {
-          try {
-            const emails = await globalGmailService.listEmails({ maxResults: 5 });
-            const summaries = emails.map((e) => ({
-              id: e.id,
-              from: e.senderName,
-              subject: e.subject,
-              snippet: e.snippet,
-              isRead: e.isRead,
-              date: e.date,
-            }));
-            const textList = summaries.map((s) => `• [${s.from}] ${s.subject} (${s.isRead ? 'Read' : 'Unread'})`).join('\n');
-            return {
-              success: true,
-              output: { total: emails.length, summaries },
-              message: `Recent emails from Gmail:\n${textList}`,
-            };
-          } catch (err: any) {
-            console.warn('[email_service:list_summaries Gmail error]', err);
-          }
-        }
-
-        const count = mockEmailDatabase.length;
-        const summaries = mockEmailDatabase.slice(0, 5).map((e) => ({
-          id: e.id,
-          from: e.senderName,
-          subject: e.subject,
-          snippet: e.snippet,
-          isRead: e.isRead,
-          date: e.date,
-        }));
-
-        const textList = summaries
-          .map((s) => `• [${s.from}] ${s.subject} (${s.isRead ? 'Read' : 'Unread'})`)
-          .join('\n');
-
-        return {
-          success: true,
-          output: { total: count, summaries },
-          message: `Recent emails:\n${textList}`,
-        };
-      }
-
-      case 'read_email': {
-        if (isGmailActive) {
-          try {
-            const { message, spokenText } = await globalGmailService.readEmail(params.emailId, params.searchQuery || params.senderQuery);
-            return {
-              success: true,
-              output: message,
-              message: spokenText,
-            };
-          } catch (err: any) {
-            console.warn('[email_service:read_email Gmail error]', err);
-          }
-        }
-
-        let found: EmailMessage | undefined;
-        if (params.emailId) {
-          found = mockEmailDatabase.find((e) => e.id === params.emailId);
-        } else if (params.senderQuery) {
-          const sq = params.senderQuery.toLowerCase();
-          found = mockEmailDatabase.find(
-            (e) => e.senderName.toLowerCase().includes(sq) || e.senderEmail.toLowerCase().includes(sq)
-          );
-        } else {
-          // Default to latest unread or first email
-          found = mockEmailDatabase.find((e) => !e.isRead) || mockEmailDatabase[0];
-        }
-
-        if (!found) {
+        } catch (err: any) {
           return {
             success: false,
             output: null,
-            error: 'No matching email found.',
-            message: 'No email found matching your request.',
+            error: err?.message || 'Failed to check new emails from Gmail.',
+            message: `Gmail error: ${err?.message || 'Unable to retrieve new emails.'}`,
           };
         }
+      }
 
-        // Mark as read
-        found.isRead = true;
+      case 'list_summaries': {
+        try {
+          const emails = await globalGmailService.listEmails({ maxResults: 5 }, userId);
+          const summaries = emails.map((e) => ({
+            id: e.id,
+            from: e.senderName,
+            subject: e.subject,
+            snippet: e.snippet,
+            isRead: e.isRead,
+            date: e.date,
+          }));
+          const textList = summaries.map((s) => `• [${s.from}] ${s.subject} (${s.isRead ? 'Read' : 'Unread'})`).join('\n');
+          return {
+            success: true,
+            output: { total: emails.length, summaries },
+            message: `Recent emails from Gmail:\n${textList}`,
+          };
+        } catch (err: any) {
+          return {
+            success: false,
+            output: null,
+            error: err?.message || 'Failed to list emails from Gmail.',
+            message: `Gmail error: ${err?.message || 'Unable to list recent emails.'}`,
+          };
+        }
+      }
 
-        return {
-          success: true,
-          output: found,
-          message: `Email from ${found.senderName} (${found.senderEmail}):\nSubject: ${found.subject}\n\n${found.body}`,
-        };
+      case 'read_email': {
+        try {
+          const { message, spokenText } = await globalGmailService.readEmail(params.emailId, params.searchQuery || params.senderQuery, userId);
+          return {
+            success: true,
+            output: message,
+            message: spokenText,
+          };
+        } catch (err: any) {
+          return {
+            success: false,
+            output: null,
+            error: err?.message || 'Failed to read email from Gmail.',
+            message: `Gmail error: ${err?.message || 'Unable to read requested email.'}`,
+          };
+        }
       }
 
       case 'summarize_email': {
