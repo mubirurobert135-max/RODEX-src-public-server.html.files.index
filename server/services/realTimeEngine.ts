@@ -40,7 +40,7 @@ export class RealTimeResponseEngine {
    * Helper to write formatted Server-Sent Event to response
    */
   private sendSSEEvent(res: Response, eventData: Record<string, any>): void {
-    if (res.writableEnded) return;
+    if (res.writableEnded || res.destroyed) return;
     res.write(`data: ${JSON.stringify(eventData)}\n\n`);
   }
 
@@ -166,15 +166,20 @@ export class RealTimeResponseEngine {
 
     if (intent.primaryIntent === 'open_url' && intent.extractedEntities?.targetUrl) {
       const url = intent.extractedEntities.targetUrl;
-      const title = intent.extractedEntities.searchQuery || 'Web Destination';
-      const text = `Opening ${title} for you now.`;
+      const title =
+        intent.extractedEntities.label ||
+        intent.extractedEntities.searchQuery ||
+        'website';
+      // Voice-triggered browser navigation may be blocked by popup protection.
+      // Tell the user where to continue rather than claiming the tab definitely opened.
+      const text = `I found ${title}. If your browser blocks the new tab, use the on-screen Open button.`;
       const ttfrMs = Date.now() - startTime;
 
       const browserAction = {
         url,
-        label: `Open ${title}`,
-        destinationType: url.includes('youtube') ? 'youtube' : 'web',
-        status: 'opened',
+        label: title,
+        destinationType: url.includes('youtube') ? 'youtube' : url.includes('google') ? 'google' : 'website',
+        status: 'requested',
       };
 
       this.sendSSEEvent(res, { type: 'start', path: 'fast_path_url', ttfrMs });
@@ -243,9 +248,9 @@ export class RealTimeResponseEngine {
             type: 'browser_action',
             action: {
               url: orchRes.openUrl,
-              label: 'Open Action Target',
-              destinationType: orchRes.openUrl.includes('youtube') ? 'youtube' : 'web',
-              status: 'opened',
+              label: intent.extractedEntities.label || orchRes.sources?.[0]?.title || 'Open Action Target',
+              destinationType: orchRes.openUrl.includes('youtube') ? 'youtube' : orchRes.openUrl.includes('google') ? 'google' : 'website',
+              status: 'requested',
             },
           });
         }
