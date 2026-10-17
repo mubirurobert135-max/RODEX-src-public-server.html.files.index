@@ -35,6 +35,21 @@ async function runRealTimeEngineTest() {
   assert(intentUrl.extractedEntities.targetUrl === 'https://www.youtube.com', 'Constructs target YouTube URL');
   assert(elapsed1 < 30, `Fast intent routing executed in ${elapsed1}ms (< 30ms threshold)`);
 
+  const politeYouTube = IntentClassifier.classify('Open YouTube for me');
+  assert(politeYouTube.primaryIntent === 'open_url', 'Accepts natural polite website commands');
+  const arbitraryWebsite = IntentClassifier.classify('RODEX, open example.com');
+  assert(
+    arbitraryWebsite.primaryIntent === 'open_url' &&
+      arbitraryWebsite.extractedEntities.targetUrl === 'https://example.com/',
+    'Constructs a safe HTTPS URL for an arbitrary domain'
+  );
+  const claude = IntentClassifier.classify('Open Claude');
+  assert(
+    claude.primaryIntent === 'open_url' &&
+      claude.extractedEntities.targetUrl === 'https://claude.ai',
+    'Routes Claude to its own website rather than YouTube'
+  );
+
   // TEST 2: Creator Inquiry Fast Path
   console.log('\n2. Testing Creator Inquiry Fast Path...');
   const intentCreator = IntentClassifier.classify('Who is your creator and who developed RODEX?');
