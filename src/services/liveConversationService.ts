@@ -175,6 +175,8 @@ export class LiveConversationService {
   // Real-time Live Voice Diagnostic Metrics
   private audioChunksSent = 0;
   private bytesSent = 0;
+  // Send a fresh wall-clock anchor about once per second without bloating every audio frame.
+  private lastClockContextSentAt = 0;
   private modelMessagesReceived = 0;
   private audioChunksReceived = 0;
   private isMicLive = false;
@@ -734,10 +736,21 @@ export class LiveConversationService {
         const pcm16Buffer = this.float32ToPcm16(inputChannelData);
         const base64Audio = this.arrayBufferToBase64(pcm16Buffer);
 
+        const wallClockNowMs = Date.now();
+        const includeClockContext = wallClockNowMs - this.lastClockContextSentAt >= 1000;
+        const clockContext = includeClockContext
+          ? {
+              clientTimeIso: new Date(wallClockNowMs).toISOString(),
+              clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Kampala',
+            }
+          : {};
+        if (includeClockContext) this.lastClockContextSentAt = wallClockNowMs;
+
         this.ws.send(
           JSON.stringify({
             audio: base64Audio,
             mimeType: 'audio/pcm;rate=16000',
+            ...clockContext,
           })
         );
 
