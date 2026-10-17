@@ -100,6 +100,11 @@ import {
 } from './utils/sessionStorage';
 import { getActiveOrbTheme } from './utils/orbTheme';
 
+// Defer voice-engine cleanup by one microtask so React StrictMode's
+// development-only setup/cleanup/setup cycle doesn't kill and restart the mic
+// permission request before the second setup can reuse the singleton.
+let liveVoiceMountGeneration = 0;
+
 const createId = (prefix = 'msg') =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -1680,6 +1685,7 @@ export default function App() {
 
   // Automatically Boot Production Live Voice Engine for Normal Orb on Mount
   useEffect(() => {
+    liveVoiceMountGeneration++;
     console.info('[RODEX BOOT] Initializing Live Voice Engine for Normal Orb Operation...');
 
     globalLiveConversationService.setCallbacks({
@@ -1807,7 +1813,14 @@ export default function App() {
     });
 
     return () => {
-      globalLiveConversationService.stop();
+      const cleanupGeneration = ++liveVoiceMountGeneration;
+      queueMicrotask(() => {
+        // If StrictMode immediately re-runs this effect, the newer setup owns
+        // the singleton and this simulated cleanup must not stop it.
+        if (liveVoiceMountGeneration === cleanupGeneration) {
+          globalLiveConversationService.stop();
+        }
+      });
     };
   }, []);
 
