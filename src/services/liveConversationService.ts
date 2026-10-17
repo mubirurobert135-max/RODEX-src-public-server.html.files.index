@@ -681,7 +681,9 @@ export class LiveConversationService {
     }
 
     this.micSource = this.inputAudioCtx.createMediaStreamSource(this.mediaStream);
-    this.audioProcessor = this.inputAudioCtx.createScriptProcessor(4096, 1, 1);
+    // 512 samples at 16 kHz is a 32 ms audio frame, reducing buffering delay.
+    // The previous 4096-sample frame buffered about 256 ms before each send.
+    this.audioProcessor = this.inputAudioCtx.createScriptProcessor(512, 1, 1);
 
     this.addTrace('PCM AUDIO STREAM STARTED (16kHz 16-bit Little-Endian)');
 
