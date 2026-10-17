@@ -4,6 +4,7 @@ import { globalRealTimeEngine } from '../server/services/realTimeEngine';
 import { IntentClassifier } from '../server/orchestrator/intentClassifier';
 import { globalPerformanceTracker } from '../server/services/performanceTracker';
 import { isLiveActionIntentSupported, buildLiveClockAnswer } from '../server/services/liveGeminiService';
+import { globalLiveConversationService } from '../src/services/liveConversationService';
 
 dotenv.config();
 
@@ -69,6 +70,20 @@ async function runRealTimeEngineTest() {
   assert(
     invalidZoneClock.timeZone === 'Africa/Kampala' && invalidZoneClock.timeOnly === '10:32 AM',
     'Maps Uganda to the valid Africa/Kampala timezone'
+  );
+
+  const liveServiceForTest = globalLiveConversationService as any;
+  const directBrowserClock = liveServiceForTest.buildDirectTimeAnswer(
+    'Hello RODEX, what time is it in Uganda right now?'
+  );
+  assert(
+    typeof directBrowserClock === 'string' &&
+      /^The time in Uganda is \\d{1,2}:\\d{2} (AM|PM)\\.$/.test(directBrowserClock),
+    'Uses a deterministic browser-clock response for spoken Uganda time questions'
+  );
+  assert(
+    liveServiceForTest.buildDirectTimeAnswer('Tell me about the history of Uganda') === null,
+    'Does not intercept ordinary questions that are not asking for current time'
   );
 
   const politeYouTube = IntentClassifier.classify('Open YouTube for me');
