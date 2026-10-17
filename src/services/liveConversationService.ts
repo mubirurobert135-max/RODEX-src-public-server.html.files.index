@@ -323,6 +323,34 @@ export class LiveConversationService {
     this.diag.audioContextState = ctx.state;
   }
 
+  /** Call synchronously from a real user gesture to unlock both audio contexts. */
+  public async unlockVoiceAudio(): Promise<void> {
+    try {
+      const { ctx: outputCtx } = this.getOrCreateOutputAudioGraph();
+      const inputCtx = this.inputAudioCtx;
+      this.addTrace(`USER GESTURE AUDIO UNLOCK: input=${inputCtx?.state || 'not-created'}, output=${outputCtx.state}`);
+
+      const resumeTasks: Promise<void>[] = [];
+      if (outputCtx.state !== 'running') {
+        resumeTasks.push(outputCtx.resume().catch(() => {}));
+      }
+      if (inputCtx && inputCtx.state !== 'running') {
+        resumeTasks.push(inputCtx.resume().catch(() => {}));
+      }
+      await Promise.all(resumeTasks);
+
+      this.diag.audioContextState = outputCtx.state;
+      this.addTrace(`USER GESTURE AUDIO UNLOCK RESULT: input=${this.inputAudioCtx?.state || 'not-created'}, output=${outputCtx.state}`);
+      if (this.inputAudioCtx?.state === 'running') {
+        this.addTrace('INPUT AUDIO PROCESSING READY');
+      } else if (this.inputAudioCtx) {
+        this.addTrace('INPUT AUDIO CONTEXT STILL SUSPENDED; LIVE PCM MAY WAIT FOR ANOTHER USER GESTURE');
+      }
+    } catch (err: any) {
+      this.addTrace(`USER GESTURE AUDIO UNLOCK FAILED: ${err?.message || err}`);
+    }
+  }
+
   public setCallbacks(callbacks: LiveServiceCallbacks) {
     this.callbacks = { ...this.callbacks, ...callbacks };
   }
@@ -461,18 +489,27 @@ export class LiveConversationService {
       // StrictMode runs effect setup/cleanup/setup in development; without this
       // guard, two pending getUserMedia() calls can overwrite the same singleton.
       pendingInputAudioCtx = new AudioCtx({ sampleRate: 16000 });
+      this.addTrace(`INPUT AUDIO CONTEXT INITIAL STATE: ${pendingInputAudioCtx.state}`);
       if (pendingInputAudioCtx.state === 'suspended') {
-        await pendingInputAudioCtx.resume().catch(() => {});
+        // Do not await this in the automatic mount path: Chromium may keep resume()
+        // pending until a real user gesture, which would prevent mic permission and
+        // the local wake recognizer from ever starting.
+        void pendingInputAudioCtx.resume()
+          .then(() => this.addTrace(`INPUT AUDIO CONTEXT RESUME RESULT: ${pendingInputAudioCtx?.state || 'released'}`))
+          .catch((err) => this.addTrace(`INPUT AUDIO CONTEXT RESUME DEFERRED: ${err?.message || err}`));
       }
       if (!isCurrentStart()) {
         releasePendingResources();
         return;
       }
 
-      // Try unlocking output AudioContext as early as browser permits.
+      // Prepare output audio without blocking startup on browser autoplay policy.
       this.getOrCreateOutputAudioGraph();
       if (this.outputAudioCtx && this.outputAudioCtx.state === 'suspended') {
-        await this.outputAudioCtx.resume().catch(() => {});
+        const outputCtx = this.outputAudioCtx;
+        void outputCtx.resume()
+          .then(() => this.addTrace(`OUTPUT AUDIO CONTEXT RESUME RESULT: ${outputCtx.state}`))
+          .catch((err) => this.addTrace(`OUTPUT AUDIO CONTEXT RESUME DEFERRED: ${err?.message || err}`));
       }
 
       this.addTrace('MIC PERMISSION REQUESTED');
