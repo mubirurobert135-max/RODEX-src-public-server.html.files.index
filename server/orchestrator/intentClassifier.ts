@@ -33,7 +33,9 @@ export class IntentClassifier {
       };
     }
 
-    const rawText = userInput.trim();
+    // A speech recognizer may include the wake phrase in the same transcript as the command.
+    // Strip it once so every downstream intent rule sees the actual request.
+    const rawText = userInput.trim().replace(/^(?:hey|hello|hi)\s+rodex(?:[\s,!:.-]+|$)/i, '');
     const resolution = ContextMemoryManager.resolveContext(
       rawText,
       history,
@@ -572,11 +574,11 @@ export class IntentClassifier {
     // Directly open common destinations. Accept natural polite endings without
     // accidentally routing unrecognised platforms to YouTube.
     if (
-      /^(rodex,?\s*)?(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?(open|launch|go to|visit|navigate to)\s+(?:the\s+)?(youtube|google|gmail|spotify|github|twitter|x\.com|wikipedia|reddit|claude|gemini|openai|chatgpt|instagram|facebook|tiktok|amazon|netflix|whatsapp|linkedin|discord)(\s+(website|app))?(\s+(for me|please|now))?[.!?]*$/i.test(
+      /^(rodex,?\s*)?(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?(open|launch|go to|visit|navigate to|browse to|take me to|pull up)\s+(?:the\s+)?(youtube|google|gmail|spotify|github|twitter|x\.com|wikipedia|reddit|claude|gemini|openai|chatgpt|instagram|facebook|tiktok|amazon|netflix|whatsapp|linkedin|discord)(\s+(website|site|app))?(\s+(for me|please|now))?[.!?]*$/i.test(
         rawLower
       )
     ) {
-      const match = rawLower.match(/(?:open|launch|go to|visit|navigate to)\s+(?:the\s+)?([a-z0-9.]+)/i);
+      const match = rawLower.match(/(?:open|launch|go to|visit|navigate to|browse to|take me to|pull up)\s+(?:the\s+)?([a-z0-9.]+)/i);
       const target = match ? match[1].toLowerCase() : 'youtube';
       const destinations: Record<string, { url: string; label: string }> = {
         youtube: { url: 'https://www.youtube.com', label: 'YouTube' },
