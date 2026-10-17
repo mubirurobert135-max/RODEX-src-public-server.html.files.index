@@ -53,6 +53,23 @@ async function runActionEngineSelfTest() {
     'Blocks high-risk action when client does not hold elevated permission'
   );
 
+  // TEST 2B: Live client clock is authoritative for date/time responses
+  console.log('\n2B. Testing Live Client Clock Accuracy...');
+  const clientClockIso = '2026-10-17T07:32:00.000Z'; // 10:32 AM in Africa/Kampala (UTC+3)
+  const resultTime = await globalActionEngine.executeAction(
+    'datetime_timezone',
+    { targetTimeZone: 'Africa/Kampala' },
+    { clientFormattedTime: clientClockIso, timeZone: 'Africa/Kampala' }
+  );
+  assert(
+    resultTime.success === true && resultTime.output?.iso === clientClockIso,
+    'Uses the fresh client timestamp instead of a potentially skewed server clock'
+  );
+  assert(
+    resultTime.message?.includes('10:32 AM'),
+    'Speaks time to the minute without confusing seconds'
+  );
+
   // TEST 3: Action Execution & State Verification Strategy
   console.log('\n3. Testing Execution & State Verification Strategy...');
   const resultLaunch = await globalActionEngine.executeAction(
