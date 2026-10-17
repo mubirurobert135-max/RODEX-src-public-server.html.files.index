@@ -37,6 +37,18 @@ async function runRealTimeEngineTest() {
 
   const politeYouTube = IntentClassifier.classify('Open YouTube for me');
   assert(politeYouTube.primaryIntent === 'open_url', 'Accepts natural polite website commands');
+  const conversationalYouTube = IntentClassifier.classify('Could you please open YouTube for me?');
+  assert(
+    conversationalYouTube.primaryIntent === 'open_url' &&
+      conversationalYouTube.extractedEntities.targetUrl === 'https://www.youtube.com',
+    'Recognizes conversational voice requests to open websites'
+  );
+  const conversationalDomain = IntentClassifier.classify('Can you open example.com?');
+  assert(
+    conversationalDomain.primaryIntent === 'open_url' &&
+      conversationalDomain.extractedEntities.targetUrl === 'https://example.com/',
+    'Recognizes conversational requests for arbitrary domains'
+  );
   const arbitraryWebsite = IntentClassifier.classify('RODEX, open example.com');
   assert(
     arbitraryWebsite.primaryIntent === 'open_url' &&
