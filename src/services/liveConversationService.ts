@@ -144,6 +144,8 @@ export class LiveConversationService {
   // Singleton initialization guards & Session Resumption
   private initializationInProgress = false;
   private engineStarted = false;
+  // Invalidates pending startup work when React StrictMode or a real unmount calls stop().
+  private startupGeneration = 0;
   private wakeRecognizer: any = null;
   private sessionResumptionHandle: string | null = null;
   private reconnectAttempts = 0;
@@ -423,6 +425,23 @@ export class LiveConversationService {
     }
 
     this.initializationInProgress = true;
+    const startupGeneration = ++this.startupGeneration;
+    let pendingInputAudioCtx: AudioContext | null = null;
+    let pendingMediaStream: MediaStream | null = null;
+    const isCurrentStart = () => this.startupGeneration === startupGeneration;
+    const releasePendingResources = () => {
+      if (pendingMediaStream) {
+        pendingMediaStream.getTracks().forEach((track) => track.stop());
+        pendingMediaStream = null;
+      }
+      if (pendingInputAudioCtx) {
+        if (pendingInputAudioCtx.state !== 'closed') {
+          void pendingInputAudioCtx.close().catch(() => {});
+        }
+        pendingInputAudioCtx = null;
+      }
+    };
+
     this.diag.lastAction = 'VOICE ENGINE STARTED';
     this.diag.lastErrorMessage = null;
     this.addTrace('ORB READY');
@@ -438,19 +457,26 @@ export class LiveConversationService {
         throw new Error('Web Audio API is not supported in this browser.');
       }
 
-      this.inputAudioCtx = new AudioCtx({ sampleRate: 16000 });
-      if (this.inputAudioCtx.state === 'suspended') {
-        await this.inputAudioCtx.resume().catch(() => {});
+      // Keep startup resources local until this attempt is still current. React
+      // StrictMode runs effect setup/cleanup/setup in development; without this
+      // guard, two pending getUserMedia() calls can overwrite the same singleton.
+      pendingInputAudioCtx = new AudioCtx({ sampleRate: 16000 });
+      if (pendingInputAudioCtx.state === 'suspended') {
+        await pendingInputAudioCtx.resume().catch(() => {});
+      }
+      if (!isCurrentStart()) {
+        releasePendingResources();
+        return;
       }
 
-      // Try unlocking output AudioContext as early as browser permits
+      // Try unlocking output AudioContext as early as browser permits.
       this.getOrCreateOutputAudioGraph();
       if (this.outputAudioCtx && this.outputAudioCtx.state === 'suspended') {
         await this.outputAudioCtx.resume().catch(() => {});
       }
 
-      // 1. Single exclusive microphone stream
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+      this.addTrace('MIC PERMISSION REQUESTED');
+      pendingMediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: 16000,
@@ -460,6 +486,19 @@ export class LiveConversationService {
         },
       });
 
+      // A stop/unmount may happen while the browser permission request is pending.
+      // Never let an obsolete startup attach its stream to the current engine.
+      if (!isCurrentStart()) {
+        this.addTrace('STALE STARTUP CANCELLED AFTER MIC PERMISSION');
+        releasePendingResources();
+        return;
+      }
+
+      this.inputAudioCtx = pendingInputAudioCtx;
+      pendingInputAudioCtx = null;
+      this.mediaStream = pendingMediaStream;
+      pendingMediaStream = null;
+
       this.isMicLive = true;
       this.engineStarted = true;
       this.initializationInProgress = false;
@@ -468,9 +507,13 @@ export class LiveConversationService {
       this.diag.micStreamId = audioTrack ? audioTrack.id.substring(0, 8) : 'mic-active';
       this.addTrace(`[RODEX AUDIO] SINGLE_STREAM_ACTIVE (Track ID: ${this.diag.micStreamId})`);
 
-      // 2. Establish Live connection
+      // Establish the Live connection only after this startup owns the microphone.
       this.diag.liveConnection = 'RUNNING';
       await this.connectWebSocketOnly();
+      if (!isCurrentStart()) {
+        this.addTrace('STALE STARTUP CANCELLED AFTER LIVE CONNECTION');
+        return;
+      }
 
       this.diag.voiceSessionId = `sess-${Date.now().toString(36)}`;
       this.diag.liveConnection = 'PASS';
@@ -481,17 +524,25 @@ export class LiveConversationService {
       console.info('[RODEX GATE] WAKE_LISTENING_ACTIVE');
       this.addTrace('[RODEX GATE] WAKE_LISTENING_ACTIVE');
 
-      // 3. Start local wake word recognizer for WAKE_LISTENING mode
+      // Start local wake recognizer; live-session transcription remains a fallback.
       this.startWakeRecognizer();
     } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      releasePendingResources();
+
+      // A failed obsolete attempt must not overwrite the state of a newer startup.
+      if (!isCurrentStart()) return;
+
       this.initializationInProgress = false;
       this.engineStarted = false;
-      const errMsg = err?.message || String(err);
-      this.addTrace(`MIC ERROR: ${errMsg}`);
+      // A connection failure must release the mic/audio graph as well, otherwise
+      // a later retry can inherit a live-but-unusable stream.
+      this.stop();
       this.diag.lastErrorMessage = `MIC ERROR: ${errMsg}`;
       this.diag.voiceEngine = 'MIC_ERROR';
       this.diag.orbVoiceState = 'ERROR';
       this.diag.liveConnection = 'FAIL';
+      this.addTrace(`MIC ERROR: ${errMsg}`);
       this.setStatus('error');
       this.callbacks.onError?.(errMsg);
     }
@@ -959,11 +1010,16 @@ export class LiveConversationService {
   private startWakeRecognizer() {
     if (typeof window === 'undefined') return;
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRec) return;
+    if (!SpeechRec) {
+      this.addTrace('LOCAL WAKE RECOGNIZER UNSUPPORTED; LIVE TRANSCRIPTION FALLBACK ACTIVE');
+      console.warn('[RODEX WAKE RECOGNIZER] Web Speech Recognition is unavailable; live-session transcription will handle wake phrases.');
+      return;
+    }
 
     if (this.wakeRecognizer) {
-      try { this.wakeRecognizer.abort(); } catch (_) {}
+      const previousRecognizer = this.wakeRecognizer;
       this.wakeRecognizer = null;
+      try { previousRecognizer.abort(); } catch (_) {}
     }
 
     try {
@@ -972,7 +1028,14 @@ export class LiveConversationService {
       rec.interimResults = true;
       rec.lang = 'en-US';
 
+      rec.onstart = () => {
+        if (this.wakeRecognizer !== rec) return;
+        this.addTrace('LOCAL WAKE RECOGNIZER STARTED');
+      };
+
       rec.onresult = (e: any) => {
+        // Ignore callbacks from recognizers that have already been replaced or stopped.
+        if (this.wakeRecognizer !== rec || this.isConversationActive) return;
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const transcript = e.results[i][0].transcript;
           if (transcript && transcript.trim().length > 0) {
@@ -983,26 +1046,39 @@ export class LiveConversationService {
 
       rec.onerror = (e: any) => {
         if (e.error !== 'no-speech' && e.error !== 'aborted') {
-          console.warn('[RODEX WAKE RECOGNIZER] Non-fatal error:', e.error);
+          const detail = String(e.error || 'unknown error');
+          this.addTrace(`LOCAL WAKE RECOGNIZER ERROR: ${detail}`);
+          this.diag.lastErrorMessage = `Wake recognition: ${detail}`;
+          console.warn('[RODEX WAKE RECOGNIZER] Non-fatal error:', detail);
         }
       };
 
       rec.onend = () => {
+        if (this.wakeRecognizer !== rec) return;
         if (!this.isConversationActive && this.isMicLive) {
           setTimeout(() => {
-            if (!this.isConversationActive && this.isMicLive) {
-              try { rec.start(); } catch (_) {}
+            // Do not resurrect an old recognizer after a reset or wake-word match.
+            if (this.wakeRecognizer !== rec || this.isConversationActive || !this.isMicLive) return;
+            try {
+              rec.start();
+            } catch (err: any) {
+              const detail = err?.message || String(err);
+              this.addTrace(`LOCAL WAKE RESTART FAILED: ${detail}`);
+              console.warn('[RODEX WAKE RECOGNIZER] Restart attempt failed:', detail);
             }
           }, 350);
         }
       };
 
-      rec.start();
       this.wakeRecognizer = rec;
+      rec.start();
       console.info('[RODEX GATE] WAKE_LISTENING');
       this.addTrace('[RODEX GATE] WAKE_LISTENING');
-    } catch (err) {
-      console.warn('[RODEX WAKE RECOGNIZER] Failed initializing local wake recognizer:', err);
+    } catch (err: any) {
+      const detail = err?.message || String(err);
+      this.addTrace(`LOCAL WAKE RECOGNIZER START FAILED: ${detail}`);
+      this.diag.lastErrorMessage = `Wake recognition: ${detail}`;
+      console.warn('[RODEX WAKE RECOGNIZER] Failed initializing local wake recognizer:', detail);
     }
   }
 
@@ -1515,6 +1591,8 @@ export class LiveConversationService {
   }
 
   public stop() {
+    // Invalidate any startup awaiting microphone permission or WebSocket setup.
+    this.startupGeneration++;
     this.deterministicResponseRunId++;
     this.explicitShutdown = true;
     if (this.reconnectTimer) {
