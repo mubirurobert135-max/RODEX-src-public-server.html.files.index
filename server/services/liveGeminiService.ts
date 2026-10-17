@@ -1,11 +1,41 @@
 import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server as HttpServer } from "http";
+import { IntentClassifier } from "../orchestrator/intentClassifier";
+import { globalOrchestrator } from "../orchestrator/orchestrator";
 
 export interface LiveSessionOptions {
   getAI: () => GoogleGenAI;
   getSystemInstruction: (isLiveCall: boolean) => string;
 }
+
+/**
+ * Explicitly allow only low-risk actions in the unauthenticated live voice session.
+ * Private integrations and desktop process execution must go through their
+ * authenticated/permissioned app pathways, not this websocket.
+ */
+const LIVE_ACTION_INTENTS = new Set([
+  "open_url",
+  "calculate_compute",
+  "datetime_timezone",
+  "weather",
+]);
+
+const RODEX_LIVE_ACTION_TOOL = {
+  name: "execute_rodex_action",
+  description:
+    "Execute a low-risk RODEX task the user explicitly requested: open or visit a website, calculate a result, check the current date/time, or check the weather. Use this tool instead of claiming RODEX lacks execution ability. Do not use it for emails, private account data, contacts, messaging, purchases, destructive actions, or launching arbitrary desktop programs.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      request: {
+        type: "STRING",
+        description: "The user's requested action, preserving the destination or calculation exactly.",
+      },
+    },
+    required: ["request"],
+  },
+};
 
 export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessionOptions): WebSocketServer {
   const wss = new WebSocketServer({
@@ -96,7 +126,16 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
 
       console.log("[Gemini Live Server] Initializing upstream session with model gemini-3.8-live...");
       const ai = options.getAI();
-      const systemInstruction = options.getSystemInstruction(true);
+      const systemInstruction = `${options.getSystemInstruction(true)}
+
+LIVE ACTION EXECUTION CONTRACT:
+- You have the execute_rodex_action tool for explicitly requested website navigation, calculations, current date/time, and weather actions.
+- When the user asks you to open or visit a website, calculate something, check the date/time, or check the weather, call the tool and wait for its result before answering.
+- Never say RODEX is only designed to process information when an execution tool is available.
+- Never claim an action succeeded unless the tool result supports that claim. A browser navigation request is not proof a tab successfully opened; tell the user to use the on-screen Open button if popup protection blocks it.
+- Email, contacts, messages, private account data, purchases, destructive actions, and arbitrary desktop program launching are not enabled through this unauthenticated live session. Do not claim to have executed these tasks; explain the required integration or permission clearly.
+- For general current-information questions, use Google Search when useful. Do not pretend to have searched if no results were returned.
+`;
 
       session = await ai.live.connect({
         model: "gemini-3.8-live",
@@ -108,6 +147,10 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
             },
           },
           systemInstruction,
+          tools: [
+            { googleSearch: {} },
+            { functionDeclarations: [RODEX_LIVE_ACTION_TOOL] },
+          ],
           outputAudioTranscription: {},
           inputAudioTranscription: {},
         },
@@ -201,13 +244,135 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
             }
 
             // 5. Tool Call or Grounding Metadata
+            // Live API tool calls are not automatic: execute the allowlisted RODEX
+            // action and return a FunctionResponse to the same live session.
             if (message.toolCall) {
-              clientWs.send(
-                JSON.stringify({
-                  type: "tool_call",
-                  toolCall: message.toolCall,
-                })
-              );
+              void (async () => {
+                const functionCalls = Array.isArray((message.toolCall as any).functionCalls)
+                  ? (message.toolCall as any).functionCalls
+                  : [];
+                if (functionCalls.length === 0) {
+                  clientWs.send(JSON.stringify({
+                    type: "tool_error",
+                    message: "Live API returned a tool call without function calls.",
+                  }));
+                  return;
+                }
+
+                const functionResponses: Array<{
+                  id?: string;
+                  name?: string;
+                  response: Record<string, unknown>;
+                }> = [];
+
+                for (const functionCall of functionCalls) {
+                  const request = typeof functionCall.args?.request === "string"
+                    ? functionCall.args.request.trim()
+                    : "";
+                  if (functionCall.name !== "execute_rodex_action" || !request) {
+                    functionResponses.push({
+                      id: functionCall.id,
+                      name: functionCall.name,
+                      response: {
+                        success: false,
+                        actionStatus: "not_executed",
+                        reply: "The requested tool call was invalid. No action was executed.",
+                      },
+                    });
+                    continue;
+                  }
+
+                  try {
+                    const intent = IntentClassifier.classify(request, []);
+                    if (!LIVE_ACTION_INTENTS.has(intent.primaryIntent)) {
+                      functionResponses.push({
+                        id: functionCall.id,
+                        name: functionCall.name,
+                        response: {
+                          success: false,
+                          actionStatus: "not_enabled",
+                          reply: "I have not executed that task. The current live voice action bridge supports website navigation, calculations, date/time, and weather. Email, contacts, messaging, private account access, purchases, destructive actions, and desktop program launching require their authenticated or permissioned integration.",
+                        },
+                      });
+                      continue;
+                    }
+
+                    const result = await globalOrchestrator.orchestrate({
+                      userInput: request,
+                      history: [],
+                      isLiveCall: true,
+                      userId: "live_public_action",
+                      userDisplayName: "RODEX user",
+                      hasElevatedPermission: false,
+                    });
+
+                    let responseReply = result.reply || "The action returned no response.";
+                    let responseStatus = result.actionStatus || "failed";
+                    if (result.openUrl) {
+                      const label = intent.extractedEntities.label ||
+                        result.sources?.[0]?.title ||
+                        new URL(result.openUrl).hostname;
+                      const destinationType = result.openUrl.includes("youtube")
+                        ? "youtube"
+                        : result.openUrl.includes("google")
+                        ? "google"
+                        : "website";
+
+                      if (clientWs.readyState === WebSocket.OPEN) {
+                        clientWs.send(JSON.stringify({
+                          type: "browser_action",
+                          action: {
+                            url: result.openUrl,
+                            label,
+                            destinationType,
+                            status: "requested",
+                          },
+                        }));
+                      }
+                      responseStatus = "requested";
+                      responseReply = `I have requested the browser to open ${label}. If the browser blocks the tab, use the on-screen Open button. The tab opening itself may still need verification.`;
+                    }
+
+                    functionResponses.push({
+                      id: functionCall.id,
+                      name: functionCall.name,
+                      response: {
+                        success: responseStatus === "completed" || responseStatus === "requested",
+                        actionStatus: responseStatus,
+                        reply: responseReply,
+                        sources: result.sources || [],
+                        searchQueries: result.searchQueries || [],
+                        pendingConfirmation: result.pendingConfirmation || null,
+                      },
+                    });
+                  } catch (err: any) {
+                    console.error("[Gemini Live Action Tool Error]", err?.message || err);
+                    functionResponses.push({
+                      id: functionCall.id,
+                      name: functionCall.name,
+                      response: {
+                        success: false,
+                        actionStatus: "failed",
+                        reply: `I could not complete that action: ${err?.message || "an execution error occurred"}. No successful result was verified.`,
+                      },
+                    });
+                  }
+                }
+
+                try {
+                  if (session && !isClosed) {
+                    session.sendToolResponse({ functionResponses });
+                  }
+                } catch (err: any) {
+                  console.error("[Gemini Live Tool Response Error]", err?.message || err);
+                  if (clientWs.readyState === WebSocket.OPEN) {
+                    clientWs.send(JSON.stringify({
+                      type: "tool_error",
+                      message: "RODEX could not return the action result to the live session.",
+                    }));
+                  }
+                }
+              })();
             }
 
             if (message.serverContent?.groundingMetadata) {
