@@ -29,7 +29,7 @@ const RODEX_LIVE_ACTION_TOOL = {
   description:
     "Execute a low-risk RODEX task the user explicitly requested: open or visit a website, calculate a result, or check the current date/time. Use this tool instead of claiming RODEX lacks execution ability. Use Google Search for current web information or weather. Do not use it for emails, private account data, contacts, messaging, purchases, destructive actions, or launching arbitrary desktop programs.",
   parameters: {
-    type: "OBJECT",
+    type: Type.OBJECT,
     properties: {
       request: {
         type: Type.STRING,
@@ -294,7 +294,7 @@ LIVE ACTION EXECUTION CONTRACT:
                         response: {
                           success: false,
                           actionStatus: "not_enabled",
-                          reply: "I have not executed that task. The current live voice action bridge supports website navigation, calculations, date/time, and weather. Email, contacts, messaging, private account access, purchases, destructive actions, and desktop program launching require their authenticated or permissioned integration.",
+                          reply: "I have not executed that task. The current live voice action bridge supports website navigation, calculations, and date/time. Current weather must come from a real Google Search result, not a guessed forecast. Email, contacts, messaging, private account access, purchases, destructive actions, and desktop program launching require their authenticated or permissioned integration.",
                         },
                       });
                       continue;
