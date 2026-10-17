@@ -65,6 +65,10 @@ export interface DetailedAudioDiagnostics {
   lastRecognizedTranscript: string;
   wakeRecognizerState: string;
   upstreamConnected: boolean;
+  inputAudioContextState: string;
+  micInputLevel: number;
+  audioChunksSent: number;
+  micTrackState: string;
   lastCommand: string;
   wakeMatch: boolean;
   voiceSessionId: string;
@@ -223,6 +227,10 @@ export class LiveConversationService {
     lastRecognizedTranscript: 'NONE',
     wakeRecognizerState: 'UNINITIALIZED',
     upstreamConnected: false,
+    inputAudioContextState: 'uninitialized',
+    micInputLevel: 0,
+    audioChunksSent: 0,
+    micTrackState: 'uninitialized',
     lastCommand: 'NONE',
     wakeMatch: false,
     voiceSessionId: 'NONE',
@@ -392,6 +400,14 @@ export class LiveConversationService {
   }
 
   public getDiagnosticState(): DetailedAudioDiagnostics {
+    this.diag.inputAudioContextState =
+      this.inputAudioCtx?.state || this.pendingStartupAudioCtx?.state || 'uninitialized';
+    this.diag.micInputLevel = this.currentInputLevel;
+    this.diag.audioChunksSent = this.audioChunksSent;
+    const micTrack = this.mediaStream?.getAudioTracks()[0];
+    this.diag.micTrackState = micTrack
+      ? `${micTrack.readyState.toUpperCase()}${micTrack.muted ? ' / MUTED' : ''}`
+      : 'unavailable';
     if (typeof document !== 'undefined') {
       this.diag.visibilityState = document.visibilityState;
       this.diag.documentHasFocus = document.hasFocus();
@@ -726,6 +742,8 @@ export class LiveConversationService {
         };
 
         this.ws.onclose = (event) => {
+          this.diag.upstreamConnected = false;
+          if (!this.explicitShutdown) this.diag.liveConnection = 'FAIL';
           this.addTrace(`LIVE WS CLOSED (code: ${event.code}, reason: ${event.reason})`);
           this.addEventTimeline('SESSION_DISCONNECTED', `WebSocket closed with code ${event.code}`);
 
@@ -1114,7 +1132,7 @@ export class LiveConversationService {
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const transcript = e.results[i][0].transcript;
           if (transcript && transcript.trim().length > 0) {
-            this.diag.lastRecognizedTranscript = transcript.trim();
+                  this.diag.lastRecognizedTranscript = transcript.trim();
             this.addTrace(`LOCAL WAKE TRANSCRIPT: "${transcript.trim().substring(0, 100)}"`);
             this.handleInputTranscript(transcript, 'wake_recognizer');
           }
@@ -1375,6 +1393,7 @@ export class LiveConversationService {
 
       this.diag.wakeMatch = true;
       this.diag.lastWakeTranscript = userText;
+      this.diag.wakeRecognizerState = 'WAKE DETECTED';
       this.diag.orbVoiceState = 'WAKE_DETECTED';
       this.setStatus('wake_detected');
       this.callbacks.onWakeDetected?.(userText);
@@ -1600,6 +1619,19 @@ export class LiveConversationService {
     await this.unlockOutputAudio();
     if (!this.isConnected()) {
       await this.connectWebSocketOnly();
+    }
+    const upstreamWaitStart = Date.now();
+    while (
+      !this.diag.upstreamConnected &&
+      this.isConnected() &&
+      Date.now() - upstreamWaitStart < 8000
+    ) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    }
+    if (!this.diag.upstreamConnected) {
+      this.diag.textRequest = 'FAIL';
+      this.addTrace('DIAGNOSTIC TEXT TEST BLOCKED: LIVE UPSTREAM SESSION IS NOT READY');
+      return;
     }
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.diagnosticTextTestActive = true;
