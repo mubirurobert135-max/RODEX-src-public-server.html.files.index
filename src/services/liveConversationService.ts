@@ -867,47 +867,11 @@ export class LiveConversationService {
         if (!this.isConversationActive || typeof data.text !== 'string' || !data.text.trim()) {
           return;
         }
-        if (this.followUpSilenceTimer) {
-          clearTimeout(this.followUpSilenceTimer);
-          this.followUpSilenceTimer = null;
+        if (this.deterministicResponseForTurn) {
+          this.addTrace('[RODEX TIME] Ignored duplicate server clock answer');
+          return;
         }
-        this.deterministicResponseForTurn = true;
-        this.deterministicResponseSpeechActive = true;
-        this.deterministicResponseTurnFinished = false;
-        this.turnPcmChunks = [];
-        this.stopAllPlayback();
-        rodexSynth.stop();
-        this.isGreetingPlaying = false;
-        this.isSpeaking = true;
-        this.diag.orbVoiceState = 'SPEAKING';
-        this.diag.voiceEngine = 'SPEAKING';
-        this.addTrace(
-          `DETERMINISTIC RESPONSE: "${data.text.substring(0, 80)}" (clock source: ${data.clockSource || 'unknown'})`
-        );
-        this.callbacks.onOutputTranscript?.(data.text);
-        this.setStatus('speaking');
-
-        rodexSynth.speak(data.text, {
-          rate: 1.05,
-          pitch: 1.0,
-          volume: 1.0,
-          onStart: () => {
-            this.diag.orbVoiceState = 'SPEAKING';
-            this.setStatus('speaking');
-          },
-          onEnd: () => {
-            this.deterministicResponseSpeechActive = false;
-            this.isSpeaking = false;
-            if (this.deterministicResponseTurnFinished) {
-              this.deterministicResponseForTurn = false;
-              this.deterministicResponseTurnFinished = false;
-              this.diag.orbVoiceState = 'LISTENING';
-              this.setStatus('listening');
-              this.startFollowUpSilenceTimer();
-              this.callbacks.onTurnComplete?.();
-            }
-          },
-        });
+        this.speakDeterministicResponse(data.text, data.clockSource || 'server_clock');
         break;
 
       case 'input_transcript':
@@ -1044,6 +1008,115 @@ export class LiveConversationService {
     }
   }
 
+  /** Return a browser-clock answer only for direct "current time" questions. */
+  private buildDirectTimeAnswer(userText: string): string | null {
+    const lower = userText
+      .toLowerCase()
+      .replace(/\\b(?:hey|hello|hi)\\s+rodex\\b/g, ' ')
+      .trim();
+    if (!/\\b(what time is it|what(?:'s| is) the time|current time|tell me the time|what time)\\b/i.test(lower)) {
+      return null;
+    }
+
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Kampala';
+    const aliases: Array<{ pattern: RegExp; zone: string }> = [
+      { pattern: /\\b(uganda|kampala|east africa|eastern africa|eat)\\b/i, zone: 'Africa/Kampala' },
+      { pattern: /\\b(kenya|nairobi)\\b/i, zone: 'Africa/Nairobi' },
+      { pattern: /\\b(rwanda|kigali)\\b/i, zone: 'Africa/Kigali' },
+      { pattern: /\\b(tanzania|dar es salaam)\\b/i, zone: 'Africa/Dar_es_Salaam' },
+      { pattern: /\\b(ethiopia|addis ababa)\\b/i, zone: 'Africa/Addis_Ababa' },
+      { pattern: /\\b(uk|united kingdom|london)\\b/i, zone: 'Europe/London' },
+      { pattern: /\\b(utc|gmt|greenwich)\\b/i, zone: 'UTC' },
+      { pattern: /\\b(india|delhi|mumbai)\\b/i, zone: 'Asia/Kolkata' },
+      { pattern: /\\b(japan|tokyo)\\b/i, zone: 'Asia/Tokyo' },
+      { pattern: /\\b(china|beijing|shanghai)\\b/i, zone: 'Asia/Shanghai' },
+      { pattern: /\\b(dubai|uae)\\b/i, zone: 'Asia/Dubai' },
+      { pattern: /\\b(new york|nyc)\\b/i, zone: 'America/New_York' },
+      { pattern: /\\b(los angeles)\\b/i, zone: 'America/Los_Angeles' },
+      { pattern: /\\b(chicago)\\b/i, zone: 'America/Chicago' },
+      { pattern: /\\b(toronto)\\b/i, zone: 'America/Toronto' },
+      { pattern: /\\b(sydney)\\b/i, zone: 'Australia/Sydney' },
+    ];
+
+    let timeZone = localZone;
+    for (const alias of aliases) {
+      if (alias.pattern.test(lower)) {
+        timeZone = alias.zone;
+        break;
+      }
+    }
+
+    // Also support explicit IANA names such as "Europe/Paris".
+    const ianaZone = lower.match(/\\b(?:in|for)\\s+([a-z]+_[a-z]+\\/[a-z0-9_+.-]+(?:\\/[a-z0-9_+.-]+)*)\\b/i)
+      || lower.match(/\\b(?:in|for)\\s+([a-z]+\\/[a-z0-9_+.-]+(?:\\/[a-z0-9_+.-]+)*)\\b/i);
+    if (ianaZone?.[1]) timeZone = ianaZone[1];
+
+    const now = new Date();
+    try {
+      const timeOnly = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(now);
+      const location = timeZone === 'Africa/Kampala'
+        ? 'Uganda'
+        : (timeZone.split('/').pop() || timeZone).replace(/_/g, ' ');
+      return `The time in ${location} is ${timeOnly}.`;
+    } catch {
+      const timeOnly = new Intl.DateTimeFormat('en-US', {
+        timeZone: localZone,
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(now);
+      return `The current local time is ${timeOnly}.`;
+    }
+  }
+
+  /** Speak an exact tool/browser result and suppress model paraphrasing for the turn. */
+  private speakDeterministicResponse(text: string, source: string): void {
+    if (!this.isConversationActive || this.deterministicResponseForTurn) return;
+    if (this.followUpSilenceTimer) {
+      clearTimeout(this.followUpSilenceTimer);
+      this.followUpSilenceTimer = null;
+    }
+
+    this.deterministicResponseForTurn = true;
+    this.deterministicResponseSpeechActive = true;
+    this.deterministicResponseTurnFinished = false;
+    this.turnPcmChunks = [];
+    this.stopAllPlayback();
+    rodexSynth.stop();
+    this.isGreetingPlaying = false;
+    this.isSpeaking = true;
+    this.diag.orbVoiceState = 'SPEAKING';
+    this.diag.voiceEngine = 'SPEAKING';
+    this.addTrace(`DETERMINISTIC RESPONSE: "${text.substring(0, 80)}" (clock source: ${source})`);
+    this.callbacks.onOutputTranscript?.(text);
+    this.setStatus('speaking');
+
+    rodexSynth.speak(text, {
+      rate: 1.05,
+      pitch: 1.0,
+      volume: 1.0,
+      onStart: () => {
+        this.diag.orbVoiceState = 'SPEAKING';
+        this.setStatus('speaking');
+      },
+      onEnd: () => {
+        this.deterministicResponseSpeechActive = false;
+        this.isSpeaking = false;
+        if (this.deterministicResponseTurnFinished) {
+          this.deterministicResponseForTurn = false;
+          this.deterministicResponseTurnFinished = false;
+          this.diag.orbVoiceState = 'LISTENING';
+          this.setStatus('listening');
+          this.startFollowUpSilenceTimer();
+          this.callbacks.onTurnComplete?.();
+        }
+      },
+    });
+  }
+
   /**
    * Process Real-Time Input Transcript with HARD Application-Level Wake Gate
    */
@@ -1055,6 +1128,20 @@ export class LiveConversationService {
 
     // 1. If an active conversational turn is already underway, capture user command directly
     if (this.isConversationActive) {
+      if (this.deterministicResponseForTurn && !this.deterministicResponseSpeechActive && !this.deterministicResponseTurnFinished) {
+        // Recover if the model failed to send turn_complete for a previous deterministic answer.
+        this.addTrace('[RODEX TIME] Cleared stale deterministic-response guard on new input');
+        this.deterministicResponseForTurn = false;
+      }
+      if (source === 'live_transcription') {
+        const directTimeAnswer = this.buildDirectTimeAnswer(userText);
+        if (directTimeAnswer) {
+          this.diag.lastCommand = userText;
+          this.addTrace('[RODEX TIME] BROWSER CLOCK FAST PATH');
+          this.speakDeterministicResponse(directTimeAnswer, 'browser_clock');
+          return;
+        }
+      }
       if (this.followUpSilenceTimer) {
         clearTimeout(this.followUpSilenceTimer);
         this.followUpSilenceTimer = null;
@@ -1111,6 +1198,12 @@ export class LiveConversationService {
         console.info('[RODEX GATE] COMMAND_ACCEPTED:', match.command);
         this.addTrace(`[RODEX GATE] COMMAND_ACCEPTED: "${match.command}"`);
         this.diag.lastCommand = match.command;
+        const directTimeAnswer = this.buildDirectTimeAnswer(match.command);
+        if (directTimeAnswer) {
+          this.addTrace('[RODEX TIME] BROWSER CLOCK FAST PATH');
+          this.speakDeterministicResponse(directTimeAnswer, 'browser_clock');
+          return;
+        }
         this.diag.orbVoiceState = 'THINKING';
         this.setStatus('thinking');
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
