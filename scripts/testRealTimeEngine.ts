@@ -4,7 +4,7 @@ import { globalRealTimeEngine } from '../server/services/realTimeEngine';
 import { IntentClassifier } from '../server/orchestrator/intentClassifier';
 import { globalPerformanceTracker } from '../server/services/performanceTracker';
 import { isLiveActionIntentSupported, buildLiveClockAnswer } from '../server/services/liveGeminiService';
-import { globalLiveConversationService } from '../src/services/liveConversationService';
+import { globalLiveConversationService, matchWakePhrase } from '../src/services/liveConversationService';
 
 dotenv.config();
 
@@ -112,6 +112,31 @@ async function runRealTimeEngineTest() {
       claude.extractedEntities.targetUrl === 'https://claude.ai',
     'Routes Claude to its own website rather than YouTube'
   );
+
+  // TEST 1B: The actual LiveConversationService wake gate must accept bare and compound calls.
+  console.log('1B. Testing the Live Orb Wake Gate...');
+  const bareHello = matchWakePhrase('hello');
+  assert(
+    bareHello.matched && bareHello.phrase === 'hello' && bareHello.command === '',
+    'A bare "hello" activates the live orb and requests the short greeting'
+  );
+  const helloRodex = matchWakePhrase('Hello RODEX');
+  assert(
+    helloRodex.matched && helloRodex.phrase === 'hello rodex' && helloRodex.command === '',
+    'Hello RODEX is recognized as a pure wake phrase'
+  );
+  const helloWithCommand = matchWakePhrase('Hello RODEX, open Wikipedia');
+  assert(
+    helloWithCommand.matched && helloWithCommand.command === 'open wikipedia',
+    'A wake phrase plus command preserves the command instead of only greeting'
+  );
+  const phoneticHello = matchWakePhrase('hello roadex');
+  assert(
+    phoneticHello.matched && phoneticHello.phrase === 'hello rodex',
+    'A common phonetic spelling is normalized by the live orb wake gate'
+  );
+  const backgroundSpeech = matchWakePhrase('please pass me the water');
+  assert(!backgroundSpeech.matched, 'Unrelated background speech does not wake the live orb');
 
   // TEST 2: Creator Inquiry Fast Path
   console.log('\n2. Testing Creator Inquiry Fast Path...');
