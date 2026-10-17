@@ -24,6 +24,72 @@ export function isLiveActionIntentSupported(intent: string): boolean {
   return LIVE_ACTION_INTENTS.has(intent);
 }
 
+export interface LiveClockAnswer {
+  text: string;
+  timeZone: string;
+  timeOnly: string;
+  iso: string;
+  clockSource: "client_clock" | "server_clock";
+}
+
+/** Build a deterministic clock answer without asking the model to restate the time. */
+export function buildLiveClockAnswer(
+  requestedTimeZone: unknown,
+  clientClockIso?: string,
+  clientTimeZone?: string
+): LiveClockAnswer {
+  const rawZone = typeof requestedTimeZone === "string" ? requestedTimeZone.trim() : "";
+  const aliases: Record<string, string> = {
+    uganda: "Africa/Kampala",
+    kampala: "Africa/Kampala",
+    eat: "Africa/Kampala",
+    "east africa": "Africa/Kampala",
+    "eastern africa": "Africa/Kampala",
+    uk: "Europe/London",
+    london: "Europe/London",
+    utc: "UTC",
+  };
+
+  let timeZone = aliases[rawZone.toLowerCase()] || rawZone || "Africa/Kampala";
+  const parsedClientTime = clientClockIso ? new Date(clientClockIso) : null;
+  const hasClientClock = Boolean(
+    parsedClientTime && Number.isFinite(parsedClientTime.getTime())
+  );
+  const now = hasClientClock ? parsedClientTime! : new Date();
+
+  const isValidTimeZone = (candidate: string): boolean => {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(now);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (!isValidTimeZone(timeZone)) {
+    timeZone = clientTimeZone && isValidTimeZone(clientTimeZone)
+      ? clientTimeZone
+      : "Africa/Kampala";
+  }
+
+  const timeOnly = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(now);
+  const location = timeZone === "Africa/Kampala"
+    ? "Uganda"
+    : (timeZone.split("/").pop() || timeZone).replace(/_/g, " ");
+
+  return {
+    text: `The time in ${location} is ${timeOnly}.`,
+    timeZone,
+    timeOnly,
+    iso: now.toISOString(),
+    clockSource: hasClientClock ? "client_clock" : "server_clock",
+  };
+}
+
 const RODEX_LIVE_ACTION_TOOL = {
   name: "execute_rodex_action",
   description:
@@ -51,6 +117,7 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
     let session: any = null;
     let isClosed = false;
     let clientClockIso: string | undefined;
+    let clientClockReceivedAt = 0;
     let clientTimeZone: string | undefined;
     const pendingClientMessages: any[] = [];
 
@@ -78,6 +145,9 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
         Number.isFinite(Date.parse(msg.clientTimeIso))
       ) {
         clientClockIso = msg.clientTimeIso;
+        // Track arrival age using the server's monotonic wall-clock progression,
+        // not by comparing client and server clock values (which may be skewed).
+        clientClockReceivedAt = Date.now();
       }
       if (
         typeof msg.clientTimeZone === "string" &&
@@ -320,6 +390,47 @@ LIVE ACTION EXECUTION CONTRACT:
                           success: false,
                           actionStatus: "not_enabled",
                           reply: "I have not executed that task. The current live voice action bridge supports website navigation, calculations, and date/time. Current weather must come from a real Google Search result, not a guessed forecast. Email, contacts, messaging, private account access, purchases, destructive actions, and desktop program launching require their authenticated or permissioned integration.",
+                        },
+                      });
+                      continue;
+                    }
+
+                    if (intent.primaryIntent === "datetime_timezone") {
+                      const clientClockIsFresh =
+                        Boolean(clientClockIso) &&
+                        clientClockReceivedAt > 0 &&
+                        Date.now() - clientClockReceivedAt < 30000;
+                      const clockAnswer = buildLiveClockAnswer(
+                        intent.extractedEntities?.targetTimeZone,
+                        clientClockIsFresh ? clientClockIso : undefined,
+                        clientTimeZone
+                      );
+
+                      console.info(
+                        `[RODEX LIVE CLOCK] source=${clockAnswer.clockSource} timeZone=${clockAnswer.timeZone} iso=${clockAnswer.iso} answer="${clockAnswer.text}"`
+                      );
+                      if (clientWs.readyState === WebSocket.OPEN) {
+                        clientWs.send(JSON.stringify({
+                          type: "deterministic_response",
+                          responseKind: "datetime_timezone",
+                          text: clockAnswer.text,
+                          timeZone: clockAnswer.timeZone,
+                          iso: clockAnswer.iso,
+                          clockSource: clockAnswer.clockSource,
+                        }));
+                      }
+
+                      functionResponses.push({
+                        id: functionCall.id,
+                        name: functionCall.name,
+                        response: {
+                          success: true,
+                          actionStatus: "completed",
+                          reply: clockAnswer.text,
+                          timeZone: clockAnswer.timeZone,
+                          exactTime: clockAnswer.timeOnly,
+                          timestamp: clockAnswer.iso,
+                          clockSource: clockAnswer.clockSource,
                         },
                       });
                       continue;
