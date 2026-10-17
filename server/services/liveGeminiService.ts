@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
+import { GoogleGenAI, Modality, LiveServerMessage, Type } from "@google/genai";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server as HttpServer } from "http";
 import { IntentClassifier } from "../orchestrator/intentClassifier";
@@ -18,18 +18,17 @@ const LIVE_ACTION_INTENTS = new Set([
   "open_url",
   "calculate_compute",
   "datetime_timezone",
-  "weather",
 ]);
 
 const RODEX_LIVE_ACTION_TOOL = {
   name: "execute_rodex_action",
   description:
-    "Execute a low-risk RODEX task the user explicitly requested: open or visit a website, calculate a result, check the current date/time, or check the weather. Use this tool instead of claiming RODEX lacks execution ability. Do not use it for emails, private account data, contacts, messaging, purchases, destructive actions, or launching arbitrary desktop programs.",
+    "Execute a low-risk RODEX task the user explicitly requested: open or visit a website, calculate a result, or check the current date/time. Use this tool instead of claiming RODEX lacks execution ability. Use Google Search for current web information or weather. Do not use it for emails, private account data, contacts, messaging, purchases, destructive actions, or launching arbitrary desktop programs.",
   parameters: {
     type: "OBJECT",
     properties: {
       request: {
-        type: "STRING",
+        type: Type.STRING,
         description: "The user's requested action, preserving the destination or calculation exactly.",
       },
     },
