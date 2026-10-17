@@ -34,6 +34,22 @@ async function runRealTimeEngineTest() {
 
   assert(intentUrl.primaryIntent === 'open_url', 'Identifies open_url intent');
   assert(intentUrl.extractedEntities.targetUrl === 'https://www.youtube.com', 'Constructs target YouTube URL');
+
+  const wikipedia = IntentClassifier.classify('Open Wikipedia');
+  assert(
+    wikipedia.primaryIntent === 'open_url' && wikipedia.extractedEntities.targetUrl === 'https://en.wikipedia.org',
+    'Constructs the correct Wikipedia destination'
+  );
+  const wakePrefixedWikipedia = IntentClassifier.classify('Hello RODEX, open Wikipedia');
+  assert(
+    wakePrefixedWikipedia.primaryIntent === 'open_url' && wakePrefixedWikipedia.extractedEntities.targetUrl === 'https://en.wikipedia.org',
+    'Recognizes a website command that includes the spoken wake phrase'
+  );
+  const takeMeToWikipedia = IntentClassifier.classify('Take me to Wikipedia');
+  assert(
+    takeMeToWikipedia.primaryIntent === 'open_url' && takeMeToWikipedia.extractedEntities.targetUrl === 'https://en.wikipedia.org',
+    'Recognizes natural navigation phrasing for Wikipedia'
+  );
   assert(elapsed1 < 30, `Fast intent routing executed in ${elapsed1}ms (< 30ms threshold)`);
 
   assert(isLiveActionIntentSupported('open_url'), 'Live voice can route website-opening actions');
