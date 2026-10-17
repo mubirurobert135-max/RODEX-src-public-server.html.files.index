@@ -2252,13 +2252,28 @@ export default function App() {
                     triggerHaptic('tap');
                     // This click is a fresh user gesture, so it is the reliable
                     // fallback when automatic voice-triggered popups are blocked.
-                    const openedWindow = window.open(browserActionToast.url, '_blank');
+                    const requestedUrl = browserActionToast.url;
+                    const openedWindow = window.open(requestedUrl, '_blank');
                     if (openedWindow) {
                       try {
                         openedWindow.opener = null;
                       } catch {
                         // Respect browser policies that disallow opener mutation.
                       }
+                      setBrowserActionToast((prev) =>
+                        prev?.url === requestedUrl
+                          ? { ...prev, status: 'opened', timestamp: Date.now() }
+                          : prev
+                      );
+                      setTimeout(() => {
+                        setBrowserActionToast((prev) => (prev?.url === requestedUrl ? null : prev));
+                      }, 8000);
+                    } else {
+                      setBrowserActionToast((prev) =>
+                        prev?.url === requestedUrl
+                          ? { ...prev, status: 'blocked', timestamp: Date.now() }
+                          : prev
+                      );
                     }
                   }}
                   className="px-3 py-1.5 rounded-xl bg-white text-black hover:bg-neutral-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
