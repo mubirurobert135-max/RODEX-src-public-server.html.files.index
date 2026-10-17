@@ -139,6 +139,7 @@ LIVE ACTION EXECUTION CONTRACT:
 - Never claim an action succeeded unless the tool result supports that claim. A browser navigation request is not proof a tab successfully opened; tell the user to use the on-screen Open button if popup protection blocks it.
 - Email, contacts, messages, private account data, purchases, destructive actions, and arbitrary desktop program launching are not enabled through this unauthenticated live session. Do not claim to have executed these tasks; explain the required integration or permission clearly.
 - For general current-information questions, use Google Search when useful. Do not pretend to have searched if no results were returned.
+- For simple utility results such as the current time or arithmetic, answer in one short sentence with the result first; avoid filler and do not repeat the full question.
 `;
 
       session = await ai.live.connect({
@@ -151,6 +152,10 @@ LIVE ACTION EXECUTION CONTRACT:
             },
           },
           systemInstruction,
+          // Google recommends roughly 500–800 ms; 600 ms trims idle wait while preserving speech gaps.
+          realtimeInputConfig: {
+            automaticActivityDetection: { silenceDurationMs: 600 },
+          },
           tools: [
             { googleSearch: {} },
             { functionDeclarations: [RODEX_LIVE_ACTION_TOOL] },
