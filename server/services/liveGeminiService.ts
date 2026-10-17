@@ -74,7 +74,7 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
       // latest validated timestamp for deterministic date/time tool execution.
       if (
         typeof msg.clientTimeIso === "string" &&
-        /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$/.test(msg.clientTimeIso) &&
+        /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:[.][0-9]{1,3})?Z$/.test(msg.clientTimeIso) &&
         Number.isFinite(Date.parse(msg.clientTimeIso))
       ) {
         clientClockIso = msg.clientTimeIso;
@@ -82,7 +82,7 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
       if (
         typeof msg.clientTimeZone === "string" &&
         msg.clientTimeZone.length <= 64 &&
-        /^[A-Za-z_+-]+(?:\\/[A-Za-z0-9_+.-]+)*$/.test(msg.clientTimeZone)
+        /^[A-Za-z_+-]+(?:[/][A-Za-z0-9_+.-]+)*$/.test(msg.clientTimeZone)
       ) {
         clientTimeZone = msg.clientTimeZone;
       }
