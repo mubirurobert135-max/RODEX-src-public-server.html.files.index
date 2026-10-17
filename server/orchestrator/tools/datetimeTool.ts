@@ -19,7 +19,16 @@ export const datetimeTool: ToolDefinition = {
   },
   handler: async (params, context) => {
     const timeZone = params.targetTimeZone || context?.timeZone || 'Africa/Kampala';
-    const now = new Date();
+    // Live voice supplies a fresh browser-clock ISO timestamp. Prefer it over the
+    // server clock so a host clock drift cannot make "what time is it?" stale.
+    const clientClockIso = typeof context?.clientFormattedTime === 'string'
+      ? context.clientFormattedTime.trim()
+      : '';
+    const isIsoTimestamp = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(clientClockIso);
+    const parsedClientClock = isIsoTimestamp ? new Date(clientClockIso) : null;
+    const now = parsedClientClock && Number.isFinite(parsedClientClock.getTime())
+      ? parsedClientClock
+      : new Date();
 
     try {
       const fullFormatter = new Intl.DateTimeFormat('en-US', {
@@ -27,9 +36,12 @@ export const datetimeTool: ToolDefinition = {
         dateStyle: 'full',
         timeStyle: 'long',
       });
+      // Spoken time is deliberately rounded to the minute; seconds caused
+      // confusing speech like "ten twenty-seven and forty-five".
       const timeFormatter = new Intl.DateTimeFormat('en-US', {
         timeZone,
-        timeStyle: 'medium',
+        hour: 'numeric',
+        minute: '2-digit',
       });
       const dateFormatter = new Intl.DateTimeFormat('en-US', {
         timeZone,
@@ -46,7 +58,8 @@ export const datetimeTool: ToolDefinition = {
         formatted,
         timeOnly,
         dateOnly,
-        year: 2026,
+        year: Number(new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric' }).format(now)),
+        clockSource: parsedClientClock && Number.isFinite(parsedClientClock.getTime()) ? 'client_clock' : 'server_clock',
         eatTime: new Intl.DateTimeFormat('en-US', {
           timeZone: 'Africa/Kampala',
           dateStyle: 'full',
@@ -58,7 +71,7 @@ export const datetimeTool: ToolDefinition = {
       return {
         success: true,
         output,
-        message: `Current time in ${timeZone}: ${formatted}`,
+        message: `The current time in ${timeZone} is ${timeOnly}.`,
       };
     } catch (err: any) {
       return {
