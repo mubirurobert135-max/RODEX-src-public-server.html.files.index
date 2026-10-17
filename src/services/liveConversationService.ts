@@ -161,6 +161,11 @@ export class LiveConversationService {
   private isSpeaking = false;
   private isGreetingPlaying = false;
   private isConversationActive = false;
+  // For deterministic utility replies (like the clock), the server's exact answer
+  // is spoken locally and any model-generated restatement is suppressed for that turn.
+  private deterministicResponseForTurn = false;
+  private deterministicResponseSpeechActive = false;
+  private deterministicResponseTurnFinished = false;
   private followUpSilenceTimer: NodeJS.Timeout | null = null;
   private status: LiveSessionStatus = 'disconnected';
   private callbacks: LiveServiceCallbacks = {};
@@ -812,6 +817,10 @@ export class LiveConversationService {
       }
 
       case 'audio':
+        if (this.deterministicResponseForTurn) {
+          // A deterministic response is already speaking the exact tool result.
+          return;
+        }
         if (!this.isConversationActive) {
           // Hard Wake Gate: Discard unsolicited response audio when no wake phrase has been confirmed
           return;
@@ -838,6 +847,10 @@ export class LiveConversationService {
         break;
 
       case 'output_transcript':
+        if (this.deterministicResponseForTurn) {
+          // Do not overwrite the exact time with a model paraphrase.
+          return;
+        }
         if (!this.isConversationActive) {
           // Hard Wake Gate: Discard unsolicited output transcripts when no wake phrase has been confirmed
           return;
@@ -848,6 +861,53 @@ export class LiveConversationService {
           this.diag.voiceEngine = 'SPEAKING';
           this.callbacks.onOutputTranscript?.(data.text);
         }
+        break;
+
+      case 'deterministic_response':
+        if (!this.isConversationActive || typeof data.text !== 'string' || !data.text.trim()) {
+          return;
+        }
+        if (this.followUpSilenceTimer) {
+          clearTimeout(this.followUpSilenceTimer);
+          this.followUpSilenceTimer = null;
+        }
+        this.deterministicResponseForTurn = true;
+        this.deterministicResponseSpeechActive = true;
+        this.deterministicResponseTurnFinished = false;
+        this.turnPcmChunks = [];
+        this.stopAllPlayback();
+        rodexSynth.stop();
+        this.isGreetingPlaying = false;
+        this.isSpeaking = true;
+        this.diag.orbVoiceState = 'SPEAKING';
+        this.diag.voiceEngine = 'SPEAKING';
+        this.addTrace(
+          `DETERMINISTIC RESPONSE: "${data.text.substring(0, 80)}" (clock source: ${data.clockSource || 'unknown'})`
+        );
+        this.callbacks.onOutputTranscript?.(data.text);
+        this.setStatus('speaking');
+
+        rodexSynth.speak(data.text, {
+          rate: 1.05,
+          pitch: 1.0,
+          volume: 1.0,
+          onStart: () => {
+            this.diag.orbVoiceState = 'SPEAKING';
+            this.setStatus('speaking');
+          },
+          onEnd: () => {
+            this.deterministicResponseSpeechActive = false;
+            this.isSpeaking = false;
+            if (this.deterministicResponseTurnFinished) {
+              this.deterministicResponseForTurn = false;
+              this.deterministicResponseTurnFinished = false;
+              this.diag.orbVoiceState = 'LISTENING';
+              this.setStatus('listening');
+              this.startFollowUpSilenceTimer();
+              this.callbacks.onTurnComplete?.();
+            }
+          },
+        });
         break;
 
       case 'input_transcript':
@@ -871,6 +931,16 @@ export class LiveConversationService {
           this.addTrace('[RODEX GATE] UNSOLICITED_TURN_COMPLETE_IGNORED');
           this.turnPcmChunks = [];
           return;
+        }
+        if (this.deterministicResponseForTurn) {
+          this.addTrace('DETERMINISTIC RESPONSE TURN COMPLETE');
+          this.turnPcmChunks = [];
+          this.deterministicResponseTurnFinished = true;
+          // Keep speech/status active until the browser TTS finishes; if TTS
+          // already finished, finish the turn here instead.
+          if (this.deterministicResponseSpeechActive) return;
+          this.deterministicResponseForTurn = false;
+          this.deterministicResponseTurnFinished = false;
         }
         this.addTrace('OUTPUT COMPLETE');
         if (!this.mediaStream && this.turnPcmChunks.length > 0) {
