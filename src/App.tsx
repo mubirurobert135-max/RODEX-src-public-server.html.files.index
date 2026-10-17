@@ -1788,6 +1788,9 @@ export default function App() {
           ];
         });
       },
+      onBrowserAction: (action) => {
+        handleOpenUrlInBrowser(action.url, action.label, action.destinationType);
+      },
       onInterrupted: () => {
         playToneChime('bargein');
         setState('listening');
