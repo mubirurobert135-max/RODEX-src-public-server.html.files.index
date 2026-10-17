@@ -167,6 +167,7 @@ export class LiveConversationService {
   private deterministicResponseSpeechActive = false;
   private deterministicResponseTurnFinished = false;
   private deterministicResponseSource: string | null = null;
+  private deterministicResponseRunId = 0;
   private followUpSilenceTimer: NodeJS.Timeout | null = null;
   private status: LiveSessionStatus = 'disconnected';
   private callbacks: LiveServiceCallbacks = {};
@@ -910,6 +911,7 @@ export class LiveConversationService {
           if (this.deterministicResponseSpeechActive) return;
           this.deterministicResponseForTurn = false;
           this.deterministicResponseTurnFinished = false;
+          this.deterministicResponseSource = null;
         }
         this.addTrace('OUTPUT COMPLETE');
         if (!this.mediaStream && this.turnPcmChunks.length > 0) {
@@ -1080,6 +1082,7 @@ export class LiveConversationService {
   /** Speak an exact tool/browser result and suppress model paraphrasing for the turn. */
   private speakDeterministicResponse(text: string, source: string): void {
     if (!this.isConversationActive) return;
+    const responseRunId = ++this.deterministicResponseRunId;
     if (this.deterministicResponseForTurn) {
       // The browser clock is the most direct source for a spoken current-time
       // question, so let it replace a server/model clock result if it arrives later.
@@ -1122,6 +1125,8 @@ export class LiveConversationService {
         this.setStatus('speaking');
       },
       onEnd: () => {
+        // Cancellation of a replaced utterance must not change the new utterance's state.
+        if (responseRunId !== this.deterministicResponseRunId) return;
         this.deterministicResponseSpeechActive = false;
         this.isSpeaking = false;
         if (this.deterministicResponseTurnFinished) {
@@ -1510,6 +1515,7 @@ export class LiveConversationService {
   }
 
   public stop() {
+    this.deterministicResponseRunId++;
     this.explicitShutdown = true;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
