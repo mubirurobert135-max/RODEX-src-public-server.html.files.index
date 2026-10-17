@@ -20,6 +20,10 @@ const LIVE_ACTION_INTENTS = new Set([
   "datetime_timezone",
 ]);
 
+export function isLiveActionIntentSupported(intent: string): boolean {
+  return LIVE_ACTION_INTENTS.has(intent);
+}
+
 const RODEX_LIVE_ACTION_TOOL = {
   name: "execute_rodex_action",
   description:
@@ -283,7 +287,7 @@ LIVE ACTION EXECUTION CONTRACT:
 
                   try {
                     const intent = IntentClassifier.classify(request, []);
-                    if (!LIVE_ACTION_INTENTS.has(intent.primaryIntent)) {
+                    if (!isLiveActionIntentSupported(intent.primaryIntent)) {
                       functionResponses.push({
                         id: functionCall.id,
                         name: functionCall.name,
