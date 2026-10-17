@@ -1012,30 +1012,30 @@ export class LiveConversationService {
   private buildDirectTimeAnswer(userText: string): string | null {
     const lower = userText
       .toLowerCase()
-      .replace(/\\b(?:hey|hello|hi)\\s+rodex\\b/g, ' ')
+      .replace(/\b(?:hey|hello|hi)\s+rodex\b/g, ' ')
       .trim();
-    if (!/\\b(what time is it|what(?:'s| is) the time|current time|tell me the time|what time)\\b/i.test(lower)) {
+    if (!/\b(what time is it|what(?:'s| is) the time|current time|tell me the time|what time)\b/i.test(lower)) {
       return null;
     }
 
     const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Kampala';
     const aliases: Array<{ pattern: RegExp; zone: string }> = [
-      { pattern: /\\b(uganda|kampala|east africa|eastern africa|eat)\\b/i, zone: 'Africa/Kampala' },
-      { pattern: /\\b(kenya|nairobi)\\b/i, zone: 'Africa/Nairobi' },
-      { pattern: /\\b(rwanda|kigali)\\b/i, zone: 'Africa/Kigali' },
-      { pattern: /\\b(tanzania|dar es salaam)\\b/i, zone: 'Africa/Dar_es_Salaam' },
-      { pattern: /\\b(ethiopia|addis ababa)\\b/i, zone: 'Africa/Addis_Ababa' },
-      { pattern: /\\b(uk|united kingdom|london)\\b/i, zone: 'Europe/London' },
-      { pattern: /\\b(utc|gmt|greenwich)\\b/i, zone: 'UTC' },
-      { pattern: /\\b(india|delhi|mumbai)\\b/i, zone: 'Asia/Kolkata' },
-      { pattern: /\\b(japan|tokyo)\\b/i, zone: 'Asia/Tokyo' },
-      { pattern: /\\b(china|beijing|shanghai)\\b/i, zone: 'Asia/Shanghai' },
-      { pattern: /\\b(dubai|uae)\\b/i, zone: 'Asia/Dubai' },
-      { pattern: /\\b(new york|nyc)\\b/i, zone: 'America/New_York' },
-      { pattern: /\\b(los angeles)\\b/i, zone: 'America/Los_Angeles' },
-      { pattern: /\\b(chicago)\\b/i, zone: 'America/Chicago' },
-      { pattern: /\\b(toronto)\\b/i, zone: 'America/Toronto' },
-      { pattern: /\\b(sydney)\\b/i, zone: 'Australia/Sydney' },
+      { pattern: /\b(uganda|kampala|east africa|eastern africa|eat)\b/i, zone: 'Africa/Kampala' },
+      { pattern: /\b(kenya|nairobi)\b/i, zone: 'Africa/Nairobi' },
+      { pattern: /\b(rwanda|kigali)\b/i, zone: 'Africa/Kigali' },
+      { pattern: /\b(tanzania|dar es salaam)\b/i, zone: 'Africa/Dar_es_Salaam' },
+      { pattern: /\b(ethiopia|addis ababa)\b/i, zone: 'Africa/Addis_Ababa' },
+      { pattern: /\b(uk|united kingdom|london)\b/i, zone: 'Europe/London' },
+      { pattern: /\b(utc|gmt|greenwich)\b/i, zone: 'UTC' },
+      { pattern: /\b(india|delhi|mumbai)\b/i, zone: 'Asia/Kolkata' },
+      { pattern: /\b(japan|tokyo)\b/i, zone: 'Asia/Tokyo' },
+      { pattern: /\b(china|beijing|shanghai)\b/i, zone: 'Asia/Shanghai' },
+      { pattern: /\b(dubai|uae)\b/i, zone: 'Asia/Dubai' },
+      { pattern: /\b(new york|nyc)\b/i, zone: 'America/New_York' },
+      { pattern: /\b(los angeles)\b/i, zone: 'America/Los_Angeles' },
+      { pattern: /\b(chicago)\b/i, zone: 'America/Chicago' },
+      { pattern: /\b(toronto)\b/i, zone: 'America/Toronto' },
+      { pattern: /\b(sydney)\b/i, zone: 'Australia/Sydney' },
     ];
 
     let timeZone = localZone;
@@ -1047,8 +1047,8 @@ export class LiveConversationService {
     }
 
     // Also support explicit IANA names such as "Europe/Paris".
-    const ianaZone = lower.match(/\\b(?:in|for)\\s+([a-z]+_[a-z]+\\/[a-z0-9_+.-]+(?:\\/[a-z0-9_+.-]+)*)\\b/i)
-      || lower.match(/\\b(?:in|for)\\s+([a-z]+\\/[a-z0-9_+.-]+(?:\\/[a-z0-9_+.-]+)*)\\b/i);
+    const ianaZone = lower.match(/\b(?:in|for)\s+([a-z]+_[a-z]+\/[a-z0-9_+.-]+(?:\/[a-z0-9_+.-]+)*)\b/i)
+      || lower.match(/\b(?:in|for)\s+([a-z]+\/[a-z0-9_+.-]+(?:\/[a-z0-9_+.-]+)*)\b/i);
     if (ianaZone?.[1]) timeZone = ianaZone[1];
 
     const now = new Date();
