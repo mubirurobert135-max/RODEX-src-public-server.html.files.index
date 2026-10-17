@@ -572,7 +572,7 @@ export class IntentClassifier {
     // Directly open common destinations. Accept natural polite endings without
     // accidentally routing unrecognised platforms to YouTube.
     if (
-      /^(rodex,?\s*)?(please\s+)?(open|launch|go to|visit|navigate to)\s+(?:the\s+)?(youtube|google|gmail|spotify|github|twitter|x\.com|wikipedia|reddit|claude|gemini|openai|chatgpt|instagram|facebook|tiktok|amazon|netflix|whatsapp|linkedin|discord)(\s+(website|app))?(\s+(for me|please|now))?[.!?]*$/i.test(
+      /^(rodex,?\s*)?(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?(open|launch|go to|visit|navigate to)\s+(?:the\s+)?(youtube|google|gmail|spotify|github|twitter|x\.com|wikipedia|reddit|claude|gemini|openai|chatgpt|instagram|facebook|tiktok|amazon|netflix|whatsapp|linkedin|discord)(\s+(website|app))?(\s+(for me|please|now))?[.!?]*$/i.test(
         rawLower
       )
     ) {
@@ -650,7 +650,7 @@ export class IntentClassifier {
     // Generic website destinations, including raw domains and complete HTTP(S) URLs.
     // Only accept standard web schemes; the openUrl tool performs its own validation too.
     const openWebsiteMatch = rawText.match(
-      /^(?:rodex,?\s*)?(?:please\s+)?(?:open|launch|go to|visit|navigate to|browse to)\s+(?:(?:the\s+)?(?:website|site)\s+(?:for|of|at)\s+|(?:the\s+)?(?:website|site)\s+)?((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?:\/[^\s]*)?)(?:\s+(?:for me|please|now))?[.!?]*$/i
+      /^(?:rodex,?\s*)?(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?(?:open|launch|go to|visit|navigate to|browse to)\s+(?:(?:the\s+)?(?:website|site)\s+(?:for|of|at)\s+|(?:the\s+)?(?:website|site)\s+)?((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?:\/[^\s]*)?)(?:\s+(?:for me|please|now))?[.!?]*$/i
     );
     if (openWebsiteMatch?.[1]) {
       const rawTarget = openWebsiteMatch[1].replace(/[.,!?;:]+$/, '');
