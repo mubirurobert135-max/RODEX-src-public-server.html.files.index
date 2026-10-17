@@ -1082,7 +1082,6 @@ export class LiveConversationService {
   /** Speak an exact tool/browser result and suppress model paraphrasing for the turn. */
   private speakDeterministicResponse(text: string, source: string): void {
     if (!this.isConversationActive) return;
-    const responseRunId = ++this.deterministicResponseRunId;
     if (this.deterministicResponseForTurn) {
       // The browser clock is the most direct source for a spoken current-time
       // question, so let it replace a server/model clock result if it arrives later.
@@ -1096,6 +1095,7 @@ export class LiveConversationService {
       this.deterministicResponseSource = null;
     }
 
+    const responseRunId = ++this.deterministicResponseRunId;
     this.stopAllPlayback();
     rodexSynth.stop();
     if (this.followUpSilenceTimer) {
