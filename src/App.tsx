@@ -842,7 +842,7 @@ export default function App() {
     setLastResponse('Connecting to Gemini 3.8 Live neural stream...');
 
     const liveStartMsg: ChatMessage = {
-      id: `live-start-${Date.now()}`,
+      id: createId('live-start'),
       sender: 'assistant',
       text: 'Live voice stream connected (Gemini 3.8 Live • 16kHz in / 24kHz out • Google Maps tool active). Speak naturally in real-time.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -885,7 +885,7 @@ export default function App() {
             return [
               ...prev,
               {
-                id: `live-user-${Date.now()}`,
+                id: createId('live-user'),
                 sender: 'user',
                 text: userText,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -905,7 +905,7 @@ export default function App() {
             return [
               ...prev,
               {
-                id: `live-asst-${Date.now()}`,
+                id: createId('live-asst'),
                 sender: 'assistant',
                 text: modelText,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -962,7 +962,7 @@ export default function App() {
     setLastResponse(endText);
 
     const liveEndMsg: ChatMessage = {
-      id: `live-end-${Date.now()}`,
+      id: createId('live-end'),
       sender: 'assistant',
       text: 'Live voice stream disconnected. Session transcript preserved in chat history.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1606,7 +1606,7 @@ export default function App() {
       if (data.status === 'ok' && data.result) {
         const confirmText = data.result.message || `Action "${toolName}" executed with verified operator permission.`;
         const resultMsg: ChatMessage = {
-          id: `confirmed-${Date.now()}`,
+          id: createId('confirmed'),
           sender: 'assistant',
           text: confirmText,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1735,7 +1735,7 @@ export default function App() {
         setMessages((prev) => [
           ...prev,
           {
-            id: `greet-${Date.now()}`,
+            id: createId('greet'),
             sender: 'assistant',
             text: "Hello, I'm here and ready to help.",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1758,7 +1758,7 @@ export default function App() {
           return [
             ...prev,
             {
-              id: `live-user-${Date.now()}`,
+              id: createId('live-user'),
               sender: 'user',
               text: userText,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1778,7 +1778,7 @@ export default function App() {
           return [
             ...prev,
             {
-              id: `live-asst-${Date.now()}`,
+              id: createId('live-asst'),
               sender: 'assistant',
               text: modelText,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

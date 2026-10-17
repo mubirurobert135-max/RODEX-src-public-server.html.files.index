@@ -22,6 +22,7 @@ export interface ToolDefinition {
 export interface ToolExecutionContext {
   userId?: string;
   userName?: string;
+  userEmail?: string;
   clientFormattedTime?: string;
   timeZone?: string;
   sessionContext?: Record<string, any>;
