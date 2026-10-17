@@ -78,7 +78,7 @@ async function runRealTimeEngineTest() {
   );
   assert(
     typeof directBrowserClock === 'string' &&
-      /^The time in Uganda is \\d{1,2}:\\d{2} (AM|PM)\\.$/.test(directBrowserClock),
+      /^The time in Uganda is \d{1,2}:\d{2} (AM|PM)\.$/.test(directBrowserClock),
     'Uses a deterministic browser-clock response for spoken Uganda time questions'
   );
   assert(
