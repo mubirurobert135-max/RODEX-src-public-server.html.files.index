@@ -172,7 +172,7 @@ export class RealTimeResponseEngine {
         'website';
       // Voice-triggered browser navigation may be blocked by popup protection.
       // Tell the user where to continue rather than claiming the tab definitely opened.
-      const text = `I found ${title}. If your browser blocks the new tab, use the on-screen Open button.`;
+      const text = `I'm opening ${title} now. If your browser blocks it, use the on-screen Open button.`;
       const ttfrMs = Date.now() - startTime;
 
       const browserAction = {
