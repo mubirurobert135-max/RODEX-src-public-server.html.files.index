@@ -2247,7 +2247,16 @@ export default function App() {
                   id="active-browser-action-open-btn"
                   onClick={() => {
                     triggerHaptic('tap');
-                    window.open(browserActionToast.url, '_blank', 'noopener,noreferrer');
+                    // This click is a fresh user gesture, so it is the reliable
+                    // fallback when automatic voice-triggered popups are blocked.
+                    const openedWindow = window.open(browserActionToast.url, '_blank');
+                    if (openedWindow) {
+                      try {
+                        openedWindow.opener = null;
+                      } catch {
+                        // Respect browser policies that disallow opener mutation.
+                      }
+                    }
                   }}
                   className="px-3 py-1.5 rounded-xl bg-white text-black hover:bg-neutral-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
                 >
