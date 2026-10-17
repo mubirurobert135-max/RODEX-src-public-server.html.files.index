@@ -409,9 +409,17 @@ export default function App() {
           : 'External Website');
 
       try {
-        const openedWindow = window.open(cleanUrl, '_blank', 'noopener,noreferrer');
-        const isBlocked =
-          !openedWindow || openedWindow.closed || typeof openedWindow.closed === 'undefined';
+        // Avoid the noopener feature here because some browsers return null for it
+        // even when a tab opens. Clear opener immediately after obtaining the window.
+        const openedWindow = window.open(cleanUrl, '_blank');
+        if (openedWindow) {
+          try {
+            openedWindow.opener = null;
+          } catch {
+            // Browser policy may restrict opener access; the navigation was still requested.
+          }
+        }
+        const isBlocked = !openedWindow;
 
         setBrowserActionToast({
           url: cleanUrl,
