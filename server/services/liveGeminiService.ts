@@ -50,6 +50,8 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
     console.log("[Gemini Live Server] Connection received from client for real-time Live API (/api/live)");
     let session: any = null;
     let isClosed = false;
+    let clientClockIso: string | undefined;
+    let clientTimeZone: string | undefined;
     const pendingClientMessages: any[] = [];
 
     // Attach message listener immediately so early messages are never dropped
@@ -68,6 +70,23 @@ export function setupGeminiLiveWebSocket(server: HttpServer, options: LiveSessio
     });
 
     const dispatchClientMessage = (msg: any) => {
+      // The client clock is refreshed with low-frequency audio frames. Keep the
+      // latest validated timestamp for deterministic date/time tool execution.
+      if (
+        typeof msg.clientTimeIso === "string" &&
+        /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?Z$/.test(msg.clientTimeIso) &&
+        Number.isFinite(Date.parse(msg.clientTimeIso))
+      ) {
+        clientClockIso = msg.clientTimeIso;
+      }
+      if (
+        typeof msg.clientTimeZone === "string" &&
+        msg.clientTimeZone.length <= 64 &&
+        /^[A-Za-z_+-]+(?:\\/[A-Za-z0-9_+.-]+)*$/.test(msg.clientTimeZone)
+      ) {
+        clientTimeZone = msg.clientTimeZone;
+      }
+
       if (!session) return;
       try {
         if (msg.audio) {
@@ -313,6 +332,10 @@ LIVE ACTION EXECUTION CONTRACT:
                       userId: "live_public_action",
                       userDisplayName: "RODEX user",
                       hasElevatedPermission: false,
+                      // Pass a current browser-clock anchor to prevent stale server
+                      // clocks from corrupting spoken time/date answers.
+                      clientFormattedTime: clientClockIso,
+                      timeZone: clientTimeZone || "Africa/Kampala",
                     });
 
                     let responseReply = result.reply || "The action returned no response.";
