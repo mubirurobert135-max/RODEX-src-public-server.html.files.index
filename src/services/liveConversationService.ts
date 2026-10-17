@@ -137,6 +137,7 @@ export function matchWakePhrase(text: string): { matched: boolean; phrase: strin
 export class LiveConversationService {
   private ws: WebSocket | null = null;
   private inputAudioCtx: AudioContext | null = null;
+  private pendingStartupAudioCtx: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
   private audioProcessor: ScriptProcessorNode | null = null;
   private micSource: MediaStreamAudioSourceNode | null = null;
@@ -327,7 +328,7 @@ export class LiveConversationService {
   public async unlockVoiceAudio(): Promise<void> {
     try {
       const { ctx: outputCtx } = this.getOrCreateOutputAudioGraph();
-      const inputCtx = this.inputAudioCtx;
+      const inputCtx = this.inputAudioCtx || this.pendingStartupAudioCtx;
       this.addTrace(`USER GESTURE AUDIO UNLOCK: input=${inputCtx?.state || 'not-created'}, output=${outputCtx.state}`);
 
       const resumeTasks: Promise<void>[] = [];
@@ -463,6 +464,9 @@ export class LiveConversationService {
         pendingMediaStream = null;
       }
       if (pendingInputAudioCtx) {
+        if (this.pendingStartupAudioCtx === pendingInputAudioCtx) {
+          this.pendingStartupAudioCtx = null;
+        }
         if (pendingInputAudioCtx.state !== 'closed') {
           void pendingInputAudioCtx.close().catch(() => {});
         }
@@ -489,6 +493,7 @@ export class LiveConversationService {
       // StrictMode runs effect setup/cleanup/setup in development; without this
       // guard, two pending getUserMedia() calls can overwrite the same singleton.
       pendingInputAudioCtx = new AudioCtx({ sampleRate: 16000 });
+      this.pendingStartupAudioCtx = pendingInputAudioCtx;
       this.addTrace(`INPUT AUDIO CONTEXT INITIAL STATE: ${pendingInputAudioCtx.state}`);
       if (pendingInputAudioCtx.state === 'suspended') {
         // Do not await this in the automatic mount path: Chromium may keep resume()
@@ -532,6 +537,9 @@ export class LiveConversationService {
       }
 
       this.inputAudioCtx = pendingInputAudioCtx;
+      if (this.pendingStartupAudioCtx === pendingInputAudioCtx) {
+        this.pendingStartupAudioCtx = null;
+      }
       pendingInputAudioCtx = null;
       this.mediaStream = pendingMediaStream;
       pendingMediaStream = null;
@@ -1665,6 +1673,13 @@ export class LiveConversationService {
     if (this.inputAudioCtx) {
       this.inputAudioCtx.close().catch(() => {});
       this.inputAudioCtx = null;
+    }
+    if (this.pendingStartupAudioCtx) {
+      const pending = this.pendingStartupAudioCtx;
+      this.pendingStartupAudioCtx = null;
+      if (pending.state !== 'closed') {
+        void pending.close().catch(() => {});
+      }
     }
     if (this.ws) {
       try {
