@@ -39,3 +39,6 @@ jobs:
 
       - name: Action and tool execution tests
         run: bun run test:action
+
+      - name: Orb and wake phrase tests
+        run: bun run test:orb
