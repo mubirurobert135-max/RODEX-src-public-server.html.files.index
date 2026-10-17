@@ -1085,7 +1085,16 @@ export class LiveConversationService {
       // question, so let it replace a server/model clock result if it arrives later.
       if (source !== 'browser_clock' || this.deterministicResponseSource === 'browser_clock') return;
       this.addTrace('[RODEX TIME] Replacing server clock speech with browser clock');
+      // Clear the old guard before cancelling existing speech so its onEnd handler
+      // cannot mutate the state of the replacement response.
+      this.deterministicResponseForTurn = false;
+      this.deterministicResponseSpeechActive = false;
+      this.deterministicResponseTurnFinished = false;
+      this.deterministicResponseSource = null;
     }
+
+    this.stopAllPlayback();
+    rodexSynth.stop();
     if (this.followUpSilenceTimer) {
       clearTimeout(this.followUpSilenceTimer);
       this.followUpSilenceTimer = null;
@@ -1096,8 +1105,6 @@ export class LiveConversationService {
     this.deterministicResponseTurnFinished = false;
     this.deterministicResponseSource = source;
     this.turnPcmChunks = [];
-    this.stopAllPlayback();
-    rodexSynth.stop();
     this.isGreetingPlaying = false;
     this.isSpeaking = true;
     this.diag.orbVoiceState = 'SPEAKING';
