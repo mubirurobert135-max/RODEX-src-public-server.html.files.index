@@ -310,7 +310,9 @@ LIVE ACTION EXECUTION CONTRACT:
                     });
 
                     let responseReply = result.reply || "The action returned no response.";
-                    let responseStatus = result.actionStatus || "failed";
+                    // "requested" is distinct from the orchestrator's completed/failed statuses:
+                    // browser popup success is not confirmed by this server-side function call.
+                    let responseStatus: string = result.actionStatus || "failed";
                     if (result.openUrl) {
                       const label = intent.extractedEntities.label ||
                         result.sources?.[0]?.title ||
