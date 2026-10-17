@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { globalRealTimeEngine } from '../server/services/realTimeEngine';
 import { IntentClassifier } from '../server/orchestrator/intentClassifier';
 import { globalPerformanceTracker } from '../server/services/performanceTracker';
-import { isLiveActionIntentSupported } from '../server/services/liveGeminiService';
+import { isLiveActionIntentSupported, buildLiveClockAnswer } from '../server/services/liveGeminiService';
 
 dotenv.config();
 
@@ -58,6 +58,18 @@ async function runRealTimeEngineTest() {
   assert(!isLiveActionIntentSupported('email_operation'), 'Live voice refuses private email actions without authenticated context');
   assert(!isLiveActionIntentSupported('contacts_operation'), 'Live voice refuses private contact actions without authenticated context');
   assert(!isLiveActionIntentSupported('weather'), 'Live action bridge refuses mock weather output');
+
+  const fixedClock = buildLiveClockAnswer('Uganda', '2026-10-17T07:32:00.000Z');
+  assert(
+    fixedClock.text === 'The time in Uganda is 10:32 AM.' &&
+      fixedClock.clockSource === 'client_clock',
+    'Live time answer uses the exact client clock and speaks only hours/minutes'
+  );
+  const invalidZoneClock = buildLiveClockAnswer('uganda', '2026-10-17T07:32:00.000Z');
+  assert(
+    invalidZoneClock.timeZone === 'Africa/Kampala' && invalidZoneClock.timeOnly === '10:32 AM',
+    'Maps Uganda to the valid Africa/Kampala timezone'
+  );
 
   const politeYouTube = IntentClassifier.classify('Open YouTube for me');
   assert(politeYouTube.primaryIntent === 'open_url', 'Accepts natural polite website commands');
