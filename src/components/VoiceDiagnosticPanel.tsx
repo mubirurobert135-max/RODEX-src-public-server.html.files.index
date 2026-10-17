@@ -60,6 +60,9 @@ export const VoiceDiagnosticPanel: React.FC<VoiceDiagnosticPanelProps> = ({
     e.stopPropagation();
     setLastActionFeedback('START NORMAL ORB VOICE CLICKED');
     try {
+      // The click is a trusted gesture: unlock input/output audio even when
+      // automatic startup already has the microphone stream open.
+      void globalLiveConversationService.unlockVoiceAudio();
       await globalLiveConversationService.startNormalOrbVoice();
     } catch (err: any) {
       console.error('[Start Normal Orb Error]', err);
@@ -91,6 +94,7 @@ export const VoiceDiagnosticPanel: React.FC<VoiceDiagnosticPanelProps> = ({
     setLastActionFeedback('TEST LIVE TEXT RESPONSE CLICKED');
     setIsProcessing(true);
     try {
+      void globalLiveConversationService.unlockVoiceAudio();
       await globalLiveConversationService.testLiveTextResponse('Say exactly: RODEX AUDIO TEST');
     } catch (err: any) {
       console.error('[Live Text Response Error]', err);
@@ -112,7 +116,7 @@ export const VoiceDiagnosticPanel: React.FC<VoiceDiagnosticPanelProps> = ({
   return (
     <div
       style={{ pointerEvents: 'auto' }}
-      className="fixed bottom-2 right-2 w-[510px] max-w-[97vw] max-h-[96vh] z-[99999] bg-neutral-950/95 border-2 border-cyan-500/70 text-emerald-300 font-mono text-[11px] p-3 rounded-lg shadow-2xl overflow-hidden flex flex-col gap-2 backdrop-blur-md select-none"
+      className="fixed bottom-2 right-2 w-[510px] max-w-[97vw] max-h-[96vh] z-[99999] bg-neutral-950/95 border-2 border-cyan-500/70 text-emerald-300 font-mono text-[11px] p-3 rounded-lg shadow-2xl overflow-y-auto flex flex-col gap-2 backdrop-blur-md select-none"
     >
       {/* Header Banner */}
       <div className="flex items-center justify-between pb-1.5 border-b border-cyan-900/80 shrink-0">
@@ -165,6 +169,44 @@ export const VoiceDiagnosticPanel: React.FC<VoiceDiagnosticPanelProps> = ({
           <div>
             <span className="text-neutral-400">MIC STREAM: </span>
             <span className="text-emerald-300 font-mono">{diag.micStreamId}</span>
+          </div>
+          <div>
+            <span className="text-neutral-400">LIVE UPSTREAM: </span>
+            <span className={diag.upstreamConnected ? 'text-emerald-300 font-bold' : diag.liveConnection === 'FAIL' ? 'text-rose-300 font-bold' : 'text-amber-300 font-bold'}>
+              {diag.upstreamConnected ? 'READY' : diag.liveConnection === 'FAIL' ? 'FAIL' : 'WAITING'}
+            </span>
+          </div>
+          <div>
+            <span className="text-neutral-400">WAKE RECOGNIZER: </span>
+            <span className={diag.wakeRecognizerState === 'LISTENING' ? 'text-emerald-300 font-bold' : diag.wakeRecognizerState.startsWith('ERROR') || diag.wakeRecognizerState === 'UNAVAILABLE' ? 'text-rose-300 font-bold' : 'text-amber-300 font-bold'}>
+              {diag.wakeRecognizerState}
+            </span>
+          </div>
+          <div>
+            <span className="text-neutral-400">INPUT AUDIO CTX: </span>
+            <span className={diag.inputAudioContextState === 'running' ? 'text-emerald-300' : 'text-amber-300'}>
+              {diag.inputAudioContextState.toUpperCase()}
+            </span>
+          </div>
+          <div>
+            <span className="text-neutral-400">MIC TRACK: </span>
+            <span className={diag.micTrackState === 'LIVE' ? 'text-emerald-300' : 'text-amber-300'}>
+              {diag.micTrackState}
+            </span>
+          </div>
+          <div>
+            <span className="text-neutral-400">AUDIO FRAMES: </span>
+            <span className="text-cyan-200">{diag.audioChunksSent}</span>
+          </div>
+          <div>
+            <span className="text-neutral-400">MIC LEVEL: </span>
+            <span className={diag.micInputLevel > 0.01 ? 'text-emerald-300' : 'text-amber-300'}>
+              {diag.micInputLevel.toFixed(3)}
+            </span>
+          </div>
+          <div className="col-span-2 truncate">
+            <span className="text-neutral-400">LAST SPEECH TRANSCRIPT: </span>
+            <span className="text-cyan-200">{diag.lastRecognizedTranscript}</span>
           </div>
         </div>
       </div>
