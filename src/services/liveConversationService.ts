@@ -1553,6 +1553,10 @@ export class LiveConversationService {
     }
     this.isMicLive = false;
     this.isConversationActive = false;
+    this.deterministicResponseForTurn = false;
+    this.deterministicResponseSpeechActive = false;
+    this.deterministicResponseTurnFinished = false;
+    this.deterministicResponseSource = null;
     this.setStatus('disconnected');
     this.addTrace('LIVE VOICE CLEANED UP');
   }
