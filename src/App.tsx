@@ -1815,6 +1815,9 @@ export default function App() {
   const handleOrbClick = async () => {
     console.info('[RODEX TRACE] ORB CLICKED');
     console.info('[RODEX TRACE] ORB VOICE START REQUESTED');
+    // Must be called directly from the user's click: browsers may block automatic
+    // AudioContext resume while keeping the wake listener itself initialized.
+    void globalLiveConversationService.unlockVoiceAudio();
     rodexSynth.prime();
     triggerHaptic('tap');
 
