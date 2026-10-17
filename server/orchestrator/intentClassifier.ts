@@ -569,41 +569,48 @@ export class IntentClassifier {
       };
     }
 
-    // Strict concise command e.g. "Open YouTube", "Open Gmail", "Open Spotify", "Open Google"
+    // Directly open common destinations. Accept natural polite endings without
+    // accidentally routing unrecognised platforms to YouTube.
     if (
-      /^(rodex,?\s*)?(please\s+)?(open|launch|go to|visit)\s+(youtube|google|gmail|spotify|github|twitter|x\.com|wikipedia|reddit|claude|gemini|openai)(\s+website|\s+app)?$/i.test(
+      /^(rodex,?\s*)?(please\s+)?(open|launch|go to|visit|navigate to)\s+(?:the\s+)?(youtube|google|gmail|spotify|github|twitter|x\.com|wikipedia|reddit|claude|gemini|openai|chatgpt|instagram|facebook|tiktok|amazon|netflix|whatsapp|linkedin|discord)(\s+(website|app))?(\s+(for me|please|now))?[.!?]*$/i.test(
         rawLower
       )
     ) {
-      const match = rawLower.match(/(?:open|launch|go to|visit)\s+([a-z0-9.]+)/i);
+      const match = rawLower.match(/(?:open|launch|go to|visit|navigate to)\s+(?:the\s+)?([a-z0-9.]+)/i);
       const target = match ? match[1].toLowerCase() : 'youtube';
-      let targetUrl = 'https://www.youtube.com';
-      let label = 'YouTube';
-
-      if (target.includes('google')) {
-        targetUrl = 'https://www.google.com';
-        label = 'Google';
-      } else if (target.includes('gmail')) {
-        targetUrl = 'https://mail.google.com';
-        label = 'Gmail';
-      } else if (target.includes('spotify')) {
-        targetUrl = 'https://open.spotify.com';
-        label = 'Spotify';
-      } else if (target.includes('github')) {
-        targetUrl = 'https://github.com';
-        label = 'GitHub';
-      } else if (target.includes('twitter') || target.includes('x.com')) {
-        targetUrl = 'https://x.com';
-        label = 'X';
-      } else if (target.includes('wikipedia')) {
-        targetUrl = 'https://en.wikipedia.org';
-        label = 'Wikipedia';
-      }
+      const destinations: Record<string, { url: string; label: string }> = {
+        youtube: { url: 'https://www.youtube.com', label: 'YouTube' },
+        google: { url: 'https://www.google.com', label: 'Google' },
+        gmail: { url: 'https://mail.google.com', label: 'Gmail' },
+        spotify: { url: 'https://open.spotify.com', label: 'Spotify' },
+        github: { url: 'https://github.com', label: 'GitHub' },
+        twitter: { url: 'https://x.com', label: 'X' },
+        'x.com': { url: 'https://x.com', label: 'X' },
+        wikipedia: { url: 'https://en.wikipedia.org', label: 'Wikipedia' },
+        reddit: { url: 'https://www.reddit.com', label: 'Reddit' },
+        claude: { url: 'https://claude.ai', label: 'Claude' },
+        gemini: { url: 'https://gemini.google.com', label: 'Gemini' },
+        openai: { url: 'https://openai.com', label: 'OpenAI' },
+        chatgpt: { url: 'https://chatgpt.com', label: 'ChatGPT' },
+        instagram: { url: 'https://www.instagram.com', label: 'Instagram' },
+        facebook: { url: 'https://www.facebook.com', label: 'Facebook' },
+        tiktok: { url: 'https://www.tiktok.com', label: 'TikTok' },
+        amazon: { url: 'https://www.amazon.com', label: 'Amazon' },
+        netflix: { url: 'https://www.netflix.com', label: 'Netflix' },
+        whatsapp: { url: 'https://web.whatsapp.com', label: 'WhatsApp Web' },
+        linkedin: { url: 'https://www.linkedin.com', label: 'LinkedIn' },
+        discord: { url: 'https://discord.com/app', label: 'Discord' },
+      };
+      const destination = destinations[target] || destinations.youtube;
 
       return {
         primaryIntent: 'open_url',
         confidence: 0.99,
-        extractedEntities: { targetUrl, label, actionType: 'open_website' },
+        extractedEntities: {
+          targetUrl: destination.url,
+          label: destination.label,
+          actionType: 'open_website',
+        },
         suggestedTools: ['open_approved_url'],
         requiresPlanning: true,
         riskLevel: 'safe',
@@ -638,6 +645,40 @@ export class IntentClassifier {
         responseFormat: 'exact',
         detailLevel: 'concise',
       };
+    }
+
+    // Generic website destinations, including raw domains and complete HTTP(S) URLs.
+    // Only accept standard web schemes; the openUrl tool performs its own validation too.
+    const openWebsiteMatch = rawText.match(
+      /^(?:rodex,?\s*)?(?:please\s+)?(?:open|launch|go to|visit|navigate to|browse to)\s+(?:(?:the\s+)?(?:website|site)\s+(?:for|of|at)\s+|(?:the\s+)?(?:website|site)\s+)?((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?:\/[^\s]*)?)(?:\s+(?:for me|please|now))?[.!?]*$/i
+    );
+    if (openWebsiteMatch?.[1]) {
+      const rawTarget = openWebsiteMatch[1].replace(/[.,!?;:]+$/, '');
+      const candidateUrl = /^https?:\/\//i.test(rawTarget) ? rawTarget : `https://${rawTarget}`;
+      try {
+        const parsedUrl = new URL(candidateUrl);
+        if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+          const hostname = parsedUrl.hostname.replace(/^www\./i, '');
+          const label = hostname.charAt(0).toUpperCase() + hostname.slice(1);
+          return {
+            primaryIntent: 'open_url',
+            confidence: 0.97,
+            extractedEntities: {
+              targetUrl: parsedUrl.toString(),
+              label,
+              actionType: 'open_website',
+            },
+            suggestedTools: ['open_approved_url'],
+            requiresPlanning: true,
+            riskLevel: 'safe',
+            interactionType: 'action_command',
+            responseFormat: 'exact',
+            detailLevel: 'concise',
+          };
+        }
+      } catch {
+        // Let the normal classifier handle malformed input rather than opening it.
+      }
     }
 
     // 7. WEATHER: "Tell me the weather", "What is the weather in Kampala"
