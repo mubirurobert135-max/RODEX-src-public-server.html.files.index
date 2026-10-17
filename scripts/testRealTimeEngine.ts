@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { globalRealTimeEngine } from '../server/services/realTimeEngine';
 import { IntentClassifier } from '../server/orchestrator/intentClassifier';
 import { globalPerformanceTracker } from '../server/services/performanceTracker';
+import { isLiveActionIntentSupported } from '../server/services/liveGeminiService';
 
 dotenv.config();
 
@@ -34,6 +35,13 @@ async function runRealTimeEngineTest() {
   assert(intentUrl.primaryIntent === 'open_url', 'Identifies open_url intent');
   assert(intentUrl.extractedEntities.targetUrl === 'https://www.youtube.com', 'Constructs target YouTube URL');
   assert(elapsed1 < 30, `Fast intent routing executed in ${elapsed1}ms (< 30ms threshold)`);
+
+  assert(isLiveActionIntentSupported('open_url'), 'Live voice can route website-opening actions');
+  assert(isLiveActionIntentSupported('calculate_compute'), 'Live voice can route calculations');
+  assert(isLiveActionIntentSupported('datetime_timezone'), 'Live voice can route date/time checks');
+  assert(!isLiveActionIntentSupported('email_operation'), 'Live voice refuses private email actions without authenticated context');
+  assert(!isLiveActionIntentSupported('contacts_operation'), 'Live voice refuses private contact actions without authenticated context');
+  assert(!isLiveActionIntentSupported('weather'), 'Live action bridge refuses mock weather output');
 
   const politeYouTube = IntentClassifier.classify('Open YouTube for me');
   assert(politeYouTube.primaryIntent === 'open_url', 'Accepts natural polite website commands');
