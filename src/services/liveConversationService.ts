@@ -102,6 +102,7 @@ export interface LiveServiceCallbacks {
   onInterrupted?: () => void;
   onError?: (errorMessage: string) => void;
   onGrounding?: (metadata: any) => void;
+  onBrowserAction?: (action: { url: string; label?: string; destinationType?: 'youtube' | 'google' | 'website' }) => void;
 }
 
 export function normalizeTranscript(text: string): string {
@@ -854,6 +855,22 @@ export class LiveConversationService {
         this.setStatus('listening');
         this.startFollowUpSilenceTimer();
         this.callbacks.onTurnComplete?.();
+        break;
+
+      case 'browser_action':
+        if (data.action?.url && this.isConversationActive) {
+          this.addTrace(`BROWSER ACTION REQUESTED: ${data.action.label || data.action.url}`);
+          this.callbacks.onBrowserAction?.({
+            url: data.action.url,
+            label: data.action.label,
+            destinationType: data.action.destinationType,
+          });
+        }
+        break;
+
+      case 'tool_error':
+        this.addTrace(`LIVE TOOL ERROR: ${data.message || 'Tool execution failed'}`);
+        this.diag.lastErrorMessage = data.message || 'Live tool execution failed';
         break;
 
       case 'grounding':
