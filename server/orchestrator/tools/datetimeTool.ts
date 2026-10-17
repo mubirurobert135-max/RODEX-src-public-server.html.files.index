@@ -24,7 +24,7 @@ export const datetimeTool: ToolDefinition = {
     const clientClockIso = typeof context?.clientFormattedTime === 'string'
       ? context.clientFormattedTime.trim()
       : '';
-    const isIsoTimestamp = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(clientClockIso);
+    const isIsoTimestamp = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:[.][0-9]{1,3})?(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(clientClockIso);
     const parsedClientClock = isIsoTimestamp ? new Date(clientClockIso) : null;
     const now = parsedClientClock && Number.isFinite(parsedClientClock.getTime())
       ? parsedClientClock
