@@ -615,28 +615,32 @@ export class LiveConversationService {
             return;
           }
 
-          // Attempt recovery with exponential backoff + jitter if under max attempts
-          if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            const backoffMs = Math.min(10000, Math.pow(2, this.reconnectAttempts) * 400 + Math.random() * 300);
-            this.addEventTimeline('SESSION_RECONNECTING', `Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${Math.round(backoffMs)}ms`);
+          // Keep recovering after transient outages. After the normal retry budget,
+          // continue at a capped cooldown instead of stopping the entire voice session.
+          const extendedRecovery = this.reconnectAttempts >= this.maxReconnectAttempts;
+          this.reconnectAttempts = Math.min(this.reconnectAttempts + 1, this.maxReconnectAttempts);
+          const backoffMs = extendedRecovery
+            ? 15000
+            : Math.min(10000, Math.pow(2, this.reconnectAttempts) * 400 + Math.random() * 300);
+          this.addEventTimeline(
+            extendedRecovery ? 'SESSION_RECOVERY_CONTINUES' : 'SESSION_RECONNECTING',
+            extendedRecovery
+              ? `Reconnect retry budget reached; recovery will continue in ${Math.round(backoffMs)}ms`
+              : `Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${Math.round(backoffMs)}ms`
+          );
 
-            if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = setTimeout(() => {
-              if (!this.explicitShutdown && this.isMicLive) {
-                this.connectWebSocketOnly().then(() => {
-                  if (this.mediaStream) {
-                    this.startMicProcessing();
-                  }
-                }).catch((err) => {
-                  console.warn('[RODEX Live] Reconnection attempt failed:', err);
-                });
-              }
-            }, backoffMs);
-          } else {
-            this.addEventTimeline('SESSION_FATAL', 'Max reconnection attempts exceeded. Stopping live session.');
-            this.stop();
-          }
+          if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = setTimeout(() => {
+            if (!this.explicitShutdown && this.isMicLive) {
+              this.connectWebSocketOnly().then(() => {
+                if (this.mediaStream) {
+                  this.startMicProcessing();
+                }
+              }).catch((err) => {
+                console.warn('[RODEX Live] Reconnection attempt failed:', err);
+              });
+            }
+          }, backoffMs);
         };
 
         this.ws.onerror = (err) => {
@@ -658,6 +662,22 @@ export class LiveConversationService {
    */
   private startMicProcessing() {
     if (!this.inputAudioCtx || !this.mediaStream || !this.ws) return;
+
+    // A reconnect must replace the previous graph. Otherwise multiple processor
+    // callbacks can send duplicate audio frames into the new WebSocket session.
+    if (this.audioProcessor) {
+      this.audioProcessor.onaudioprocess = null;
+      try {
+        this.audioProcessor.disconnect();
+      } catch (_) {}
+      this.audioProcessor = null;
+    }
+    if (this.micSource) {
+      try {
+        this.micSource.disconnect();
+      } catch (_) {}
+      this.micSource = null;
+    }
 
     this.micSource = this.inputAudioCtx.createMediaStreamSource(this.mediaStream);
     this.audioProcessor = this.inputAudioCtx.createScriptProcessor(4096, 1, 1);
