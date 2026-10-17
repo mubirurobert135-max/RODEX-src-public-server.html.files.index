@@ -166,6 +166,7 @@ export class LiveConversationService {
   private deterministicResponseForTurn = false;
   private deterministicResponseSpeechActive = false;
   private deterministicResponseTurnFinished = false;
+  private deterministicResponseSource: string | null = null;
   private followUpSilenceTimer: NodeJS.Timeout | null = null;
   private status: LiveSessionStatus = 'disconnected';
   private callbacks: LiveServiceCallbacks = {};
@@ -573,6 +574,10 @@ export class LiveConversationService {
       if (this.isConversationActive && !this.isSpeaking && this.status === 'listening') {
         this.isConversationActive = false;
         this.diag.isConversationActive = false;
+        this.deterministicResponseForTurn = false;
+        this.deterministicResponseSpeechActive = false;
+        this.deterministicResponseTurnFinished = false;
+        this.deterministicResponseSource = null;
         this.diag.orbVoiceState = 'IDLE';
         this.setStatus('idle');
         console.info('[RODEX GATE] RETURNED_TO_WAKE_LISTENING');
@@ -1074,7 +1079,13 @@ export class LiveConversationService {
 
   /** Speak an exact tool/browser result and suppress model paraphrasing for the turn. */
   private speakDeterministicResponse(text: string, source: string): void {
-    if (!this.isConversationActive || this.deterministicResponseForTurn) return;
+    if (!this.isConversationActive) return;
+    if (this.deterministicResponseForTurn) {
+      // The browser clock is the most direct source for a spoken current-time
+      // question, so let it replace a server/model clock result if it arrives later.
+      if (source !== 'browser_clock' || this.deterministicResponseSource === 'browser_clock') return;
+      this.addTrace('[RODEX TIME] Replacing server clock speech with browser clock');
+    }
     if (this.followUpSilenceTimer) {
       clearTimeout(this.followUpSilenceTimer);
       this.followUpSilenceTimer = null;
@@ -1083,6 +1094,7 @@ export class LiveConversationService {
     this.deterministicResponseForTurn = true;
     this.deterministicResponseSpeechActive = true;
     this.deterministicResponseTurnFinished = false;
+    this.deterministicResponseSource = source;
     this.turnPcmChunks = [];
     this.stopAllPlayback();
     rodexSynth.stop();
@@ -1108,10 +1120,16 @@ export class LiveConversationService {
         if (this.deterministicResponseTurnFinished) {
           this.deterministicResponseForTurn = false;
           this.deterministicResponseTurnFinished = false;
+          this.deterministicResponseSource = null;
           this.diag.orbVoiceState = 'LISTENING';
           this.setStatus('listening');
           this.startFollowUpSilenceTimer();
           this.callbacks.onTurnComplete?.();
+        } else {
+          // If a turn-complete event is delayed, do not leave the orb stuck in SPEAKING.
+          this.diag.orbVoiceState = 'LISTENING';
+          this.setStatus('listening');
+          this.startFollowUpSilenceTimer();
         }
       },
     });
