@@ -19,9 +19,11 @@ export const VoiceDiagnosticPanel: React.FC<VoiceDiagnosticPanelProps> = ({
   const [liveLogs, setLiveLogs] = useState<Array<{ id: string; time: string; text: string }>>([]);
   const [lastActionFeedback, setLastActionFeedback] = useState<string>('NONE');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const debugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('rodexDebug');
   const [isVisible, setIsVisible] = useState<boolean>(true);
 
   useEffect(() => {
+    if (!debugEnabled) return;
     const interval = setInterval(() => {
       setLiveMetrics(globalLiveConversationService.getMetrics());
       setDiag(globalLiveConversationService.getDiagnosticState());
@@ -29,7 +31,11 @@ export const VoiceDiagnosticPanel: React.FC<VoiceDiagnosticPanelProps> = ({
     }, 80);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [debugEnabled]);
+
+  // Diagnostic detail is opt-in for engineers: /?rodexDebug=1
+  // It must never turn ordinary human conversation into visible status labels.
+  if (!debugEnabled) return null;
 
   if (!isVisible) {
     return (
