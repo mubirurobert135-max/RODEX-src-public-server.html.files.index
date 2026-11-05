@@ -2563,8 +2563,9 @@ export default function App() {
           }}
         />
 
-        {/* Live On-Screen Developer Voice Pipeline Diagnostic Panel */}
-        <VoiceDiagnosticPanel
+        {/* Developer diagnostics are opt-in and never part of the natural character UI. */}
+        {import.meta.env.DEV && new URLSearchParams(window.location.search).has('diagnostics') && (
+          <VoiceDiagnosticPanel
           assistantState={state}
           lastTranscript={transcript}
           wakeMatched={diagWakeMatched}
@@ -2572,7 +2573,8 @@ export default function App() {
           aiRequestState={aiRequestState}
           aiResponseState={aiResponseState}
           ttsState={ttsState}
-        />
+          />
+        )}
       </main>
     </AndroidFrame>
   );
