@@ -968,13 +968,10 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
               ))
             )}
 
-            {assistantState === 'thinking' && (
-              <div className="flex items-center gap-2 p-3 rounded-2xl bg-neutral-950 border border-neutral-800/80 w-fit">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                <span className="text-xs text-neutral-400 tracking-wide">
-                  RODEX is processing live input...
-                </span>
-              </div>
+            {/* The character expresses concentration; no visible artificial
+                listening/thinking/processing badge is added to the conversation. */}
+            {(assistantState === 'thinking' || assistantState === 'processing') && (
+              <span className="sr-only" role="status">RODEX is preparing a reply.</span>
             )}
             <div ref={messagesEndRef} />
           </div>
