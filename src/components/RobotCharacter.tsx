@@ -83,15 +83,31 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
         setPose(p => p === 7 ? 8 : 7);
       }, 1750);
     } else if (expression === 'speak') {
-      // Delivering an action/result calls for a different hand gesture than a
-      // conversational reply; voice energy controls the pace without flashing.
-      const isActionReply = /\b(open|launch|playing|search|send|found|youtube|browser|navigate)\b/i.test(lastResponse);
+      // Conversation gestures are varied, meaning-sensitive and softly paced,
+      // rather than a mechanical repeating arm motion every few milliseconds.
+      const message = lastResponse.toLowerCase().trim();
+      const isActionReply = /\b(open(?:ing|ed)?|launch(?:ing|ed)?|play(?:ing)?|search(?:ing)?|send(?:ing|sent)?|found|youtube|browser|navigate)\b/i.test(message);
+      const isGreeting = /^(hi|hello|hey|good morning|good afternoon|good evening|welcome)\b/i.test(message);
+      const isReassuring = /\b(sorry|unfortunately|apologize|cannot|can't|unable)\b/i.test(message);
       let beat = 0;
-      interval = window.setInterval(() => {
-        beat++;
-        const animated = levelRef.current > 0.09;
-        setPose(isActionReply ? (beat % 3 === 0 ? 4 : 9) : (animated ? (beat % 2 ? 3 : 13) : 14));
-      }, 710);
+      const cadence = [1080, 1520, 1180, 1860, 1320];
+      const gesture = () => {
+        const energy = levelRef.current;
+        const naturalPause = beat % 5 === 3;
+        if (isReassuring) {
+          setPose(naturalPause ? 14 : 15);
+        } else if (isGreeting && beat < 2) {
+          setPose(beat === 0 ? 12 : 13);
+        } else if (isActionReply) {
+          setPose(naturalPause ? 14 : (beat % 2 ? 9 : 4));
+        } else {
+          setPose(naturalPause || (energy < 0.025 && beat % 2 === 0) ? 14 : (beat % 2 ? 3 : 13));
+        }
+        const delay = cadence[beat % cadence.length];
+        beat += 1;
+        after(delay, gesture);
+      };
+      gesture();
     } else if (expression === 'act') {
       interval = window.setInterval(() => setPose(p => p === 10 ? 11 : 10), 1250);
     } else if (expression === 'happy') {
