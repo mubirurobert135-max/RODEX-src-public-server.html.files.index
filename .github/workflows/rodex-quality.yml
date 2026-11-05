@@ -42,3 +42,6 @@ jobs:
 
       - name: Orb and wake phrase tests
         run: bun run test:orb
+
+      - name: Character behavior and gesture tests
+        run: bun run test:companion
