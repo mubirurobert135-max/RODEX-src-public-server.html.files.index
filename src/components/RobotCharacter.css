@@ -7,8 +7,8 @@
   justify-content: center;
   flex: 0 0 auto;
   width: min(94vw, 460px);
-  height: min(61vh, 470px);
-  min-height: 292px;
+  height: clamp(248px, 56svh, 470px);
+  min-height: 0;
   padding: 0;
   border: 0;
   border-radius: 36px;
@@ -40,6 +40,7 @@
   height: 207px;
   transform: translate(-50%, -50%) scale(1.86);
   transform-origin: center center;
+  perspective: 620px;
   pointer-events: none;
   z-index: 3;
 }
@@ -48,6 +49,8 @@
   position: absolute;
   inset: 0;
 }
+.rodex-robot-floating { transform-style: preserve-3d; will-change: transform; }
+.rodex-robot-pose { will-change: opacity; }
 .rodex-robot-viewport {
   width: 178px;
   height: 207px;
@@ -103,10 +106,16 @@
   50% { opacity: 1; box-shadow: 0 0 23px rgba(0, 187, 255, .64); }
 }
 @media (max-width: 600px), (max-height: 640px) {
-  .rodex-robot-button { height: min(54vh, 335px); min-height: 238px; width: min(98vw, 370px); }
+  .rodex-robot-button { height: clamp(205px, 47svh, 335px); width: min(98vw, 370px); }
   .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.37); top: 46%; }
   .rodex-robot-light-ring { bottom: 3%; }
   .rodex-robot-ground-glow { bottom: 2%; }
+}
+@media (max-width: 360px), (max-height: 490px) {
+  .rodex-robot-button { height: clamp(180px, 42svh, 255px); width: min(98vw, 320px); }
+  .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.14); top: 46%; }
+  .rodex-robot-light-ring { bottom: 0; width: 58%; }
+  .rodex-robot-ground-glow { bottom: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rodex-robot-light-ring { animation: none; }
