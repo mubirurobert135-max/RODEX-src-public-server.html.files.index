@@ -115,7 +115,7 @@ export class SpeechSynthesizer {
     }
 
     // Split long text into natural sentence chunks to eliminate Chrome 14-second cut-off & stutter
-    const sentenceMatches = cleanSpokenText.match(/[^.!?\n]+[.!?\n]+/g) || [cleanSpokenText];
+    const sentenceMatches = cleanSpokenText.match(/[^.!?\n]+(?:[.!?\n]+|$)/g) || [cleanSpokenText];
     const chunks: string[] = [];
 
     for (const sentence of sentenceMatches) {
@@ -145,17 +145,21 @@ export class SpeechSynthesizer {
     }
 
     if (!selectedVoice) {
-      selectedVoice =
-        voices.find(
-          (v) =>
-            v.lang.startsWith('en') &&
-            (v.name.includes('Google') ||
-              v.name.includes('Natural') ||
-              v.name.includes('Samantha') ||
-              v.name.includes('Daniel') ||
-              v.name.includes('Alex') ||
-              v.name.includes('Zira'))
-        ) || null;
+      // When the caller has not selected a specific voice, prefer clear,
+      // natural voices over old robotic system defaults. This never overrides
+      // the user's explicit voiceURI, and degrades safely if none are present.
+      const englishVoices = voices.filter((v) => /^en(?:[-_]|$)/i.test(v.lang));
+      const quality = (v: SpeechSynthesisVoice): number => {
+        const name = v.name.toLowerCase();
+        let score = 0;
+        if (/neural|natural|enhanced|premium/.test(name)) score += 9;
+        if (/aria|jenny|samantha|sonia|ava|zira|olivia|victoria/.test(name)) score += 6;
+        if (/google|microsoft|apple/.test(name)) score += 4;
+        if (!v.localService) score += 2;
+        if (/^en[-_](us|gb)/i.test(v.lang)) score += 1;
+        return score;
+      };
+      selectedVoice = [...englishVoices].sort((a, b) => quality(b) - quality(a))[0] || null;
     }
 
     console.info('[RODEX TTS Dispatch]', {
