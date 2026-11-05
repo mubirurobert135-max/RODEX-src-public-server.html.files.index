@@ -1877,39 +1877,11 @@ export default function App() {
     await globalSpeechManager.startCommandCapture();
   };
 
-  // Status subtitle copy
-  const getStatusText = () => {
-    switch (state) {
-      case 'listening':
-        return transcript || (isLiveConversation ? 'Ready for follow-up — Listening...' : 'Listening to your voice...');
-      case 'thinking':
-      case 'processing':
-        return 'RODEX is understanding...';
-      case 'planning':
-        return 'Planning task execution...';
-      case 'executing':
-      case 'executing_tool':
-        return 'Executing authorized actions...';
-      case 'success':
-        return 'Task completed successfully';
-      case 'warning':
-      case 'permission_required':
-        return 'Operator confirmation required';
-      case 'error':
-        return 'System alert — Check connection';
-      case 'speaking':
-        return 'Speaking response...';
-      case 'idle':
-      default:
-        return 'Call "Hey RODEX" or tap Orb to interact';
-    }
-  };
-
   return (
     <AndroidFrame>
       <main
         id="rodex-main-screen"
-        className="w-full h-full flex flex-col justify-between items-center relative bg-black text-white overflow-hidden select-none m-0 p-0"
+        className="w-full h-full flex flex-col justify-between items-center relative bg-[#0C1119] text-white overflow-hidden select-none m-0 p-0"
       >
         {/* VIEWPORT-LEVEL ATMOSPHERIC LIGHT FIELD AND UNRESTRICTED ENERGY FIELD */}
         <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden z-0 select-none">
@@ -2127,14 +2099,14 @@ export default function App() {
           </div>
         </header>
 
-        {/* Center: The Large Glowing AI Orb - Pure, Grand & Uncluttered Focus */}
+        {/* Center: The expressive RODEX character is the visual conversation surface. */}
         <div className="flex-1 flex flex-col items-center justify-center relative px-4 w-full my-0 py-0 overflow-visible">
           {/* Subtle Ambient Radial Glow */}
           <div
             className={`absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none transition-colors duration-700 ${currentOrbTheme.ambientGlowClass}`}
           />
 
-          {/* Central Orb Identity */}
+          {/* Expressive character identity and nonverbal speech response */}
           <motion.div
             className="relative flex flex-col items-center justify-center cursor-pointer select-none m-0 p-0"
             animate={{
@@ -2169,6 +2141,7 @@ export default function App() {
               activeMode={activeMode}
               isLive={isLiveConversation}
               themeAccent={themeAccent}
+              utterance={lastResponse}
             />
           </motion.div>
 
@@ -2593,8 +2566,9 @@ export default function App() {
           }}
         />
 
-        {/* Live On-Screen Developer Voice Pipeline Diagnostic Panel */}
-        <VoiceDiagnosticPanel
+        {/* Debug tools are never part of the natural character experience. */}
+        {import.meta.env.DEV && new URLSearchParams(window.location.search).has('diagnostics') && (
+          <VoiceDiagnosticPanel
           assistantState={state}
           lastTranscript={transcript}
           wakeMatched={diagWakeMatched}
@@ -2602,7 +2576,8 @@ export default function App() {
           aiRequestState={aiRequestState}
           aiResponseState={aiResponseState}
           ttsState={ttsState}
-        />
+          />
+        )}
       </main>
     </AndroidFrame>
   );
