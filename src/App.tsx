@@ -2564,7 +2564,7 @@ export default function App() {
         />
 
         {/* Developer diagnostics are opt-in and never part of the natural character UI. */}
-        {import.meta.env.DEV && new URLSearchParams(window.location.search).has('diagnostics') && (
+        {typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname) && new URLSearchParams(window.location.search).has('diagnostics') && (
           <VoiceDiagnosticPanel
           assistantState={state}
           lastTranscript={transcript}
