@@ -54,73 +54,135 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
   const levelRef = useRef(audioLevel);
   levelRef.current = audioLevel;
 
-  // Human-like changes of attention: brief greeting, blink, consideration,
-  // speech gestures, task acknowledgement and relaxed return to neutral.
-  // These expressions are driven by real voice and task state, never by demo timers.
+  // All frames are local, and preloading prevents a blank silhouette on the
+  // first blink or gesture. This does not fetch content or start an AI session.
   useEffect(() => {
-    setPose(INITIAL_POSE[expression]);
+    if (typeof Image === 'undefined') return;
+    const images = ROBOT_FRAMES.map(src => {
+      const image = new Image();
+      image.src = src;
+      return image;
+    });
+    return () => { images.length = 0; };
+  }, []);
+
+  // Behaviour is triggered by genuine assistant and voice state. Short,
+  // imperfectly-spaced micro-gestures feel more natural than fixed loops.
+  // Speech still moves the face when a browser TTS engine supplies no output
+  // meter, which is normal in Chrome's speechSynthesis implementation.
+  useEffect(() => {
+    const neutralPose = INITIAL_POSE[expression];
+    setPose(neutralPose);
     if (reducedMotion) return;
-    const timers: number[] = [];
-    let interval: number | undefined;
-    const after = (ms: number, fn: () => void) => {
-      timers.push(window.setTimeout(fn, ms));
+
+    const timers = new Set<number>();
+    let beat = 0;
+    const schedule = (ms: number, fn: () => void) => {
+      const id = window.setTimeout(() => {
+        timers.delete(id);
+        if (!document.hidden) fn();
+      }, ms);
+      timers.add(id);
+    };
+    const clearScheduled = () => {
+      timers.forEach(id => window.clearTimeout(id));
+      timers.clear();
+    };
+    const next = () => {
+      beat += 1;
+      switch (expression) {
+        case 'rest': {
+          setPose(1); // a blink; no on-screen indicator
+          schedule(145 + Math.random() * 90, () => setPose(0));
+          schedule(3200 + Math.random() * 3700, next);
+          break;
+        }
+        case 'wake': {
+          setPose(3); // acknowledges the human, without announcing a state
+          break;
+        }
+        case 'focus': {
+          // An attentive tilt responds to actual incoming voice energy.
+          setPose(levelRef.current > 0.10 ? 6 : (beat % 3 === 0 ? 5 : 6));
+          schedule(680 + Math.random() * 330, next);
+          break;
+        }
+        case 'think': {
+          setPose(beat % 3 === 0 ? 8 : 7);
+          schedule(1150 + Math.random() * 730, next);
+          break;
+        }
+        case 'speak': {
+          const actionReply = /\b(opened|opening|launched|launching|playing|searching|found|sent|navigating|youtube|browser)\b/i.test(lastResponse);
+          const sequence = actionReply ? [3, 4, 9, 13, 4] : [3, 13, 14, 3, 9, 13];
+          setPose(sequence[beat % sequence.length]);
+          // Measured output makes gestures slightly faster, but is optional.
+          const energetic = levelRef.current > 0.10;
+          schedule((energetic ? 420 : 590) + Math.random() * 180, next);
+          break;
+        }
+        case 'act': {
+          setPose(beat % 2 ? 10 : 11);
+          schedule(960 + Math.random() * 370, next);
+          break;
+        }
+        case 'happy': {
+          setPose(13);
+          break;
+        }
+        case 'concerned': {
+          setPose(15);
+          break;
+        }
+      }
     };
 
-    if (expression === 'wake') {
-      after(620, () => setPose(3));
-    } else if (expression === 'rest') {
-      interval = window.setInterval(() => {
-        setPose(1); // small friendly blink
-        after(220, () => setPose(0));
-      }, 4400);
-    } else if (expression === 'focus') {
-      interval = window.setInterval(() => {
-        setPose(levelRef.current > 0.13 ? 6 : 5);
-        after(420, () => setPose(6));
-      }, 1600);
-    } else if (expression === 'think') {
-      interval = window.setInterval(() => {
-        setPose(p => p === 7 ? 8 : 7);
-      }, 1750);
-    } else if (expression === 'speak') {
-      // Conversation gestures are varied, meaning-sensitive and softly paced,
-      // rather than a mechanical repeating arm motion every few milliseconds.
-      const message = lastResponse.toLowerCase().trim();
-      const isActionReply = /\b(open(?:ing|ed)?|launch(?:ing|ed)?|play(?:ing)?|search(?:ing)?|send(?:ing|sent)?|found|youtube|browser|navigate)\b/i.test(message);
-      const isGreeting = /^(hi|hello|hey|good morning|good afternoon|good evening|welcome)\b/i.test(message);
-      const isReassuring = /\b(sorry|unfortunately|apologize|cannot|can't|unable)\b/i.test(message);
-      let beat = 0;
-      const cadence = [1080, 1520, 1180, 1860, 1320];
-      const gesture = () => {
-        const energy = levelRef.current;
-        const naturalPause = beat % 5 === 3;
-        if (isReassuring) {
-          setPose(naturalPause ? 14 : 15);
-        } else if (isGreeting && beat < 2) {
-          setPose(beat === 0 ? 12 : 13);
-        } else if (isActionReply) {
-          setPose(naturalPause ? 14 : (beat % 2 ? 9 : 4));
-        } else {
-          setPose(naturalPause || (energy < 0.025 && beat % 2 === 0) ? 14 : (beat % 2 ? 3 : 13));
-        }
-        const delay = cadence[beat % cadence.length];
-        beat += 1;
-        after(delay, gesture);
-      };
-      gesture();
-    } else if (expression === 'act') {
-      interval = window.setInterval(() => setPose(p => p === 10 ? 11 : 10), 1250);
-    } else if (expression === 'happy') {
-      after(820, () => setPose(13));
-    } else if (expression === 'concerned') {
-      after(1100, () => setPose(15));
-    }
+    const initialDelay = expression === 'wake' ? 480
+      : expression === 'happy' ? 620
+      : expression === 'concerned' ? 880
+      : expression === 'rest' ? 3100
+      : 470;
 
+    const visibilityChanged = () => {
+      clearScheduled();
+      setPose(neutralPose);
+      if (!document.hidden) schedule(initialDelay, next);
+    };
+    document.addEventListener('visibilitychange', visibilityChanged);
+    if (!document.hidden) schedule(initialDelay, next);
     return () => {
-      if (interval !== undefined) window.clearInterval(interval);
-      timers.forEach(window.clearTimeout);
+      clearScheduled();
+      document.removeEventListener('visibilitychange', visibilityChanged);
     };
   }, [expression, lastResponse, reducedMotion]);
+
+  const gazeFrame = useRef<number | null>(null);
+  const gazeTarget = useRef({ x: 0, y: 0 });
+  useEffect(() => () => {
+    if (gazeFrame.current !== null) window.cancelAnimationFrame(gazeFrame.current);
+  }, []);
+
+  const moveGaze = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (reducedMotion || event.pointerType !== 'mouse') return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    gazeTarget.current = {
+      x: Math.max(-1, Math.min(1, (event.clientX - rect.left - rect.width / 2) / (rect.width / 2))),
+      y: Math.max(-1, Math.min(1, (event.clientY - rect.top - rect.height / 2) / (rect.height / 2))),
+    };
+    // Pointer events may arrive faster than the display can paint.
+    if (gazeFrame.current === null) {
+      gazeFrame.current = window.requestAnimationFrame(() => {
+        setGaze(gazeTarget.current);
+        gazeFrame.current = null;
+      });
+    }
+  };
+  const resetGaze = () => {
+    if (gazeFrame.current !== null) window.cancelAnimationFrame(gazeFrame.current);
+    gazeFrame.current = null;
+    gazeTarget.current = { x: 0, y: 0 };
+    setGaze({ x: 0, y: 0 });
+  };
 
   return (
     <button
@@ -129,15 +191,8 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       onClick={onClick}
       aria-label="Speak with RODEX"
       title="Speak with RODEX"
-      onPointerMove={(event) => {
-        if (reducedMotion || event.pointerType !== 'mouse') return;
-        const box = event.currentTarget.getBoundingClientRect();
-        setGaze({
-          x: Math.max(-1, Math.min(1, (event.clientX - box.left - box.width / 2) / (box.width / 2))),
-          y: Math.max(-1, Math.min(1, (event.clientY - box.top - box.height / 2) / (box.height / 2))),
-        });
-      }}
-      onPointerLeave={() => setGaze({ x: 0, y: 0 })}
+      onPointerMove={moveGaze}
+      onPointerLeave={resetGaze}
     >
       <span className="rodex-robot-ambient" aria-hidden="true" />
       <span className="rodex-robot-scale" aria-hidden="true">
