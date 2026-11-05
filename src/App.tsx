@@ -33,7 +33,7 @@ import {
   Mail,
   Menu,
 } from 'lucide-react';
-import { Orb } from './components/Orb';
+import { RobotCharacter } from './components/RobotCharacter';
 import { ActionBar } from './components/ActionBar';
 import { MoreMenu } from './components/MoreMenu';
 import { ChatSheet } from './components/ChatSheet';
@@ -1824,7 +1824,7 @@ export default function App() {
     };
   }, []);
 
-  // Unified Orb Click Handler (Seamlessly Integrates Real-Time Live Voice with the Orb)
+  // RODEX Character Interaction (Preserves the real-time live voice pipeline)
   const handleOrbClick = async () => {
     console.info('[RODEX TRACE] ORB CLICKED');
     console.info('[RODEX TRACE] ORB VOICE START REQUESTED');
@@ -1877,34 +1877,7 @@ export default function App() {
     await globalSpeechManager.startCommandCapture();
   };
 
-  // Status subtitle copy
-  const getStatusText = () => {
-    switch (state) {
-      case 'listening':
-        return transcript || (isLiveConversation ? 'Ready for follow-up — Listening...' : 'Listening to your voice...');
-      case 'thinking':
-      case 'processing':
-        return 'RODEX is understanding...';
-      case 'planning':
-        return 'Planning task execution...';
-      case 'executing':
-      case 'executing_tool':
-        return 'Executing authorized actions...';
-      case 'success':
-        return 'Task completed successfully';
-      case 'warning':
-      case 'permission_required':
-        return 'Operator confirmation required';
-      case 'error':
-        return 'System alert — Check connection';
-      case 'speaking':
-        return 'Speaking response...';
-      case 'idle':
-      default:
-        return 'Call "Hey RODEX" or tap Orb to interact';
-    }
-  };
-
+  // Expressions are conveyed by the character rather than a status subtitle.
   return (
     <AndroidFrame>
       <main
@@ -2127,14 +2100,14 @@ export default function App() {
           </div>
         </header>
 
-        {/* Center: The Large Glowing AI Orb - Pure, Grand & Uncluttered Focus */}
+        {/* Center: Approved expressive RODEX robot, powered by real assistant events */}
         <div className="flex-1 flex flex-col items-center justify-center relative px-4 w-full my-0 py-0 overflow-visible">
           {/* Subtle Ambient Radial Glow */}
           <div
             className={`absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none transition-colors duration-700 ${currentOrbTheme.ambientGlowClass}`}
           />
 
-          {/* Central Orb Identity */}
+          {/* Central Robot Identity - no on-screen listening/thinking labels */}
           <motion.div
             className="relative flex flex-col items-center justify-center cursor-pointer select-none m-0 p-0"
             animate={{
@@ -2160,15 +2133,12 @@ export default function App() {
               damping: 24,
             }}
           >
-            <Orb
+            <RobotCharacter
               state={state}
               audioLevel={audioLevel}
-              pitchHz={pitchHz}
-              size={260}
+              taskState={activeTask?.state}
+              lastResponse={lastResponse}
               onClick={handleOrbClick}
-              activeMode={activeMode}
-              isLive={isLiveConversation}
-              themeAccent={themeAccent}
             />
           </motion.div>
 
