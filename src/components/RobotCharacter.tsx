@@ -1,13 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import type { AssistantState, TaskState } from '../types';
-import { ROBOT_FRAMES } from './robotFrames';
-import { isolateRobotFrame } from './robotCutout';
 import './RobotCharacter.css';
 
-type Expression =
-  | 'rest' | 'wake' | 'focus' | 'think' | 'speak' | 'act'
-  | 'happy' | 'concerned';
+type Expression = 'rest' | 'wake' | 'focus' | 'think' | 'speak' | 'act' | 'happy' | 'concerned';
 
 interface RobotCharacterProps {
   state: AssistantState;
@@ -17,7 +13,11 @@ interface RobotCharacterProps {
   onClick: () => void | Promise<void>;
 }
 
-/** The RODEX robot is the interface itself, not a separate status display. */
+/**
+ * RODEX's original robot silhouette, redrawn as an infinitely scalable
+ * dimensional vector. No bitmap crop, picture panel, CSS mask or iframe.
+ * Every expression reacts to actual assistant state.
+ */
 function resolveExpression(state: AssistantState, taskState?: TaskState): Expression {
   if (state === 'error' || taskState === 'FAILED') return 'concerned';
   if (state === 'warning' || state === 'permission_required') return 'concerned';
@@ -30,17 +30,6 @@ function resolveExpression(state: AssistantState, taskState?: TaskState): Expres
   return 'rest';
 }
 
-const INITIAL_POSE: Record<Expression, number> = {
-  rest: 0,
-  wake: 2,
-  focus: 6,
-  think: 7,
-  speak: 3,
-  act: 10,
-  happy: 12,
-  concerned: 8,
-};
-
 export const RobotCharacter: React.FC<RobotCharacterProps> = ({
   state,
   audioLevel = 0,
@@ -50,156 +39,65 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
 }) => {
   const expression = resolveExpression(state, taskState);
   const reducedMotion = useReducedMotion();
-  const [pose, setPose] = useState(INITIAL_POSE[expression]);
+  const [blink, setBlink] = useState(false);
   const [gaze, setGaze] = useState({ x: 0, y: 0 });
-  const levelRef = useRef(audioLevel);
-  levelRef.current = audioLevel;
-
-  // Remove the demo panels and their rectangular background from all 16
-  // original robot poses. Decoding is local; no network call or AI request.
-  const [preparedFrames, setPreparedFrames] = useState<(string | undefined)[]>([]);
-  useEffect(() => {
-    let active = true;
-    const ownedUrls: string[] = [];
-    ROBOT_FRAMES.forEach((frame, index) => {
-      isolateRobotFrame(frame).then(url => {
-        if (!active) {
-          if (url.startsWith('blob:')) URL.revokeObjectURL(url);
-          return;
-        }
-        if (url.startsWith('blob:')) ownedUrls.push(url);
-        setPreparedFrames(previous => {
-          const next = [...previous];
-          next[index] = url;
-          return next;
-        });
-      }).catch(error => {
-        console.warn('[RODEX character] Unable to prepare animation frame', index, error);
-      });
-    });
-    return () => {
-      active = false;
-      ownedUrls.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, []);
-
-  // Behaviour is triggered by genuine assistant and voice state. Short,
-  // imperfectly-spaced micro-gestures feel more natural than fixed loops.
-  // Speech still moves the face when a browser TTS engine supplies no output
-  // meter, which is normal in Chrome's speechSynthesis implementation.
-  useEffect(() => {
-    const neutralPose = INITIAL_POSE[expression];
-    setPose(neutralPose);
-    if (reducedMotion) return;
-
-    const timers = new Set<number>();
-    let beat = 0;
-    const schedule = (ms: number, fn: () => void) => {
-      const id = window.setTimeout(() => {
-        timers.delete(id);
-        if (!document.hidden) fn();
-      }, ms);
-      timers.add(id);
-    };
-    const clearScheduled = () => {
-      timers.forEach(id => window.clearTimeout(id));
-      timers.clear();
-    };
-    const next = () => {
-      beat += 1;
-      switch (expression) {
-        case 'rest': {
-          setPose(1); // a blink; no on-screen indicator
-          schedule(145 + Math.random() * 90, () => setPose(0));
-          schedule(3200 + Math.random() * 3700, next);
-          break;
-        }
-        case 'wake': {
-          setPose(3); // acknowledges the human, without announcing a state
-          break;
-        }
-        case 'focus': {
-          // An attentive tilt responds to actual incoming voice energy.
-          setPose(levelRef.current > 0.10 ? 6 : (beat % 3 === 0 ? 5 : 6));
-          schedule(680 + Math.random() * 330, next);
-          break;
-        }
-        case 'think': {
-          setPose(beat % 3 === 0 ? 8 : 7);
-          schedule(1150 + Math.random() * 730, next);
-          break;
-        }
-        case 'speak': {
-          const actionReply = /\b(opened|opening|launched|launching|playing|searching|found|sent|navigating|youtube|browser)\b/i.test(lastResponse);
-          const sequence = actionReply ? [3, 4, 9, 13, 4] : [3, 13, 14, 3, 9, 13];
-          setPose(sequence[beat % sequence.length]);
-          // Measured output makes gestures slightly faster, but is optional.
-          const energetic = levelRef.current > 0.10;
-          schedule((energetic ? 420 : 590) + Math.random() * 180, next);
-          break;
-        }
-        case 'act': {
-          setPose(beat % 2 ? 10 : 11);
-          schedule(960 + Math.random() * 370, next);
-          break;
-        }
-        case 'happy': {
-          setPose(13);
-          break;
-        }
-        case 'concerned': {
-          setPose(15);
-          break;
-        }
-      }
-    };
-
-    const initialDelay = expression === 'wake' ? 480
-      : expression === 'happy' ? 620
-      : expression === 'concerned' ? 880
-      : expression === 'rest' ? 3100
-      : 470;
-
-    const visibilityChanged = () => {
-      clearScheduled();
-      setPose(neutralPose);
-      if (!document.hidden) schedule(initialDelay, next);
-    };
-    document.addEventListener('visibilitychange', visibilityChanged);
-    if (!document.hidden) schedule(initialDelay, next);
-    return () => {
-      clearScheduled();
-      document.removeEventListener('visibilitychange', visibilityChanged);
-    };
-  }, [expression, lastResponse, reducedMotion]);
-
   const gazeFrame = useRef<number | null>(null);
-  const gazeTarget = useRef({ x: 0, y: 0 });
+  const safeAudio = Math.min(1, Math.max(0, audioLevel || 0));
+  const actionReply = /\b(opened|opening|launched|launching|playing|searching|found|sent|navigating|youtube|browser)\b/i.test(lastResponse);
+  const happy = expression === 'happy' || (expression === 'speak' && /thank|great|wonderful|welcome/i.test(lastResponse));
+  const speaking = expression === 'speak';
+  const focused = expression === 'focus' || expression === 'wake';
+  const busy = expression === 'think' || expression === 'act';
+  const concerned = expression === 'concerned';
+
+  useEffect(() => {
+    if (reducedMotion) { setBlink(false); return; }
+    let blinkTimer: number | undefined;
+    let reopenTimer: number | undefined;
+    let cancelled = false;
+    const next = () => {
+      blinkTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        if (document.visibilityState === 'visible' && expression !== 'speak') {
+          setBlink(true);
+          reopenTimer = window.setTimeout(() => setBlink(false), 140);
+        }
+        next();
+      }, 2500 + Math.random() * 3800);
+    };
+    next();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(blinkTimer);
+      window.clearTimeout(reopenTimer);
+    };
+  }, [reducedMotion, expression]);
+
   useEffect(() => () => {
     if (gazeFrame.current !== null) window.cancelAnimationFrame(gazeFrame.current);
   }, []);
 
-  const moveGaze = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (reducedMotion || event.pointerType !== 'mouse') return;
     const rect = event.currentTarget.getBoundingClientRect();
-    gazeTarget.current = {
-      x: Math.max(-1, Math.min(1, (event.clientX - rect.left - rect.width / 2) / (rect.width / 2))),
-      y: Math.max(-1, Math.min(1, (event.clientY - rect.top - rect.height / 2) / (rect.height / 2))),
-    };
-    // Pointer events may arrive faster than the display can paint.
-    if (gazeFrame.current === null) {
-      gazeFrame.current = window.requestAnimationFrame(() => {
-        setGaze(gazeTarget.current);
-        gazeFrame.current = null;
-      });
-    }
+    const x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - .5) * 2));
+    const y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - .5) * 2));
+    if (gazeFrame.current !== null) return;
+    gazeFrame.current = window.requestAnimationFrame(() => {
+      setGaze({ x, y });
+      gazeFrame.current = null;
+    });
   };
   const resetGaze = () => {
     if (gazeFrame.current !== null) window.cancelAnimationFrame(gazeFrame.current);
     gazeFrame.current = null;
-    gazeTarget.current = { x: 0, y: 0 };
     setGaze({ x: 0, y: 0 });
   };
+
+  const eyeSet = happy ? 'happy' : concerned ? 'concerned' : focused ? 'focus' : busy ? 'busy' : 'rest';
+  const headTilt = concerned ? -5 : expression === 'think' ? -7 : expression === 'wake' ? 5 : 0;
+  const rightGesture = expression === 'act' ? -28 : speaking && actionReply ? -25 : happy ? -19 : speaking ? -12 : expression === 'think' ? -9 : 0;
+  const leftGesture = happy ? 16 : focused ? -8 : speaking ? 9 : 0;
 
   return (
     <button
@@ -208,49 +106,194 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       onClick={onClick}
       aria-label="Speak with RODEX"
       title="Speak with RODEX"
-      onPointerMove={moveGaze}
+      onPointerMove={handlePointerMove}
       onPointerLeave={resetGaze}
     >
-      <span className="rodex-robot-ambient" aria-hidden="true" />
-      <span className="rodex-robot-scale" aria-hidden="true">
-        <motion.span
-          className="rodex-robot-floating"
-          animate={reducedMotion ? {} : {
-            y: expression === 'act' ? [0, -9, 0] : [0, -7, 0],
-            rotateY: gaze.x * 5,
+      <span className="rodex-dimensional-atmosphere" aria-hidden="true" />
+      <svg
+        className="rodex-robot-vector"
+        viewBox="0 0 600 650"
+        role="presentation"
+        aria-hidden="true"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <defs>
+          <radialGradient id="rdx-air" cx="50%" cy="52%" r="49%">
+            <stop offset="0%" stopColor="#1366ac" stopOpacity=".22" />
+            <stop offset="62%" stopColor="#08436d" stopOpacity=".08" />
+            <stop offset="100%" stopColor="#030711" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="rdx-helmet" cx="26%" cy="17%" r="92%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="22%" stopColor="#f0fbff" />
+            <stop offset="48%" stopColor="#c3e8fb" />
+            <stop offset="78%" stopColor="#8cc3ea" />
+            <stop offset="100%" stopColor="#356b9b" />
+          </radialGradient>
+          <radialGradient id="rdx-torso" cx="27%" cy="14%" r="98%">
+            <stop offset="0%" stopColor="#fff" />
+            <stop offset="35%" stopColor="#e3f7ff" />
+            <stop offset="65%" stopColor="#a4d7f1" />
+            <stop offset="88%" stopColor="#72acd5" />
+            <stop offset="100%" stopColor="#306589" />
+          </radialGradient>
+          <linearGradient id="rdx-arm" x1="0%" y1="0%" x2="95%" y2="100%">
+            <stop offset="0%" stopColor="#f7fdff" />
+            <stop offset="38%" stopColor="#e5f6ff" />
+            <stop offset="78%" stopColor="#91c5e9" />
+            <stop offset="100%" stopColor="#417ab1" />
+          </linearGradient>
+          <linearGradient id="rdx-visor" x1="20%" y1="0%" x2="75%" y2="100%">
+            <stop offset="0%" stopColor="#0c1c2b" />
+            <stop offset="36%" stopColor="#000712" />
+            <stop offset="100%" stopColor="#000107" />
+          </linearGradient>
+          <linearGradient id="rdx-eye" x1="0%" y1="0%" x2="90%" y2="100%">
+            <stop offset="0%" stopColor="#58eaff" />
+            <stop offset="48%" stopColor="#00d8ff" />
+            <stop offset="100%" stopColor="#008dff" />
+          </linearGradient>
+          <radialGradient id="rdx-floor" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#00c8ff" stopOpacity=".47" />
+            <stop offset="45%" stopColor="#009bfa" stopOpacity=".18" />
+            <stop offset="100%" stopColor="#0075ef" stopOpacity="0" />
+          </radialGradient>
+          <filter id="rdx-soft-glow" x="-90%" y="-160%" width="280%" height="420%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
+          <filter id="rdx-shadow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="12" />
+          </filter>
+        </defs>
+
+        {/* Full-width atmospheric environment, not a character container. */}
+        <ellipse cx="300" cy="330" rx="290" ry="310" fill="url(#rdx-air)" />
+        <ellipse cx="300" cy="563" rx="192" ry="36" fill="url(#rdx-floor)" />
+        <motion.ellipse
+          cx="300" cy="562" rx="173" ry="26" fill="none"
+          stroke="#16caff" strokeWidth="2.2"
+          strokeOpacity=".67"
+          animate={reducedMotion ? undefined : { rx: [166, 178, 166], opacity: [.56, .88, .56] }}
+          transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <ellipse cx="300" cy="562" rx="134" ry="16" fill="none" stroke="#42a7fb" strokeWidth="1" strokeOpacity=".22" />
+        <ellipse cx="300" cy="553" rx="85" ry="12" fill="#0185de" opacity=".25" filter="url(#rdx-shadow)" />
+
+        <motion.g
+          className="rodex-robot-model"
+          style={{ transformOrigin: '50% 47%' }}
+          animate={reducedMotion ? undefined : {
+            y: speaking ? [1, -7, 1] : busy ? [0, -6, 0] : [0, -13, 0],
+            rotateZ: expression === 'think' ? [0, -2, 0] : [0, .7, 0],
+            rotateY: gaze.x * 4,
             rotateX: -gaze.y * 3,
-            rotateZ: expression === 'think' ? [-1.4, 1.4, -1.4] : [0, 0.6, 0],
           }}
           transition={{
-            y: { repeat: Infinity, duration: expression === 'act' ? 2.1 : 3.7, ease: 'easeInOut' },
-            rotateZ: { repeat: Infinity, duration: 4, ease: 'easeInOut' },
-            rotateX: { duration: 0.23 }, rotateY: { duration: 0.23 },
+            y: { duration: speaking ? 1.8 : 4.1, repeat: Infinity, ease: 'easeInOut' },
+            rotateZ: { duration: 4.2, repeat: Infinity, ease: 'easeInOut' },
+            rotateY: { duration: .25 },
+            rotateX: { duration: .25 },
           }}
         >
-          <span className="rodex-robot-viewport">
-            {preparedFrames[pose] || preparedFrames[0] ? (
-              <AnimatePresence initial={false}>
-                <motion.img
-                  key={pose}
-                  src={preparedFrames[pose] || preparedFrames[0]}
-                  alt=""
-                  aria-hidden="true"
-                  draggable={false}
-                  className="rodex-robot-pose"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: reducedMotion ? 0 : 0.20, ease: 'easeInOut' }}
-                />
-              </AnimatePresence>
-            ) : (
-              <span className="rodex-robot-boot" aria-hidden="true" />
-            )}
-          </span>
-        </motion.span>
-      </span>
-      <span className="rodex-robot-light-ring" aria-hidden="true" />
-      <span className="rodex-robot-ground-glow" aria-hidden="true" />
+          {/* The limbs are separate articulated elements; they never clip. */}
+          <motion.g
+            className="rodex-left-arm"
+            style={{ transformOrigin: '192px 310px' }}
+            animate={reducedMotion ? undefined : { rotate: leftGesture, y: focused ? -3 : 0 }}
+            transition={{ type: 'spring', stiffness: 110, damping: 17 }}
+          >
+            <path d="M193 309 C176 303 158 320 151 346 C143 373 144 426 153 448 C161 469 178 467 190 450 C210 423 214 357 210 331 C207 321 202 313 193 309Z"
+              fill="url(#rdx-arm)" stroke="#b7ddfa" strokeWidth="2" />
+            <path d="M159 358 C158 332 172 319 185 320" fill="none" stroke="#fff" strokeWidth="11" strokeLinecap="round" opacity=".32" />
+          </motion.g>
+          <motion.g
+            className="rodex-right-arm"
+            style={{ transformOrigin: '402px 313px' }}
+            animate={reducedMotion ? undefined : { rotate: rightGesture, y: speaking ? [0, -4, 0] : 0 }}
+            transition={{
+              rotate: { type: 'spring', stiffness: 105, damping: 15 },
+              y: { repeat: speaking ? Infinity : 0, duration: .78, ease: 'easeInOut' },
+            }}
+          >
+            <path d="M398 310 C417 303 438 326 446 351 C460 391 453 440 438 453 C424 468 410 458 401 442 C390 421 384 357 389 329 C391 318 394 314 398 310Z"
+              fill="url(#rdx-arm)" stroke="#b5dbf8" strokeWidth="2" />
+            <path d="M404 321 C426 325 436 349 437 375" fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round" opacity=".27" />
+          </motion.g>
+
+          {/* Rounded tapered, pearlescent body with real depth cues. */}
+          <path d="M228 290 C252 275 342 276 368 297 C398 325 390 426 350 494 C333 525 314 545 301 550 C284 548 261 524 245 497 C208 436 200 339 228 290Z"
+            fill="#2d6a9f" opacity=".43" transform="translate(0 7)" />
+          <path d="M228 290 C252 275 342 276 368 297 C398 325 390 426 350 494 C333 525 314 545 301 550 C284 548 261 524 245 497 C208 436 200 339 228 290Z"
+            fill="url(#rdx-torso)" stroke="#d9f6ff" strokeWidth="1.5" />
+          <path d="M245 306 C231 343 245 414 272 476" stroke="#fff" strokeWidth="17" strokeLinecap="round" fill="none" opacity=".17" />
+          <path d="M354 311 C367 367 348 457 315 509" stroke="#3379a5" strokeWidth="17" strokeLinecap="round" fill="none" opacity=".15" />
+          <ellipse cx="299" cy="314" rx="57" ry="11" fill="#ffffff" opacity=".16" />
+
+          {/* Large floating helmet, dark glass visor and luminous eyes. */}
+          <motion.g
+            style={{ transformOrigin: '300px 207px' }}
+            animate={reducedMotion ? undefined : {
+              rotate: headTilt + gaze.x * 3,
+              x: gaze.x * 3,
+              y: gaze.y * 2,
+            }}
+            transition={{ type: 'spring', stiffness: 95, damping: 17 }}
+          >
+            <path d="M181 190 C176 116 228 67 306 66 C388 64 427 124 420 204 C415 259 367 306 301 308 C234 307 185 257 181 190Z"
+              fill="url(#rdx-helmet)" stroke="#d3efff" strokeWidth="2.5" />
+            <path d="M211 125 C229 86 268 76 299 77" stroke="#fff" strokeWidth="21" strokeLinecap="round" opacity=".40" fill="none" />
+            <path d="M196 188 C194 167 199 149 206 132" stroke="#fff" strokeWidth="6" strokeLinecap="round" opacity=".33" fill="none" />
+            <path d="M205 210 C221 175 261 162 311 164 C369 165 401 186 407 220 C415 258 376 289 309 293 C257 291 216 275 205 247 C200 233 200 221 205 210Z"
+              fill="url(#rdx-visor)" stroke="#152a41" strokeWidth="3" />
+            <path d="M216 209 C237 178 277 172 322 172" fill="none" stroke="#69b9ee" strokeWidth="3.5" strokeLinecap="round" opacity=".17" />
+            <path d="M217 242 C234 278 278 284 307 284" fill="none" stroke="#00528c" strokeWidth="3" strokeLinecap="round" opacity=".14" />
+
+            <motion.g
+              className="rodex-eye-pair"
+              animate={reducedMotion ? undefined : {
+                scaleY: blink ? .07 : 1,
+                x: gaze.x * 2.5,
+                y: gaze.y * 1.6,
+                opacity: expression === 'think' ? [.75, 1, .75] : 1,
+              }}
+              style={{ transformOrigin: '300px 232px' }}
+              transition={{ scaleY: { duration: .10 }, x: { duration: .2 }, y: { duration: .2 }, opacity: { duration: 1.4, repeat: Infinity } }}
+            >
+              {eyeSet === 'happy' ? (
+                <>
+                  <path d="M236 238 Q258 203 280 237 M330 237 Q350 201 375 234" fill="none" stroke="#00aaff" strokeWidth="18" strokeLinecap="round" opacity=".7" filter="url(#rdx-soft-glow)" />
+                  <path d="M236 238 Q258 203 280 237 M330 237 Q350 201 375 234" fill="none" stroke="url(#rdx-eye)" strokeWidth="8" strokeLinecap="round" />
+                </>
+              ) : eyeSet === 'concerned' ? (
+                <>
+                  <path d="M237 234 L277 228 M335 228 L374 234" fill="none" stroke="#00baff" strokeWidth="17" strokeLinecap="round" opacity=".7" filter="url(#rdx-soft-glow)" />
+                  <path d="M237 234 L277 228 M335 228 L374 234" fill="none" stroke="url(#rdx-eye)" strokeWidth="7" strokeLinecap="round" />
+                </>
+              ) : eyeSet === 'focus' ? (
+                <>
+                  <ellipse cx="259" cy="230" rx="22" ry="9" fill="#00bbff" filter="url(#rdx-soft-glow)" />
+                  <ellipse cx="351" cy="230" rx="22" ry="9" fill="#00bbff" filter="url(#rdx-soft-glow)" />
+                  <ellipse cx="259" cy="230" rx="19" ry="7" fill="url(#rdx-eye)" />
+                  <ellipse cx="351" cy="230" rx="19" ry="7" fill="url(#rdx-eye)" />
+                </>
+              ) : (
+                <>
+                  <path d="M239 223 Q260 225 280 239 M332 237 Q351 222 373 220" fill="none" stroke="#00afff" strokeWidth="19" strokeLinecap="round" opacity={speaking ? '.95' : '.8'} filter="url(#rdx-soft-glow)" />
+                  <path d="M239 223 Q260 225 280 239 M332 237 Q351 222 373 220" fill="none" stroke="url(#rdx-eye)" strokeWidth={speaking ? '10' : '8'} strokeLinecap="round" />
+                </>
+              )}
+            </motion.g>
+            <ellipse cx="296" cy="107" rx="37" ry="12" fill="#fff" opacity=".10" transform="rotate(-19 296 107)" />
+          </motion.g>
+          <motion.ellipse
+            cx="299" cy="391" rx="17" ry="18"
+            fill="#3ddaff" opacity=".12"
+            animate={reducedMotion ? undefined : { opacity: speaking ? [.08, .32, .08] : [.07, .15, .07], scale: [1, 1.08, 1] }}
+            transition={{ duration: speaking ? .55 : 3.5, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </motion.g>
+      </svg>
+      <span className="rodex-character-aura" aria-hidden="true" />
     </button>
   );
 };
