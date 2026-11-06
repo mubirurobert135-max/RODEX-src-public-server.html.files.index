@@ -32,8 +32,13 @@ import {
   Stethoscope,
   Mail,
   Menu,
+  Bell,
+  UserRound,
+  Plus,
+  Keyboard,
 } from 'lucide-react';
 import { RobotCharacter } from './components/RobotCharacter';
+import { RodexCockpit } from './components/RodexCockpit';
 import './components/RodexImmersive.css';
 import { ActionBar } from './components/ActionBar';
 import { MoreMenu } from './components/MoreMenu';
@@ -1976,26 +1981,28 @@ export default function App() {
           </div>
         )}
 
-        {/* Approved RODEX AI identity; all secondary features remain inside menus. */}
+        {/* Reference-aligned wordmark and utility controls. No mic shortcut. */}
         <header className="rodex-home-header">
           <div className="rodex-brand">
             <span className="rodex-brand-mark" aria-hidden="true" />
             <span className="rodex-brand-word">RODEX <span>AI</span></span>
           </div>
           <div className="rodex-top-actions">
-            <button id="header-more-btn" type="button" aria-label="Open RODEX features"
-              title="Features and settings" className="rodex-glass-icon"
-              onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
-              <Menu className="w-[45%] h-[45%]" />
+            <button type="button" id="header-notifications-btn"
+              aria-label="System updates" title="System updates"
+              className="rodex-glass-icon rodex-notification-icon"
+              onClick={() => { triggerHaptic('tap'); setIsUpdateOpen(true); }}>
+              <Bell className="w-[45%] h-[45%]" />
             </button>
-            <button type="button" aria-label={currentUser ? 'Your RODEX profile' : 'Sign in to RODEX'}
+            <button type="button" id="header-profile-btn"
+              aria-label={currentUser ? 'Your RODEX profile' : 'Sign in to RODEX'}
               title={currentUser ? 'My profile' : 'Sign in'} className="rodex-glass-icon"
               onClick={() => {
                 triggerHaptic('tap');
                 if (currentUser) setIsUserProfileOpen(true);
                 else { setAuthModalTab('signin'); setIsAuthModalOpen(true); }
               }}>
-              <UserCheck className="w-[45%] h-[45%]" />
+              <UserRound className="w-[45%] h-[45%]" />
             </button>
           </div>
         </header>
@@ -2040,6 +2047,32 @@ export default function App() {
               onClick={handleOrbClick}
             />
           </motion.div>
+
+          <RodexCockpit
+            onHome={() => {
+              triggerHaptic('tap');
+              setIsChatOpen(false);
+              setActiveMode('home');
+            }}
+            onChat={() => { triggerHaptic('tap'); setIsChatOpen(true); }}
+            onApps={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}
+            onLayers={() => { triggerHaptic('tap'); setIsCapabilityOpen(true); }}
+            onSettings={() => { triggerHaptic('tap'); setIsSettingsOpen(true); }}
+            onCreate={() => {
+              triggerHaptic('tap');
+              setMediaStudioTab('video');
+              setIsMediaStudioOpen(true);
+            }}
+            onWrite={() => { triggerHaptic('tap'); setIsChatOpen(true); }}
+            onGenerate={() => {
+              triggerHaptic('tap');
+              setMediaStudioTab('image');
+              setIsMediaStudioOpen(true);
+            }}
+            onAnalyze={() => { triggerHaptic('tap'); setActiveMode('web'); }}
+            onBuild={() => { triggerHaptic('tap'); setActiveMode('code'); }}
+            onExplore={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}
+          />
 
           {/* Active Task Card (Lightweight Proactive & Multi-Step Agent Agenda Card) */}
           {activeTask && (
@@ -2189,10 +2222,10 @@ export default function App() {
             </button>
           )}
           <div className="rodex-quiet-dock-inner">
-            <button type="button" aria-label="Open conversation" title="Chat with RODEX"
+            <button type="button" aria-label="More actions" title="More actions"
               className="rodex-quiet-dock-icon"
-              onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}>
-              <MessageSquare className="w-[45%] h-[45%]" />
+              onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
+              <Plus className="w-[45%] h-[45%]" />
             </button>
             <div className="rodex-quiet-wave" aria-hidden="true"
               data-voice-active={state === 'speaking' || state === 'listening' || state === 'input_detected'}>
@@ -2206,10 +2239,10 @@ export default function App() {
                 return <span key={i} style={{ '--bar-height': height + '%', '--bar-delay': (-i * 0.025) + 's' } as React.CSSProperties} />;
               })}
             </div>
-            <button type="button" aria-label="More RODEX features" title="Features and settings"
+            <button type="button" aria-label="Open keyboard chat" title="Text chat"
               className="rodex-quiet-dock-icon"
-              onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
-              <Menu className="w-[45%] h-[45%]" />
+              onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}>
+              <Keyboard className="w-[45%] h-[45%]" />
             </button>
           </div>
         </footer>
