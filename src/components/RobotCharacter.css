@@ -39,6 +39,41 @@
     radial-gradient(ellipse 37% 52% at 50% 47%, rgba(5, 92, 170, .15) 0%, rgba(5, 55, 105, .07) 52%, transparent 100%);
   filter: blur(22px);
 }
+/* The holographic platform is in world space, not part of the spinning robot. */
+.rodex-holographic-floor {
+  position: absolute;
+  left: 50%;
+  bottom: 6.1%;
+  width: min(74vw, 52vh, 420px);
+  height: clamp(32px, 6.5vh, 72px);
+  transform: translateX(-50%) perspective(420px) rotateX(65deg);
+  transform-origin: center center;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 2px solid rgba(37, 199, 255, .67);
+  box-shadow: 0 0 18px rgba(0, 176, 255, .31), inset 0 0 21px rgba(0, 183, 255, .23);
+  z-index: 0;
+  animation: rodex-floor-breathe 4.4s ease-in-out infinite;
+}
+.rodex-holographic-floor::before {
+  content: '';
+  position: absolute;
+  inset: 20% 15%;
+  border-radius: 50%;
+  border: 1px solid rgba(76, 198, 252, .29);
+}
+.rodex-holographic-floor::after {
+  content: '';
+  position: absolute;
+  inset: -45% -10%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 180, 255, .20), transparent 67%);
+  filter: blur(16px);
+}
+@keyframes rodex-floor-breathe {
+  0%, 100% { opacity: .52; }
+  50% { opacity: .95; }
+}
 .rodex-robot-spin-shell {
   position: relative;
   display: flex;
@@ -110,4 +145,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .rodex-robot-model, .rodex-robot-vector, .rodex-robot-spin-shell { will-change: auto; }
+  .rodex-holographic-floor { animation: none; }
 }
