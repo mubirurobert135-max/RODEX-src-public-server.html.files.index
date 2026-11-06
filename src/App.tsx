@@ -2116,7 +2116,7 @@ export default function App() {
         </header>
 
         {/* Center: Approved expressive RODEX robot, powered by real assistant events */}
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative px-4 w-full my-0 py-0 overflow-visible">
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative px-0 sm:px-2 w-full my-0 py-0 overflow-visible">
           {/* Subtle Ambient Radial Glow */}
           <div
             className={`absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none transition-colors duration-700 ${currentOrbTheme.ambientGlowClass}`}
@@ -2124,7 +2124,7 @@ export default function App() {
 
           {/* Central Robot Identity - no on-screen listening/thinking labels */}
           <motion.div
-            className="relative flex flex-col items-center justify-center cursor-pointer select-none m-0 p-0"
+            className="relative w-full h-full min-h-0 flex flex-col items-center justify-center cursor-pointer select-none m-0 p-0"
             animate={{
               scale:
                 state === 'wake_detected'
@@ -2296,8 +2296,37 @@ export default function App() {
           {/* Clean Subtitle & Status Text - Overlayed below Orb without disturbing exact vertical centering */}
         </div>
 
-        {/* Bottom Section: Subtle Hands-Free Voice Status */}
-        <div className="w-full flex flex-col items-center pb-6 pt-2 z-20 shrink-0">
+        {/* Light, usable navigation - never placed over the robot's face. */}
+        <div className="w-full flex flex-col items-center pb-[max(16px,env(safe-area-inset-bottom))] pt-2 z-20 shrink-0">
+          <nav
+            className="inline-flex items-center gap-1 sm:gap-2 px-2.5 py-2 rounded-[24px] bg-[#0c1420]/90 border border-white/[0.10] shadow-[0_12px_60px_rgba(0,0,0,.33),inset_0_1px_0_rgba(255,255,255,.07)] backdrop-blur-xl"
+            aria-label="RODEX navigation"
+          >
+            <button
+              type="button"
+              onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}
+              className="flex items-center justify-center gap-2 min-w-[80px] sm:min-w-[106px] px-3 sm:px-5 py-2.5 rounded-2xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-[.97] transition-all text-xs sm:text-sm font-semibold"
+            >
+              <MessageSquare className="w-4 h-4 text-cyan-300" />
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => { triggerHaptic('tap'); setIsCapabilityOpen(true); }}
+              className="flex items-center justify-center gap-2 min-w-[88px] sm:min-w-[120px] px-3 sm:px-5 py-2.5 rounded-2xl bg-cyan-400/[.12] border border-cyan-200/[.10] text-cyan-100 hover:bg-cyan-400/[.19] active:scale-[.97] transition-all text-xs sm:text-sm font-semibold"
+            >
+              <Sparkles className="w-4 h-4 text-cyan-300" />
+              Explore
+            </button>
+            <button
+              type="button"
+              onClick={() => { triggerHaptic('tap'); setIsSettingsOpen(true); }}
+              className="flex items-center justify-center gap-2 min-w-[88px] sm:min-w-[110px] px-3 sm:px-5 py-2.5 rounded-2xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-[.97] transition-all text-xs sm:text-sm font-semibold"
+            >
+              <Settings className="w-4 h-4 text-cyan-300" />
+              Settings
+            </button>
+          </nav>
           {/* Dedicated End Call Hang-Up Button when Live Call is active */}
           {isLiveConversation && (
             <div className="mb-2">
