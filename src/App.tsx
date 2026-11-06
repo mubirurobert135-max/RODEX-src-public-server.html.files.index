@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { RobotCharacter } from './components/RobotCharacter';
 import { RodexCockpit } from './components/RodexCockpit';
+import { RodexSpeechWave } from './components/RodexSpeechWave';
 import './components/RodexImmersive.css';
 import { ActionBar } from './components/ActionBar';
 import { MoreMenu } from './components/MoreMenu';
@@ -2239,18 +2240,7 @@ export default function App() {
               onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
               <Plus className="w-[45%] h-[45%]" />
             </button>
-            <div className="rodex-quiet-wave" aria-hidden="true"
-              data-voice-active={state === 'speaking' || state === 'listening' || state === 'input_detected'}>
-              {Array.from({ length: 73 }, (_, i) => {
-                const center = 36;
-                const distance = Math.abs(i - center) / center;
-                const curve = Math.pow(Math.max(0, 1 - distance), 1.8);
-                const ripple = Math.abs(Math.sin(i * 0.37)) * 0.46 + Math.abs(Math.cos(i * 0.11)) * 0.54;
-                const activity = state === 'speaking' || state === 'listening' || state === 'input_detected';
-                const height = 7 + (activity ? 64 : 36) * curve * ripple * (1 + (activity ? audioLevel : 0) * .45);
-                return <span key={i} style={{ '--bar-height': height + '%', '--bar-delay': (-i * 0.025) + 's' } as React.CSSProperties} />;
-              })}
-            </div>
+            <RodexSpeechWave state={state} audioLevel={audioLevel} />
             <button type="button" aria-label="Open keyboard chat" title="Text chat"
               className="rodex-quiet-dock-icon"
               onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}>
