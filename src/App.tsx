@@ -34,6 +34,7 @@ import {
   Menu,
 } from 'lucide-react';
 import { RobotCharacter } from './components/RobotCharacter';
+import './components/RodexImmersive.css';
 import { ActionBar } from './components/ActionBar';
 import { MoreMenu } from './components/MoreMenu';
 import { ChatSheet } from './components/ChatSheet';
@@ -1882,75 +1883,9 @@ export default function App() {
     <AndroidFrame>
       <main
         id="rodex-main-screen"
-        className="w-full h-full flex flex-col justify-between items-center relative bg-black text-white overflow-hidden select-none m-0 p-0"
+        className="rodex-home w-full h-full flex flex-col justify-between items-center text-white select-none m-0 p-0"
       >
-        {/* VIEWPORT-LEVEL ATMOSPHERIC LIGHT FIELD AND UNRESTRICTED ENERGY FIELD */}
-        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden z-0 select-none">
-          {/* Volumetric Core Radial Gradient Layer - Centered and covering full screen */}
-          <motion.div
-            className="absolute inset-[-50%] w-[200%] h-[200%] rounded-full opacity-30 mix-blend-screen pointer-events-none transition-colors duration-1000 blur-[130px] sm:blur-[160px] md:blur-[220px]"
-            style={{
-              background: `radial-gradient(circle at center, rgba(${currentOrbTheme.primaryRGB.join(',')}, 0.55) 0%, rgba(${currentOrbTheme.secondaryRGB.join(',')}, 0.22) 25%, rgba(${currentOrbTheme.accentRGB.join(',')}, 0.08) 50%, rgba(0,0,0,0) 75%)`,
-            }}
-            animate={{
-              scale: state === 'wake_detected'
-                ? [1, 1.45, 1.15]
-                : state === 'listening'
-                ? [1, 1.05 + audioLevel * 0.7, 1]
-                : state === 'speaking'
-                ? [1, 1.02 + audioLevel * 0.5, 1]
-                : state === 'thinking' || state === 'processing'
-                ? [0.95, 1.08, 0.95]
-                : 1,
-              opacity: state === 'wake_detected'
-                ? 0.75
-                : state === 'listening'
-                ? 0.45 + audioLevel * 0.4
-                : state === 'speaking'
-                ? 0.42 + audioLevel * 0.35
-                : state === 'thinking' || state === 'processing'
-                ? [0.28, 0.48, 0.28]
-                : 0.22,
-            }}
-            transition={{
-              duration: state === 'wake_detected'
-                ? 0.4
-                : state === 'listening' || state === 'speaking'
-                ? 0.15
-                : state === 'thinking' || state === 'processing'
-                ? 3.2
-                : 4.5,
-              repeat: state === 'thinking' || state === 'processing' || state === 'idle' ? Infinity : 0,
-              ease: 'easeInOut',
-            }}
-          />
-
-          {/* Deep Ambient Edge Atmosphere Layer - Gently blends to screen edges */}
-          <div
-            className="absolute inset-0 w-full h-full pointer-events-none transition-all duration-1000 opacity-20"
-            style={{
-              background: `radial-gradient(circle at center, rgba(${currentOrbTheme.primaryRGB.join(',')}, 0.12) 0%, rgba(${currentOrbTheme.accentRGB.join(',')}, 0.04) 60%, rgba(0,0,0,0.95) 100%)`,
-            }}
-          />
-
-          {/* High-Frequency Interactive Voice Ripple Overlay */}
-          {(state === 'listening' || state === 'speaking') && (
-            <motion.div
-              className="absolute inset-[-100px] rounded-full opacity-15 mix-blend-color-dodge blur-[90px] pointer-events-none"
-              style={{
-                background: `radial-gradient(circle at center, rgba(${currentOrbTheme.secondaryRGB.join(',')}, 0.45) 0%, rgba(${currentOrbTheme.primaryRGB.join(',')}, 0.15) 40%, rgba(0,0,0,0) 80%)`,
-              }}
-              animate={{
-                scale: 1.0 + audioLevel * 1.3,
-                opacity: 0.1 + audioLevel * 0.5,
-              }}
-              transition={{
-                duration: 0.08,
-                ease: 'easeOut',
-              }}
-            />
-          )}
-        </div>
+        {/* Live CSS atmospheric background: no static screenshot or visible frame. */}
 
         {/* SCI-FI COGNITIVE VOICE ENGINE DIAGNOSTIC DOCK */}
         {showDiagPanel && (
@@ -2041,90 +1976,39 @@ export default function App() {
           </div>
         )}
 
-        {/* Quiet, compact navigation: the robot remains the visual focus. */}
-        <header className="w-full max-w-6xl mx-auto px-4 sm:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3 flex items-center justify-between gap-4 z-20 bg-transparent shrink-0">
-          <div className="flex items-center gap-3 sm:gap-5 min-w-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,.09)] shrink-0">
-                <span className="font-bold text-lg sm:text-xl text-cyan-300" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>R</span>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold tracking-[.16em] text-white text-sm sm:text-base leading-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>RODEX</span>
-                <span className="text-[9px] tracking-[.17em] uppercase text-slate-500 leading-tight mt-0.5">Personal AI</span>
-              </div>
-            </div>
-            <button
-              id="header-more-btn"
+        {/* Approved RODEX AI identity; all secondary features remain inside menus. */}
+        <header className="rodex-home-header">
+          <div className="rodex-brand">
+            <span className="rodex-brand-mark" aria-hidden="true" />
+            <span className="rodex-brand-word">RODEX <span>AI</span></span>
+          </div>
+          <div className="rodex-top-actions">
+            <button id="header-more-btn" type="button" aria-label="Open RODEX features"
+              title="Features and settings" className="rodex-glass-icon"
+              onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
+              <Menu className="w-[45%] h-[45%]" />
+            </button>
+            <button type="button" aria-label={currentUser ? 'Your RODEX profile' : 'Sign in to RODEX'}
+              title={currentUser ? 'My profile' : 'Sign in'} className="rodex-glass-icon"
               onClick={() => {
                 triggerHaptic('tap');
-                setIsMoreMenuOpen(true);
-              }}
-              className="px-3.5 py-2 rounded-full bg-white/[0.06] border border-white/10 hover:bg-white/[0.11] hover:border-cyan-300/35 text-slate-200 hover:text-white flex items-center gap-2 text-xs font-semibold active:scale-95 transition-all cursor-pointer"
-              title="Open RODEX features"
-            >
-              <Menu className="w-4 h-4 text-cyan-300" />
-              <span>Explore</span>
-            </button>
-          </div>
-
-          {/* TOP-RIGHT: Live Call / Mute status controls */}
-          <div className="flex items-center gap-2 pt-0.5">
-            {isLiveConversation && (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.3)] animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
-                <span className="text-[10px] font-bold tracking-wider text-rose-300 uppercase">
-                  Live Call
-                </span>
-                <button
-                  id="header-end-call-btn"
-                  onClick={endLiveCall}
-                  className="ml-1 px-1.5 py-0.5 rounded-full bg-red-900 hover:bg-red-800 border border-red-600 text-red-100 text-[9px] font-bold cursor-pointer transition-colors"
-                  title="End Live Call"
-                >
-                  End
-                </button>
-              </div>
-            )}
-
-            <button
-              id="audio-mute-toggle"
-              onClick={() => {
-                const nextMuted = !isMuted;
-                if (nextMuted) {
-                  // Stopping an utterance deliberately suppresses stale onEnd
-                  // callbacks. Update the conversation state here instead.
-                  if (rodexSynth.isSpeaking()) rodexSynth.stop();
-                  if (state === 'speaking') {
-                    globalLiveConversationService.stopAllPlayback();
-                    globalSpeechManager.setSelfSpeaking(false);
-                    setTtsState('idle');
-                    setState(micPermissionGranted ? 'listening' : 'idle');
-                  }
-                }
-                setIsMuted(nextMuted);
-              }}
-              title={isMuted ? 'Unmute voice output' : 'Mute voice output'}
-              className="p-2.5 rounded-full text-neutral-400 bg-white/[0.06] border border-white/10 hover:bg-white/[0.12] hover:text-white transition-all cursor-pointer"
-            >
-              {isMuted ? (
-                <VolumeX className="w-4 h-4 text-neutral-600" />
-              ) : (
-                <Volume2 className="w-4 h-4 text-cyan-400/80" />
-              )}
+                if (currentUser) setIsUserProfileOpen(true);
+                else { setAuthModalTab('signin'); setIsAuthModalOpen(true); }
+              }}>
+              <UserCheck className="w-[45%] h-[45%]" />
             </button>
           </div>
         </header>
 
         {/* Center: Approved expressive RODEX robot, powered by real assistant events */}
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative px-0 sm:px-2 w-full my-0 py-0 overflow-visible">
-          {/* Subtle Ambient Radial Glow */}
-          <div
-            className={`absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none transition-colors duration-700 ${currentOrbTheme.ambientGlowClass}`}
-          />
+        <div className="rodex-scene">
+          <span className="rodex-stage-glow" aria-hidden="true" />
+          <span className="rodex-stage-orbit" aria-hidden="true" />
+          <span className="rodex-stage-orbit rodex-stage-orbit--reverse" aria-hidden="true" />
 
           {/* Central Robot Identity - no on-screen listening/thinking labels */}
           <motion.div
-            className="relative w-full h-full min-h-0 flex flex-col items-center justify-center cursor-pointer select-none m-0 p-0"
+            className="rodex-character-stage"
             animate={{
               scale:
                 state === 'wake_detected'
@@ -2296,80 +2180,39 @@ export default function App() {
           {/* Clean Subtitle & Status Text - Overlayed below Orb without disturbing exact vertical centering */}
         </div>
 
-        {/* Light, usable navigation - never placed over the robot's face. */}
-        <div className="w-full flex flex-col items-center pb-[max(16px,env(safe-area-inset-bottom))] pt-2 z-20 shrink-0">
-          <nav
-            className="inline-flex items-center gap-1 sm:gap-2 px-2.5 py-2 rounded-[24px] bg-[#0c1420]/90 border border-white/[0.10] shadow-[0_12px_60px_rgba(0,0,0,.33),inset_0_1px_0_rgba(255,255,255,.07)] backdrop-blur-xl"
-            aria-label="RODEX navigation"
-          >
-            <button
-              type="button"
-              onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}
-              className="flex items-center justify-center gap-2 min-w-[80px] sm:min-w-[106px] px-3 sm:px-5 py-2.5 rounded-2xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-[.97] transition-all text-xs sm:text-sm font-semibold"
-            >
-              <MessageSquare className="w-4 h-4 text-cyan-300" />
-              Chat
-            </button>
-            <button
-              type="button"
-              onClick={() => { triggerHaptic('tap'); setIsCapabilityOpen(true); }}
-              className="flex items-center justify-center gap-2 min-w-[88px] sm:min-w-[120px] px-3 sm:px-5 py-2.5 rounded-2xl bg-cyan-400/[.12] border border-cyan-200/[.10] text-cyan-100 hover:bg-cyan-400/[.19] active:scale-[.97] transition-all text-xs sm:text-sm font-semibold"
-            >
-              <Sparkles className="w-4 h-4 text-cyan-300" />
-              Explore
-            </button>
-            <button
-              type="button"
-              onClick={() => { triggerHaptic('tap'); setIsSettingsOpen(true); }}
-              className="flex items-center justify-center gap-2 min-w-[88px] sm:min-w-[110px] px-3 sm:px-5 py-2.5 rounded-2xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-[.97] transition-all text-xs sm:text-sm font-semibold"
-            >
-              <Settings className="w-4 h-4 text-cyan-300" />
-              Settings
-            </button>
-          </nav>
-          {/* Dedicated End Call Hang-Up Button when Live Call is active */}
+        {/* No microphone icon, feature pills, verbose labels or default permission
+            prompt. Existing wake-word and robot-tap voice paths remain intact. */}
+        <footer className="rodex-quiet-dock">
           {isLiveConversation && (
-            <div className="mb-2">
-              <button
-                id="hangup-call-btn"
-                onClick={endLiveCall}
-                className="px-4 py-2 rounded-full bg-red-950/90 hover:bg-red-900 border border-red-600/80 text-red-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.35)] active:scale-90 transition-all cursor-pointer text-xs font-semibold"
-                title="End Live Call"
-              >
-                <PhoneOff className="w-4 h-4" />
-                <span>End Call</span>
-              </button>
-            </div>
+            <button type="button" id="hangup-call-btn" className="rodex-live-stop" onClick={endLiveCall}>
+              <PhoneOff className="w-4 h-4" /> End call
+            </button>
           )}
-        </div>
-
-        {/* Futuristic Mic Permission Banner to meet "browser reality" */}
-        {!micPermissionGranted && (
-          <div className="fixed bottom-24 left-4 right-4 mx-auto max-w-sm bg-neutral-900/95 border border-cyan-500/30 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_0_25px_rgba(6,182,212,0.15)] backdrop-blur-md z-40">
-            <div className="flex items-start gap-2.5">
-              <span className="text-xl">🎙️</span>
-              <div className="text-left">
-                <p className="text-xs font-bold text-white tracking-wide">RODEX Voice Interface</p>
-                <p className="text-[10px] text-neutral-400 mt-0.5 leading-relaxed">
-                  To communicate with RODEX naturally using your voice, please grant microphone permissions.
-                </p>
-              </div>
+          <div className="rodex-quiet-dock-inner">
+            <button type="button" aria-label="Open conversation" title="Chat with RODEX"
+              className="rodex-quiet-dock-icon"
+              onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}>
+              <MessageSquare className="w-[45%] h-[45%]" />
+            </button>
+            <div className="rodex-quiet-wave" aria-hidden="true"
+              data-voice-active={state === 'speaking' || state === 'listening' || state === 'input_detected'}>
+              {Array.from({ length: 73 }, (_, i) => {
+                const center = 36;
+                const distance = Math.abs(i - center) / center;
+                const curve = Math.pow(Math.max(0, 1 - distance), 1.8);
+                const ripple = Math.abs(Math.sin(i * 0.37)) * 0.46 + Math.abs(Math.cos(i * 0.11)) * 0.54;
+                const activity = state === 'speaking' || state === 'listening' || state === 'input_detected';
+                const height = 7 + (activity ? 64 : 36) * curve * ripple * (1 + (activity ? audioLevel : 0) * .45);
+                return <span key={i} style={{ '--bar-height': height + '%', '--bar-delay': (-i * 0.025) + 's' } as React.CSSProperties} />;
+              })}
             </div>
-            <button
-              onClick={async () => {
-                triggerHaptic('tap');
-                const granted = await requestMicPermission();
-                if (granted) {
-                  // Priming sound context
-                  rodexSynth.prime();
-                }
-              }}
-              className="w-full py-2 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-black font-extrabold text-[11px] uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all shadow-md shadow-cyan-500/20 text-center"
-            >
-              Grant Microphone Access
+            <button type="button" aria-label="More RODEX features" title="Features and settings"
+              className="rodex-quiet-dock-icon"
+              onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
+              <Menu className="w-[45%] h-[45%]" />
             </button>
           </div>
-        )}
+        </footer>
 
         {/* Slide-up Chat History Sheet */}
         <ChatSheet
@@ -2385,7 +2228,6 @@ export default function App() {
           onReplayAudio={(text) => speakResponse(text)}
           onClearHistory={() => setMessages([])}
           assistantState={state}
-          onStartVoice={startListening}
           isLiveConversation={isLiveConversation}
           onConfirmAction={handleConfirmAction}
           onToggleLiveCall={() => {
