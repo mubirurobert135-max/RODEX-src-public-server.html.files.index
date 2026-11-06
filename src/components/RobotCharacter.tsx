@@ -90,32 +90,27 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
     }
 
     const play = async () => {
+      // Shallow volumetric gestures preserve a real, forward-facing face.
+      // A 360-degree planar SVG flip made the character appear like a card.
       if (expression === 'wake' || expression === 'happy') {
-        spinControls.set({ rotateY: 0, rotateZ: 0, scale: 1 });
         await spinControls.start({
-          rotateY: [0, -23, 83, 177, 270, 360],
-          rotateZ: [0, -2.3, 0, 1.5, 0, 0],
-          scale: [1, 1.025, 1.045, 1.015, 1.035, 1],
-          transition: {
-            duration: expression === 'wake' ? 1.65 : 1.85,
-            times: [0, .15, .37, .59, .82, 1],
-            ease: 'easeInOut',
-          },
+          rotateY: [0, -9, 12, 0],
+          rotateZ: [0, -1.2, 1.5, 0],
+          scale: [1, 1.025, 1.045, 1],
+          transition: { duration: 1.45, ease: 'easeInOut' },
         });
-        if (!cancelled) spinControls.set({ rotateY: 0, rotateZ: 0, scale: 1 });
       } else if (expression === 'act') {
-        // Look toward the task, then naturally return to the user.
         await spinControls.start({
-          rotateY: [0, -12, -34, -23, 0],
-          rotateZ: [0, -.6, 1, 0, 0],
-          transition: { duration: 1.7, ease: 'easeInOut' },
+          rotateY: [0, -8, -16, 0],
+          rotateZ: [0, -1.1, 0.9, 0],
+          transition: { duration: 1.55, ease: 'easeInOut' },
         });
       } else {
         await spinControls.start({
-          rotateY: expression === 'think' ? -13 : expression === 'focus' ? 6 : 0,
+          rotateY: expression === 'think' ? -8 : expression === 'focus' ? 4 : 0,
           rotateZ: 0,
           scale: 1,
-          transition: { type: 'spring', stiffness: 75, damping: 18 },
+          transition: { type: 'spring', stiffness: 78, damping: 19 },
         });
       }
     };
@@ -199,8 +194,8 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
 
   const eyeSet = happy ? 'happy' : concerned ? 'concerned' : focused ? 'focus' : busy ? 'busy' : 'rest';
   const headTilt = concerned ? -5 : expression === 'think' ? -7 : expression === 'wake' ? 5 : 0;
-  const rightGesture = expression === 'act' ? -67 : speaking && actionReply ? -62 : happy ? -57 : speaking ? -44 : expression === 'think' ? -18 : -9;
-  const leftGesture = happy ? 16 : focused ? -8 : speaking ? (gestureBeat % 3 === 0 ? 17 : 5) : 0;
+  const rightGesture = expression === 'act' ? -42 : speaking && actionReply ? -39 : happy ? -44 : speaking ? -28 : expression === 'think' ? -10 : -6;
+  const leftGesture = happy ? 8 : focused ? -7 : speaking ? (gestureBeat % 3 === 0 ? 9 : 1) : 0;
   const reactiveGesture = speaking ? [-4, -14, 2, -7, 8, -4, -12, 2][gestureBeat] : 0;
 
   return (
@@ -217,217 +212,298 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       <span className="rodex-holographic-floor" aria-hidden="true" />
       <motion.span className="rodex-robot-spin-shell" animate={spinControls} style={{ transformStyle: 'preserve-3d' }}>
         <svg
-        className="rodex-robot-vector"
-        viewBox="100 14 400 606"
-        role="presentation"
-        aria-hidden="true"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <defs>
-          <radialGradient id="rdx-air" cx="50%" cy="52%" r="49%">
-            <stop offset="0%" stopColor="#1366ac" stopOpacity=".22" />
-            <stop offset="62%" stopColor="#08436d" stopOpacity=".08" />
-            <stop offset="100%" stopColor="#030711" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="rdx-helmet" cx="26%" cy="17%" r="92%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="22%" stopColor="#f0fbff" />
-            <stop offset="48%" stopColor="#c3e8fb" />
-            <stop offset="78%" stopColor="#8cc3ea" />
-            <stop offset="100%" stopColor="#356b9b" />
-          </radialGradient>
-          <radialGradient id="rdx-torso" cx="27%" cy="14%" r="98%">
-            <stop offset="0%" stopColor="#fff" />
-            <stop offset="35%" stopColor="#e3f7ff" />
-            <stop offset="65%" stopColor="#a4d7f1" />
-            <stop offset="88%" stopColor="#72acd5" />
-            <stop offset="100%" stopColor="#306589" />
-          </radialGradient>
-          <linearGradient id="rdx-arm" x1="0%" y1="0%" x2="95%" y2="100%">
-            <stop offset="0%" stopColor="#f7fdff" />
-            <stop offset="38%" stopColor="#e5f6ff" />
-            <stop offset="78%" stopColor="#91c5e9" />
-            <stop offset="100%" stopColor="#417ab1" />
-          </linearGradient>
-          <linearGradient id="rdx-chrome" x1="15%" y1="10%" x2="90%" y2="90%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="36%" stopColor="#b4e4fe" />
-            <stop offset="70%" stopColor="#558fb8" />
-            <stop offset="100%" stopColor="#123e64" />
-          </linearGradient>
-          <radialGradient id="rdx-blue-core" cx="39%" cy="32%" r="71%">
-            <stop offset="0%" stopColor="#d8fdff" />
-            <stop offset="39%" stopColor="#2adfff" />
-            <stop offset="76%" stopColor="#007ef3" />
-            <stop offset="100%" stopColor="#062d79" />
-          </radialGradient>
-          <linearGradient id="rdx-visor" x1="20%" y1="0%" x2="75%" y2="100%">
-            <stop offset="0%" stopColor="#0c1c2b" />
-            <stop offset="36%" stopColor="#000712" />
-            <stop offset="100%" stopColor="#000107" />
-          </linearGradient>
-          <linearGradient id="rdx-eye" x1="0%" y1="0%" x2="90%" y2="100%">
-            <stop offset="0%" stopColor="#58eaff" />
-            <stop offset="48%" stopColor="#00d8ff" />
-            <stop offset="100%" stopColor="#008dff" />
-          </linearGradient>
-          <radialGradient id="rdx-floor" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#00c8ff" stopOpacity=".47" />
-            <stop offset="45%" stopColor="#009bfa" stopOpacity=".18" />
-            <stop offset="100%" stopColor="#0075ef" stopOpacity="0" />
-          </radialGradient>
-          <filter id="rdx-soft-glow" x="-90%" y="-160%" width="280%" height="420%">
-            <feGaussianBlur stdDeviation="6" />
-          </filter>
-          <filter id="rdx-shadow" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="12" />
-          </filter>
-        </defs>
-
-        {/* Character geometry alone rotates; stage atmosphere stays anchored. */}
-        <motion.g
-          className="rodex-robot-model"
-          style={{ transformOrigin: '50% 47%' }}
-          animate={reducedMotion ? undefined : {
-            y: speaking ? [0, -(7 + safeAudio * 7), 0] : busy ? [0, -9, 0] : [0, -14, 0],
-            x: expression === 'think' ? [-3, 4, -3] : 0,
-            rotateZ: expression === 'think' ? [0, -2.4, 0] : focused ? [0, 1.1, 0] : [0, .65, 0],
-          }}
-          transition={{
-            y: { duration: speaking ? 1.8 : 4.1, repeat: Infinity, ease: 'easeInOut' },
-            rotateZ: { duration: 4.2, repeat: Infinity, ease: 'easeInOut' },
-            x: { duration: 4.8, repeat: Infinity, ease: 'easeInOut' },
-          }}
+          className="rodex-robot-vector"
+          viewBox="75 20 450 590"
+          role="presentation"
+          aria-hidden="true"
+          preserveAspectRatio="xMidYMid meet"
         >
-          {/* The limbs are separate articulated elements; they never clip. */}
-          <motion.g
-            className="rodex-left-arm"
-            style={{ transformOrigin: '192px 310px' }}
-            animate={reducedMotion ? undefined : { rotate: leftGesture, y: focused ? -3 : 0 }}
-            transition={{ type: 'spring', stiffness: 110, damping: 17 }}
-          >
-            <path d="M193 309 C176 303 158 320 151 346 C143 373 144 426 153 448 C161 469 178 467 190 450 C210 423 214 357 210 331 C207 321 202 313 193 309Z"
-              fill="url(#rdx-arm)" stroke="#b7ddfa" strokeWidth="2" />
-            <path d="M159 358 C158 332 172 319 185 320" fill="none" stroke="#fff" strokeWidth="11" strokeLinecap="round" opacity=".32" />
-            <ellipse cx="174" cy="452" rx="17" ry="14" fill="url(#rdx-chrome)" stroke="#ccefff" strokeWidth="2" />
-            <path d="M161 454 Q169 469 183 456" fill="none" stroke="#15b2ff" strokeWidth="2.3" opacity=".6" />
-          </motion.g>
-          <motion.g
-            className="rodex-right-arm"
-            style={{ transformOrigin: '402px 313px' }}
-            animate={reducedMotion ? undefined : { rotate: rightGesture + reactiveGesture, y: speaking ? [0, -4 - safeAudio * 3, 0] : 0 }}
-            transition={{
-              rotate: { type: 'spring', stiffness: 105, damping: 15 },
-              y: { repeat: speaking ? Infinity : 0, duration: .78, ease: 'easeInOut' },
-            }}
-          >
-            <path d="M398 310 C417 303 438 326 446 351 C460 391 453 440 438 453 C424 468 410 458 401 442 C390 421 384 357 389 329 C391 318 394 314 398 310Z"
-              fill="url(#rdx-arm)" stroke="#b5dbf8" strokeWidth="2" />
-            <path d="M404 321 C426 325 436 349 437 375" fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round" opacity=".27" />
-            <g className="rodex-right-palm">
-              <ellipse cx="426" cy="446" rx="18" ry="16" fill="url(#rdx-chrome)" stroke="#d3f1ff" strokeWidth="1.8" />
-              <path d="M416 450 Q411 462 414 474 Q419 483 424 473 L426 466 Q425 483 432 483 Q438 481 435 465 Q438 482 444 479 Q451 475 443 456 Q452 469 457 463 Q461 456 444 442"
-                fill="url(#rdx-arm)" stroke="#c9edff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M426 463 L429 475 M435 463 L439 473" fill="none" stroke="#149cee" strokeOpacity=".48" strokeWidth="2" />
-            </g>
-          </motion.g>
+          <defs>
+            <linearGradient id="rodex-shell" x1="8%" y1="5%" x2="90%" y2="96%">
+              <stop offset="0" stopColor="#fafdff"/>
+              <stop offset=".19" stopColor="#ffffff"/>
+              <stop offset=".46" stopColor="#dceefa"/>
+              <stop offset=".70" stopColor="#a7cbe9"/>
+              <stop offset=".88" stopColor="#628fba"/>
+              <stop offset="1" stopColor="#284968"/>
+            </linearGradient>
+            <radialGradient id="rodex-pearl" cx="26%" cy="14%" r="94%">
+              <stop offset="0" stopColor="#fff"/>
+              <stop offset=".3" stopColor="#f3fbff"/>
+              <stop offset=".55" stopColor="#c8e1f6"/>
+              <stop offset=".78" stopColor="#81afd4"/>
+              <stop offset="1" stopColor="#2f5478"/>
+            </radialGradient>
+            <linearGradient id="rodex-armor" x1="0%" y1="4%" x2="94%" y2="89%">
+              <stop offset="0" stopColor="#fff"/>
+              <stop offset=".34" stopColor="#dff2ff"/>
+              <stop offset=".65" stopColor="#a1c8e5"/>
+              <stop offset=".85" stopColor="#5a92c3"/>
+              <stop offset="1" stopColor="#1e456e"/>
+            </linearGradient>
+            <linearGradient id="rodex-dark-seam" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0" stopColor="#173f5b"/>
+              <stop offset=".5" stopColor="#06192a"/>
+              <stop offset="1" stopColor="#1d5479"/>
+            </linearGradient>
+            <radialGradient id="rodex-visor" cx="42%" cy="24%" r="92%">
+              <stop offset="0" stopColor="#132a42"/>
+              <stop offset=".34" stopColor="#081321"/>
+              <stop offset=".76" stopColor="#03070e"/>
+              <stop offset="1" stopColor="#000309"/>
+            </radialGradient>
+            <linearGradient id="rodex-visor-glint" x1="12%" y1="0%" x2="77%" y2="100%">
+              <stop offset="0" stopColor="#b9f4ff" stopOpacity=".22"/>
+              <stop offset=".42" stopColor="#74cfff" stopOpacity=".045"/>
+              <stop offset="1" stopColor="#00294b" stopOpacity="0"/>
+            </linearGradient>
+            <radialGradient id="rodex-energy" cx="40%" cy="28%" r="68%">
+              <stop offset="0" stopColor="#ebffff"/>
+              <stop offset=".24" stopColor="#78f8ff"/>
+              <stop offset=".54" stopColor="#00c3ff"/>
+              <stop offset=".82" stopColor="#1261f9"/>
+              <stop offset="1" stopColor="#09234d"/>
+            </radialGradient>
+            <linearGradient id="rodex-eye" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0" stopColor="#c6ffff"/>
+              <stop offset=".4" stopColor="#38f0ff"/>
+              <stop offset="1" stopColor="#008aff"/>
+            </linearGradient>
+            <linearGradient id="rodex-hand" x1="0%" y1="0%" x2="90%" y2="100%">
+              <stop offset="0" stopColor="#fff"/>
+              <stop offset=".45" stopColor="#d8effd"/>
+              <stop offset="1" stopColor="#619ac7"/>
+            </linearGradient>
+            <radialGradient id="rodex-underlight" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stopColor="#20daff" stopOpacity=".67"/>
+              <stop offset=".47" stopColor="#008ded" stopOpacity=".22"/>
+              <stop offset="1" stopColor="#02448d" stopOpacity="0"/>
+            </radialGradient>
+            <filter id="rodex-neon" x="-115%" y="-150%" width="330%" height="400%">
+              <feGaussianBlur stdDeviation="5"/>
+            </filter>
+            <filter id="rodex-shadow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="9"/>
+            </filter>
+            <filter id="rodex-small-neon" x="-80%" y="-100%" width="260%" height="300%">
+              <feGaussianBlur stdDeviation="2.8"/>
+            </filter>
+          </defs>
 
-          {/* Rounded tapered, pearlescent body with real depth cues. */}
-          <path d="M228 290 C252 275 342 276 368 297 C398 325 390 426 350 494 C333 525 314 545 301 550 C284 548 261 524 245 497 C208 436 200 339 228 290Z"
-            fill="#2d6a9f" opacity=".43" transform="translate(0 7)" />
-          <path d="M228 290 C252 275 342 276 368 297 C398 325 390 426 350 494 C333 525 314 545 301 550 C284 548 261 524 245 497 C208 436 200 339 228 290Z"
-            fill="url(#rdx-torso)" stroke="#d9f6ff" strokeWidth="1.5" />
-          <path d="M245 306 C231 343 245 414 272 476" stroke="#fff" strokeWidth="17" strokeLinecap="round" fill="none" opacity=".17" />
-          <path d="M354 311 C367 367 348 457 315 509" stroke="#3379a5" strokeWidth="17" strokeLinecap="round" fill="none" opacity=".15" />
-          <ellipse cx="299" cy="314" rx="57" ry="11" fill="#ffffff" opacity=".16" />
-          {/* The premium O-shaped energy core and segmented shoulder armor are
-              part of RODEX's body, not new overlay controls. */}
-          <path d="M229 296 C242 284 265 282 271 304 C266 324 244 337 221 322 Q216 310 229 296Z"
-            fill="url(#rdx-chrome)" stroke="#b6e6ff" strokeWidth="2" />
-          <path d="M371 296 C357 282 335 282 330 304 C335 324 356 337 380 322 Q386 308 371 296Z"
-            fill="url(#rdx-chrome)" stroke="#b6e6ff" strokeWidth="2" />
-          <path d="M244 331 Q300 349 357 329" fill="none" stroke="#1de4ff" strokeWidth="2.6" strokeOpacity=".64" />
-          <circle cx="300" cy="388" r="24" fill="#18528a" opacity=".55" />
-          <motion.circle cx="300" cy="388" r="17" fill="none" stroke="#46dcff"
-            strokeWidth="6" filter="url(#rdx-soft-glow)" opacity=".5"
-            animate={reducedMotion ? undefined : { opacity: speaking ? [.35,.75,.35] : [.3,.5,.3] }}
-            transition={{ duration: speaking ? .9 : 3.1, repeat: Infinity, ease: 'easeInOut' }} />
-          <circle cx="300" cy="388" r="16.5" fill="none" stroke="url(#rdx-blue-core)" strokeWidth="7" />
-          <circle cx="300" cy="388" r="6.5" fill="#075990" />
-          <path d="M266 452 Q301 479 335 451" fill="none" stroke="#65ddff" strokeWidth="1.8" strokeOpacity=".55" />
-          
-
-          {/* Large floating helmet, dark glass visor and luminous eyes. */}
+          <ellipse cx="301" cy="557" rx="124" ry="17" fill="url(#rodex-underlight)" opacity=".7"/>
           <motion.g
-            style={{ transformOrigin: '300px 207px' }}
+            className="rodex-robot-model"
+            style={{ transformOrigin: '300px 293px' }}
             animate={reducedMotion ? undefined : {
-              rotate: headTilt + gaze.x * 3 + ambientLook.x * 2.2 + (speaking ? [-2, 1.7, 3, -1, 1, -2, 2, 0][gestureBeat] : 0),
-              x: gaze.x * 3 + ambientLook.x * 3,
-              y: gaze.y * 2 + ambientLook.y * 2 + (speaking ? Math.max(-4, -safeAudio * 6) : 0),
+              y: speaking ? [0, -5 - safeAudio * 3, 0] : busy ? [0, -5, 0] : [0, -10, 0],
+              rotateZ: concerned ? [-1, -2, -1] : focused ? [0, .65, 0] : [0, 1.15, 0],
             }}
-            transition={{ type: 'spring', stiffness: 95, damping: 17 }}
+            transition={{
+              y: { duration: speaking ? 1.5 : 4.3, ease: 'easeInOut', repeat: Infinity },
+              rotateZ: { duration: 5.8, ease: 'easeInOut', repeat: Infinity },
+            }}
           >
-            <path d="M181 190 C176 116 228 67 306 66 C388 64 427 124 420 204 C415 259 367 306 301 308 C234 307 185 257 181 190Z"
-              fill="url(#rdx-helmet)" stroke="#d3efff" strokeWidth="2.5" />
-            <path d="M211 125 C229 86 268 76 299 77" stroke="#fff" strokeWidth="21" strokeLinecap="round" opacity=".40" fill="none" />
-            <path d="M196 188 C194 167 199 149 206 132" stroke="#fff" strokeWidth="6" strokeLinecap="round" opacity=".33" fill="none" />
-            {/* Dimensional cyan ear ports echo the approved glossy concept. */}
-            <ellipse cx="189" cy="217" rx="20" ry="34" fill="#1a629b" stroke="#daf5ff" strokeWidth="3" />
-            <ellipse cx="186" cy="217" rx="14" ry="27" fill="#092747" stroke="#3be4ff" strokeWidth="3.5" />
-            <ellipse cx="186" cy="217" rx="8" ry="20" fill="#053568" />
-            <ellipse cx="422" cy="214" rx="13" ry="28" fill="#104c85" stroke="#bfeaff" strokeWidth="2" />
-            <ellipse cx="425" cy="214" rx="7" ry="20" fill="#03244a" stroke="#00cfff" strokeWidth="2.5" />
-            <path d="M205 210 C221 175 261 162 311 164 C369 165 401 186 407 220 C415 258 376 289 309 293 C257 291 216 275 205 247 C200 233 200 221 205 210Z"
-              fill="url(#rdx-visor)" stroke="#152a41" strokeWidth="3" />
-            <path d="M216 209 C237 178 277 172 322 172" fill="none" stroke="#69b9ee" strokeWidth="3.5" strokeLinecap="round" opacity=".17" />
-            <path d="M217 242 C234 278 278 284 307 284" fill="none" stroke="#00528c" strokeWidth="3" strokeLinecap="round" opacity=".14" />
+            {/* Rear armor and neck give the face physical depth instead of an image plane. */}
+            <path d="M254 270 Q299 253 347 271 L360 307 Q300 322 240 305Z" fill="#112d47" opacity=".66"/>
+            <path d="M278 269 L323 268 L326 310 Q301 327 274 307Z" fill="url(#rodex-dark-seam)" stroke="#5085ac" strokeWidth="2.4"/>
+            <path d="M282 287 Q301 297 320 286" fill="none" stroke="#54c4ef" strokeOpacity=".65" strokeWidth="2"/>
+            <path d="M288 304 L311 304" stroke="#90eaff" strokeWidth="2.5" strokeLinecap="round" opacity=".56"/>
 
+            {/* Left shoulder and articulated arm: separate joints track conversational motion. */}
+            <g>
+              <ellipse cx="219" cy="320" rx="31" ry="29" fill="#122d49" opacity=".65"/>
+              <ellipse cx="219" cy="318" rx="24" ry="22" fill="url(#rodex-armor)" stroke="#9bc9e9" strokeWidth="2"/>
+              <circle cx="219" cy="320" r="10" fill="url(#rodex-dark-seam)" stroke="#4d9bd1" strokeWidth="2"/>
+              <circle cx="219" cy="320" r="5" fill="#08bfff" opacity=".8"/>
+            </g>
             <motion.g
-              className="rodex-eye-pair"
+              className="rodex-left-arm"
+              style={{ transformOrigin: '220px 319px' }}
               animate={reducedMotion ? undefined : {
-                scaleY: blink ? .07 : 1,
-                x: gaze.x * 2.5,
-                y: gaze.y * 1.6,
-                opacity: expression === 'think' ? [.75, 1, .75] : 1,
+                rotate: leftGesture + (expression === 'wake' ? -10 : 0),
+                y: speaking ? [-1, 2, -1] : 0,
               }}
-              style={{ transformOrigin: '300px 232px' }}
-              transition={{ scaleY: { duration: .10 }, x: { duration: .2 }, y: { duration: .2 }, opacity: { duration: 1.4, repeat: Infinity } }}
+              transition={{ rotate: { type: 'spring', stiffness: 95, damping: 17 }, y: { duration: 2.1, repeat: speaking ? Infinity : 0 } }}
             >
-              {eyeSet === 'happy' ? (
-                <>
-                  <path d="M236 238 Q258 203 280 237 M330 237 Q350 201 375 234" fill="none" stroke="#00aaff" strokeWidth="18" strokeLinecap="round" opacity=".7" filter="url(#rdx-soft-glow)" />
-                  <path d="M236 238 Q258 203 280 237 M330 237 Q350 201 375 234" fill="none" stroke="url(#rdx-eye)" strokeWidth="8" strokeLinecap="round" />
-                </>
-              ) : eyeSet === 'concerned' ? (
-                <>
-                  <path d="M237 234 L277 228 M335 228 L374 234" fill="none" stroke="#00baff" strokeWidth="17" strokeLinecap="round" opacity=".7" filter="url(#rdx-soft-glow)" />
-                  <path d="M237 234 L277 228 M335 228 L374 234" fill="none" stroke="url(#rdx-eye)" strokeWidth="7" strokeLinecap="round" />
-                </>
-              ) : eyeSet === 'focus' ? (
-                <>
-                  <ellipse cx="259" cy="230" rx="22" ry="9" fill="#00bbff" filter="url(#rdx-soft-glow)" />
-                  <ellipse cx="351" cy="230" rx="22" ry="9" fill="#00bbff" filter="url(#rdx-soft-glow)" />
-                  <ellipse cx="259" cy="230" rx="19" ry="7" fill="url(#rdx-eye)" />
-                  <ellipse cx="351" cy="230" rx="19" ry="7" fill="url(#rdx-eye)" />
-                </>
-              ) : (
-                <>
-                  <path d={busy ? "M239 226 Q260 223 280 237 M332 237 Q351 223 373 222" : "M239 235 Q259 211 280 234 M332 234 Q353 210 373 233"}
-                    fill="none" stroke="#00afff" strokeWidth="19" strokeLinecap="round" opacity={speaking ? '.95' : '.8'} filter="url(#rdx-soft-glow)" />
-                  <path d={busy ? "M239 226 Q260 223 280 237 M332 237 Q351 223 373 222" : "M239 235 Q259 211 280 234 M332 234 Q353 210 373 233"}
-                    fill="none" stroke="url(#rdx-eye)" strokeWidth={speaking ? '10' : '8'} strokeLinecap="round" />
-                </>
-              )}
+              <path d="M211 317 C185 308 165 336 160 364 C154 399 164 436 181 442 C197 446 211 420 220 390 C227 362 226 328 211 317Z" fill="#0b2b49" opacity=".6" transform="translate(3 5)"/>
+              <path d="M211 313 C185 305 164 333 158 363 C150 400 162 434 181 438 C197 441 212 413 220 386 C228 357 226 325 211 313Z" fill="url(#rodex-armor)" stroke="#c0e7fa" strokeWidth="2.4"/>
+              <path d="M182 328 C169 352 167 381 174 398" fill="none" stroke="white" strokeOpacity=".50" strokeWidth="9" strokeLinecap="round"/>
+              <path d="M191 328 C208 319 217 329 218 349" fill="none" stroke="#4c8ab8" strokeOpacity=".25" strokeWidth="7" strokeLinecap="round"/>
+              <ellipse cx="181" cy="436" rx="17" ry="13" fill="url(#rodex-dark-seam)" stroke="#8dc6ea" strokeWidth="2"/>
+              <path d="M169 435 Q180 448 194 434" fill="none" stroke="#48d9ff" strokeWidth="2.5" opacity=".75"/>
+              <g transform="translate(-2 0)">
+                <path d="M167 442 C156 448 151 457 156 468 C158 472 165 472 169 467 L176 460 C171 470 175 477 181 476 C187 476 187 462 189 457 C188 470 194 475 198 470 Q204 463 195 446 L188 437Z" fill="url(#rodex-hand)" stroke="#c9ebfd" strokeWidth="2.2"/>
+                <path d="M163 451 Q166 447 171 445" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" opacity=".62"/>
+              </g>
             </motion.g>
-            <ellipse cx="296" cy="107" rx="37" ry="12" fill="#fff" opacity=".10" transform="rotate(-19 296 107)" />
+
+            {/* Right arm opens naturally on actions and is never an inert cutout. */}
+            <g>
+              <ellipse cx="383" cy="318" rx="30" ry="29" fill="#0c2a4a" opacity=".7"/>
+              <ellipse cx="383" cy="316" rx="25" ry="23" fill="url(#rodex-armor)" stroke="#b4def8" strokeWidth="2"/>
+              <circle cx="383" cy="318" r="10" fill="url(#rodex-dark-seam)" stroke="#51aee4" strokeWidth="2"/>
+              <circle cx="383" cy="318" r="5" fill="#0bcaff"/>
+            </g>
+            <motion.g
+              className="rodex-right-arm"
+              style={{ transformOrigin: '382px 317px' }}
+              animate={reducedMotion ? undefined : {
+                rotate: rightGesture + reactiveGesture,
+                y: speaking ? [0, -3 - safeAudio * 2, 0] : 0,
+              }}
+              transition={{
+                rotate: { type: 'spring', stiffness: 96, damping: 19 },
+                y: { duration: .9, repeat: speaking ? Infinity : 0, ease: 'easeInOut' },
+              }}
+            >
+              <path d="M392 315 C415 310 436 333 444 361 C453 395 440 427 422 439 C407 445 389 421 382 392 C373 360 378 325 392 315Z" fill="#0e304f" opacity=".7" transform="translate(3 5)"/>
+              <path d="M392 311 C415 307 437 332 443 362 C449 397 439 422 422 435 C407 439 390 420 382 389 C375 360 379 323 392 311Z" fill="url(#rodex-armor)" stroke="#c4e8fd" strokeWidth="2.4"/>
+              <path d="M398 326 Q432 335 431 381" fill="none" stroke="white" strokeOpacity=".43" strokeWidth="9" strokeLinecap="round"/>
+              <path d="M422 414 Q433 424 430 437" fill="none" stroke="#478ebb" strokeWidth="3" opacity=".43"/>
+              <ellipse cx="426" cy="434" rx="17" ry="14" fill="url(#rodex-dark-seam)" stroke="#8fd3f2" strokeWidth="2"/>
+              <path d="M414 433 Q428 446 438 432" fill="none" stroke="#17c7ff" strokeWidth="3" opacity=".78"/>
+              <g>
+                <path d="M415 436 Q401 438 396 446 L395 457 Q396 465 404 464 L414 457 L407 469 Q407 476 415 477 Q422 478 425 468 L427 463 L425 477 Q426 484 433 482 Q440 482 439 472 L437 462 L443 476 Q449 480 453 473 Q455 468 448 455 L456 462 Q463 465 465 458 Q465 450 450 442 Q430 427 415 436Z" fill="url(#rodex-hand)" stroke="#c8edff" strokeWidth="2.2" strokeLinejoin="round"/>
+                <path d="M423 449 L416 467 M432 451 L431 470 M443 451 L449 465" fill="none" stroke="#4785b4" strokeOpacity=".6" strokeWidth="2"/>
+                <path d="M403 447 C407 440 415 440 420 440" fill="none" stroke="white" strokeOpacity=".7" strokeWidth="3" strokeLinecap="round"/>
+              </g>
+            </motion.g>
+
+            {/* A layered pearlescent body with recessed mechanical flanks and a clean tapered silhouette. */}
+            <path d="M235 303 C255 288 344 287 367 305 C400 339 396 438 349 501 Q321 539 300 549 Q278 538 248 500 C201 434 203 340 235 303Z" fill="#05203c" opacity=".52" transform="translate(2 7)"/>
+            <path d="M232 297 C255 284 345 282 368 299 C402 334 394 433 351 496 C335 523 311 541 300 547 C287 541 265 525 247 496 C205 429 200 335 232 297Z" fill="url(#rodex-dark-seam)" stroke="#447eaa" strokeWidth="3"/>
+            <path d="M239 297 C257 286 342 285 361 298 C386 328 377 419 343 481 Q322 523 300 535 Q274 521 258 486 C222 417 217 330 239 297Z" fill="url(#rodex-shell)" stroke="#e4f7ff" strokeWidth="2.7"/>
+            <path d="M245 314 Q230 365 254 437 Q269 486 286 504" fill="none" stroke="white" strokeWidth="16" strokeLinecap="round" opacity=".28"/>
+            <path d="M353 312 Q374 356 352 438 Q336 487 317 515" fill="none" stroke="#275e92" strokeWidth="15" strokeLinecap="round" opacity=".13"/>
+            <path d="M234 319 Q218 373 251 462" fill="none" stroke="#5ddaff" strokeOpacity=".34" strokeWidth="2.2"/>
+            <path d="M366 319 Q382 368 348 461" fill="none" stroke="#1f78bc" strokeOpacity=".53" strokeWidth="2.2"/>
+            <path d="M247 311 Q299 328 352 308" fill="none" stroke="#346e9c" strokeWidth="2.8"/>
+            <path d="M248 319 Q299 338 353 317" fill="none" stroke="#9de9ff" strokeOpacity=".58" strokeWidth="1.5"/>
+            {/* Shoulder collar and floating breastplate are integrated with body geometry. */}
+            <path d="M250 304 Q269 286 298 294 Q326 288 352 303 L335 337 Q298 347 266 335Z" fill="url(#rodex-armor)" stroke="#e6f7ff" strokeWidth="2"/>
+            <path d="M251 307 Q296 324 350 305" fill="none" stroke="white" strokeOpacity=".42" strokeWidth="5"/>
+            <path d="M265 342 Q300 353 335 342" stroke="#5ba2d0" strokeWidth="2" strokeOpacity=".45" fill="none"/>
+            <path d="M262 464 Q300 479 338 462" stroke="#72d5f2" strokeOpacity=".35" strokeWidth="1.8" fill="none"/>
+            <path d="M283 505 Q301 519 317 505" stroke="#2e78a4" strokeOpacity=".4" strokeWidth="2" fill="none"/>
+            {/* A restrained power core: metallic bezel, deep recess and real audio-reactive light. */}
+            <circle cx="301" cy="383" r="30" fill="#2d618b" opacity=".42" filter="url(#rodex-shadow)"/>
+            <circle cx="301" cy="379" r="27" fill="url(#rodex-dark-seam)" stroke="#a5d9f7" strokeWidth="2.4"/>
+            <circle cx="301" cy="379" r="22" fill="#051727" stroke="#5095be" strokeWidth="3"/>
+            <motion.circle cx="301" cy="379" r="17" fill="url(#rodex-energy)" opacity={reducedMotion ? .74 : 1}
+              animate={reducedMotion ? undefined : { opacity: speaking ? [.58, .85 + safeAudio * .15, .58] : busy ? [.38,.72,.38] : [.42,.60,.42] }}
+              transition={{ duration: speaking ? .8 : 3.1, repeat: Infinity, ease: 'easeInOut' }}/>
+            <circle cx="301" cy="379" r="10" fill="#e3ffff" opacity=".65" filter="url(#rodex-neon)"/>
+            <circle cx="301" cy="379" r="8" fill="#0e5bb2" stroke="#71f6ff" strokeWidth="1.8"/>
+            <circle cx="301" cy="379" r="3.3" fill="#ceffff"/>
+
+            {/* Expressive floating head: pivot independent from body, visor and eyelids. */}
+            <motion.g className="rodex-robot-head"
+              style={{ transformOrigin: '300px 197px' }}
+              animate={reducedMotion ? undefined : {
+                rotate: headTilt + gaze.x * 4 + ambientLook.x * 2 + (speaking ? [-1, 1.5, 2, -1, 0, -1, 1.2, 0][gestureBeat] : 0),
+                x: gaze.x * 3.2 + ambientLook.x * 3,
+                y: gaze.y * 2.2 + ambientLook.y * 2 + (speaking ? -safeAudio * 4 : 0),
+              }}
+              transition={{ type: 'spring', stiffness: 85, damping: 17 }}
+            >
+              {/* Recessed ear ports behind helmet rim. */}
+              <ellipse cx="181" cy="218" rx="23" ry="36" fill="#061728" opacity=".77" transform="translate(-3 5)"/>
+              <ellipse cx="182" cy="218" rx="23" ry="35" fill="url(#rodex-dark-seam)" stroke="#96cdee" strokeWidth="3"/>
+              <ellipse cx="182" cy="218" rx="16" ry="28" fill="#061628" stroke="#19d7ff" strokeWidth="3.1"/>
+              <ellipse cx="182" cy="218" rx="9" ry="20" fill="#052547"/>
+              <ellipse cx="418" cy="218" rx="23" ry="35" fill="url(#rodex-dark-seam)" stroke="#9bd6f4" strokeWidth="3"/>
+              <ellipse cx="418" cy="218" rx="15" ry="28" fill="#07172a" stroke="#15d9ff" strokeWidth="3"/>
+              <ellipse cx="418" cy="218" rx="8" ry="20" fill="#0b3256"/>
+              <motion.ellipse cx="182" cy="218" rx="17" ry="28" stroke="#11d8ff" fill="none" strokeWidth="2.5"
+                animate={reducedMotion ? undefined : { opacity: focused ? [.65,1,.65] : [.15,.45,.15] }}
+                transition={{ duration: focused ? .8 : 4, repeat: Infinity }}/>
+              <motion.ellipse cx="418" cy="218" rx="17" ry="28" stroke="#13d5ff" fill="none" strokeWidth="2.5"
+                animate={reducedMotion ? undefined : { opacity: focused ? [.65,1,.65] : [.15,.45,.15] }}
+                transition={{ duration: focused ? .8 : 4, repeat: Infinity }}/>
+
+              {/* Helmet shell combines distinct rim, main pearl body and specular flare. */}
+              <path d="M177 192 C171 126 218 67 287 63 C364 55 417 104 424 177 C431 233 405 277 352 295 C310 312 264 309 222 284 C196 265 180 231 177 192Z"
+                fill="#06192b" stroke="#336f99" strokeWidth="4" transform="translate(0 5)" opacity=".60"/>
+              <path d="M176 191 C170 127 213 66 287 62 C365 55 420 108 424 178 C428 233 398 282 347 298 Q300 315 252 298 C204 280 180 240 176 191Z"
+                fill="url(#rodex-pearl)" stroke="#e2f5ff" strokeWidth="3.8"/>
+              <path d="M197 154 C209 105 249 83 291 79" stroke="#fff" strokeOpacity=".62" strokeWidth="18" strokeLinecap="round" fill="none"/>
+              <path d="M203 119 Q232 79 275 78" stroke="#d0f1ff" strokeOpacity=".78" strokeWidth="5" strokeLinecap="round" fill="none"/>
+              <path d="M378 96 C403 122 414 155 412 180" stroke="#215d8f" strokeOpacity=".22" strokeWidth="17" strokeLinecap="round" fill="none"/>
+              <path d="M198 201 C190 244 215 273 248 289" stroke="#fff" strokeOpacity=".32" strokeWidth="6" strokeLinecap="round" fill="none"/>
+              {/* Forehead segmentation catches light but avoids a cartoon outline. */}
+              <path d="M244 91 Q306 64 362 91" fill="none" stroke="#e6f9ff" strokeOpacity=".37" strokeWidth="2"/>
+              <path d="M253 294 Q300 315 347 294" fill="none" stroke="#6499c6" strokeOpacity=".5" strokeWidth="2.5"/>
+
+              {/* Full-glass visor, dramatically wider than the previous cartoon mask. */}
+              <path d="M200 184 C220 156 257 145 301 145 C346 145 388 157 405 183 C416 204 415 237 397 257 C373 283 339 293 299 293 C260 293 227 283 206 259 C190 243 188 207 200 184Z"
+                fill="#07223a" stroke="#7abde1" strokeWidth="5"/>
+              <path d="M207 185 C227 161 265 153 302 153 C348 152 383 165 400 188 C411 207 407 234 389 252 C368 276 336 285 300 285 C260 285 232 275 212 253 C195 236 196 205 207 185Z"
+                fill="url(#rodex-visor)" stroke="#02070e" strokeWidth="3"/>
+              <path d="M214 185 Q253 156 324 158 C344 159 365 165 381 172"
+                fill="none" stroke="url(#rodex-visor-glint)" strokeWidth="14" strokeLinecap="round"/>
+              <path d="M207 219 Q212 193 224 187" fill="none" stroke="#b6edff" strokeOpacity=".14" strokeWidth="5" strokeLinecap="round"/>
+              <path d="M226 258 Q299 303 379 254" fill="none" stroke="#048ce0" strokeOpacity=".17" strokeWidth="3"/>
+
+              <motion.g className="rodex-eye-pair"
+                style={{ transformOrigin: '300px 223px' }}
+                animate={reducedMotion ? undefined : {
+                  scaleY: blink ? .085 : 1,
+                  x: gaze.x * 4,
+                  y: gaze.y * 2,
+                  opacity: expression === 'think' ? [.7, 1, .7] : 1,
+                }}
+                transition={{ scaleY: { duration: .10 }, x: { duration: .20 }, y: { duration: .20 }, opacity: { duration: 1.6, repeat: Infinity } }}
+              >
+                {eyeSet === 'happy' || (speaking && happy) ? (
+                  <>
+                    <path d="M239 233 Q259 205 277 232 M326 233 Q346 205 364 231" fill="none" stroke="#00baff" strokeWidth="21" strokeLinecap="round" opacity=".65" filter="url(#rodex-neon)"/>
+                    <path d="M239 233 Q259 205 277 232 M326 233 Q346 205 364 231" fill="none" stroke="url(#rodex-eye)" strokeWidth="8.6" strokeLinecap="round"/>
+                  </>
+                ) : concerned ? (
+                  <>
+                    <path d="M236 220 L277 233 M324 233 L364 220" fill="none" stroke="#05b8ff" strokeWidth="19" opacity=".65" filter="url(#rodex-neon)"/>
+                    <path d="M236 220 L277 233 M324 233 L364 220" fill="none" stroke="url(#rodex-eye)" strokeWidth="7.5" strokeLinecap="round"/>
+                  </>
+                ) : focused ? (
+                  <>
+                    <ellipse cx="257" cy="226" rx="20" ry="10" fill="#00bfff" opacity=".7" filter="url(#rodex-neon)"/>
+                    <ellipse cx="345" cy="226" rx="20" ry="10" fill="#00bfff" opacity=".7" filter="url(#rodex-neon)"/>
+                    <ellipse cx="257" cy="226" rx="18" ry="7" fill="url(#rodex-eye)"/>
+                    <ellipse cx="345" cy="226" rx="18" ry="7" fill="url(#rodex-eye)"/>
+                    <ellipse cx="252" cy="224" rx="5" ry="2" fill="#fff" opacity=".72"/>
+                    <ellipse cx="340" cy="224" rx="5" ry="2" fill="#fff" opacity=".72"/>
+                  </>
+                ) : busy ? (
+                  <>
+                    <path d="M239 222 Q259 229 278 226 M324 226 Q346 229 366 222" fill="none" stroke="#00b8ff" strokeWidth="20" strokeLinecap="round" opacity=".68" filter="url(#rodex-neon)"/>
+                    <path d="M239 222 Q259 229 278 226 M324 226 Q346 229 366 222" fill="none" stroke="url(#rodex-eye)" strokeWidth="8" strokeLinecap="round"/>
+                  </>
+                ) : (
+                  <>
+                    <path d="M238 230 Q254 211 278 227 M324 227 Q347 210 366 230" fill="none" stroke="#00bfff" strokeWidth="19" strokeLinecap="round" opacity=".62" filter="url(#rodex-neon)"/>
+                    <path d="M238 230 Q254 211 278 227 M324 227 Q347 210 366 230" fill="none" stroke="url(#rodex-eye)" strokeWidth={speaking ? 10 : 8} strokeLinecap="round"/>
+                  </>
+                )}
+              </motion.g>
+
+              {/* A subtle equalizer inside the face while talking, never a status word. */}
+              {speaking && (
+                <motion.g className="rodex-face-voice" opacity=".7">
+                  {[0, 1, 2, 3, 4].map((bar) => (
+                    <motion.rect key={bar} x={282 + bar * 8} y={250} width="3.2" rx="1.6" height={3 + safeAudio * (bar % 2 ? 9 : 6)}
+                      fill="#28dcff"
+                      animate={reducedMotion ? undefined : { height: [3, 7 + safeAudio * 13, 3], y: [250, 248 - safeAudio * 5, 250] }}
+                      transition={{ duration: .32 + bar * .055, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                  ))}
+                </motion.g>
+              )}
+              <path d="M223 264 Q299 303 378 263" fill="none" stroke="#9aeaff" strokeOpacity=".11" strokeWidth="2"/>
+            </motion.g>
+            <motion.circle cx="301" cy="379" r="24" fill="none" stroke="#0dc9ff" strokeWidth="3" opacity=".3" filter="url(#rodex-small-neon)"
+              animate={reducedMotion ? undefined : { opacity: speaking ? [.17,.53,.17] : [.09,.22,.09], scale: [1,1.08,1] }}
+              transition={{ duration: speaking ? .8 : 3.5, repeat: Infinity }}/>
           </motion.g>
-          <motion.ellipse
-            cx="299" cy="391" rx="17" ry="18"
-            fill="#3ddaff" opacity=".12"
-            animate={reducedMotion ? undefined : { opacity: speaking ? [.08, .32, .08] : [.07, .15, .07], scale: [1, 1.08, 1] }}
-            transition={{ duration: speaking ? .55 : 3.5, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        </motion.g>
         </svg>
       </motion.span>
       <span className="rodex-character-aura" aria-hidden="true" />
