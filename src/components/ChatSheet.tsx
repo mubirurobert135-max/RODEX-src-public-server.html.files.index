@@ -7,7 +7,6 @@ import {
   Copy,
   Check,
   Trash2,
-  Mic,
   Bot,
   User,
   Globe,
@@ -55,7 +54,6 @@ interface ChatSheetProps {
   onReplayAudio: (text: string) => void;
   onClearHistory: () => void;
   assistantState: AssistantState;
-  onStartVoice: () => void;
   isLiveConversation: boolean;
   onToggleLiveCall: () => void;
   onConfirmAction?: (actionId: string, toolName: string, params: any) => Promise<void>;
@@ -74,7 +72,6 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   onReplayAudio,
   onClearHistory,
   assistantState,
-  onStartVoice,
   isLiveConversation,
   onToggleLiveCall,
   onConfirmAction,
@@ -181,10 +178,10 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                   onClose();
                 }}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-950/90 hover:bg-cyan-900 border border-cyan-700/80 text-cyan-300 text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-sm"
-                title="Return to the Voice Orb screen"
+                title="Return to RODEX"
               >
                 <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                <span className="hidden sm:inline">VOICE ORB</span>
+                <span className="hidden sm:inline">RODEX</span>
               </button>
 
               {/* Live Audio Call Connect / End Button */}
@@ -979,23 +976,6 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           {/* Bottom Chat Input Bar */}
           <footer className="p-3 border-t border-neutral-900 bg-black/95 shrink-0 flex justify-center">
             <form onSubmit={handleSubmit} className="flex items-center gap-2 w-full max-w-3xl">
-              <button
-                type="button"
-                id="chat-mic-button"
-                onClick={() => {
-                  triggerHaptic('tap');
-                  onStartVoice();
-                }}
-                title={isLiveConversation ? 'Speaking directly' : 'Tap to speak into this session'}
-                className={`p-3 rounded-xl border transition-all active:scale-95 cursor-pointer ${
-                  isLiveConversation
-                    ? 'bg-rose-950 border-rose-600 text-rose-300 animate-pulse'
-                    : 'bg-neutral-900 text-cyan-400 border-neutral-800 hover:border-cyan-500/50 hover:bg-neutral-800'
-                }`}
-              >
-                <Mic className="w-5 h-5" />
-              </button>
-
               <input
                 id="chat-text-input"
                 type="text"
