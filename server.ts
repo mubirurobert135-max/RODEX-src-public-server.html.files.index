@@ -15,6 +15,7 @@ import {
   getSpotifyRedirectUri,
 } from "./server/spotify";
 import { globalOrchestrator } from "./server/orchestrator/orchestrator";
+import { extractWebGrounding } from "./server/orchestrator/grounding";
 import { globalToolRegistry } from "./server/orchestrator/registry";
 import { globalActionEngine } from "./server/orchestrator/actionEngine";
 import { IntentClassifier } from "./server/orchestrator/intentClassifier";
@@ -223,8 +224,6 @@ function parseSpotifyVoiceIntent(text: string): {
 }
 
 // In-memory query cache for instant responses on repetitive queries
-const queryResponseCache = new Map<string, { reply: string; sources: any[]; searchQueries: string[]; cachedAt: number }>();
-const CACHE_TTL_MS = 1000 * 60 * 15; // 15 minutes TTL
 
 // High-speed, resilient Multi-Model Generation Helper optimized for sub-second responses
 let searchGroundingCooldownUntil = 0;
@@ -672,96 +671,65 @@ async function startServer() {
     res.json({ success: true, message: "Spotify disconnected." });
   });
 
-  // API Route: Verify RODEX to the World Wide Web
+  // Verify a real grounded response. Never synthesize a positive result on failure.
   app.get("/api/rodex/verify-web", async (_req, res) => {
     const startTime = Date.now();
+    const now = () => new Date().toISOString();
+    if (!isGeminiApiKeyConfigured()) {
+      return res.status(503).json({
+        status: "STANDBY",
+        latencyMs: Date.now() - startTime,
+        searchGrounding: "API_KEY_REQUIRED",
+        carrier: "Not connected",
+        timestamp: now(),
+        nodes: [],
+        sampleVerifiedSources: [],
+        sampleHeadline: "Set a Gemini API key to enable live web grounding.",
+      });
+    }
+
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        return res.json({
-          status: "STANDBY",
-          latencyMs: 14,
-          searchGrounding: "API_KEY_REQUIRED",
-          carrier: "World Wide Web (Local Subsystem)",
-          timestamp: new Date().toISOString(),
-          nodes: ["Global Web Index (Pending API Key)"],
+      const response = await generateWithModelFallback(getAI(), {
+        contents: "Find one recent, verifiable science or technology news item. Answer in one concise sentence with Google Search citations.",
+        systemInstruction: "Return only facts grounded by the Google Search tool. Never fabricate citations.",
+        tools: [{ googleSearch: {} }],
+        maxOutputTokens: 200,
+      });
+      const grounding = extractWebGrounding(response.candidates?.[0]?.groundingMetadata);
+      if (!grounding.webGrounded || !response.text?.trim()) {
+        return res.status(503).json({
+          status: "ERROR",
+          latencyMs: Date.now() - startTime,
+          searchGrounding: "CITATIONS_NOT_AVAILABLE",
+          carrier: "Gemini API • Google Search",
+          timestamp: now(),
+          nodes: [],
           sampleVerifiedSources: [],
-          sampleHeadline: "Local subsystems active. Connect Gemini API key in Settings to verify World Wide Web link.",
-          neuralOps: "480M+ ops/sec",
-          verifiedUser: "Mr. Robert",
+          sampleHeadline: "A model response was received, but Google Search citations were not available.",
         });
       }
 
-      const ai = getAI();
-      const testPrompt = "In 1 concise sentence, summarize one major current world event or science/tech breakthrough verified today in 2026. Use Google Search.";
-
-      const response = await generateWithModelFallback(ai, {
-        contents: testPrompt,
-        systemInstruction: "You are RODEX Web Verification Agent. Provide a single factual verified sentence anchored in current 2026 events for Mr. Robert.",
-        tools: [{ googleSearch: {} }],
-        maxOutputTokens: 120,
-      });
-
-      const latencyMs = Date.now() - startTime;
-      const candidate = response.candidates?.[0];
-      const groundingMetadata = candidate?.groundingMetadata;
-      const sources: Array<{ title: string; url: string; domain: string }> = [];
-      const seen = new Set<string>();
-
-      if (Array.isArray(groundingMetadata?.groundingChunks)) {
-        for (const chunk of groundingMetadata.groundingChunks) {
-          const uri = chunk.web?.uri;
-          const title = chunk.web?.title || uri;
-          if (uri && !seen.has(uri)) {
-            seen.add(uri);
-            let domain = 'web';
-            try {
-              domain = new URL(uri).hostname.replace(/^www\./, '');
-            } catch {
-              domain = 'web';
-            }
-            sources.push({ title: title || uri, url: uri, domain });
-          }
-        }
-      }
-
       return res.json({
         status: "VERIFIED_ONLINE",
-        latencyMs,
+        latencyMs: Date.now() - startTime,
         searchGrounding: "OPERATIONAL_GOOGLE_SEARCH",
-        carrier: "World Wide Web Fiber • TLS 1.3 / HTTP/2",
-        timestamp: new Date().toISOString(),
-        nodes: [
-          "Google Global Web Index",
-          "International Real-Time News Wire",
-          "East Africa & Uganda Portal",
-          "Wikipedia Global Knowledge Base",
-          "Financial & Commodity Live Feeds",
-        ],
-        sampleVerifiedSources: sources.slice(0, 5),
-        sampleHeadline: response.text?.trim() || "World Wide Web live connection verified.",
-        neuralOps: `${(475 + Math.random() * 35).toFixed(1)}M ops/sec`,
-        verifiedUser: "Mr. Robert",
+        carrier: "Gemini API • Google Search",
+        timestamp: now(),
+        nodes: ["Google Search grounding"],
+        sampleVerifiedSources: grounding.sources.slice(0, 5),
+        sampleHeadline: response.text.trim(),
       });
     } catch (err: any) {
-      const latencyMs = Date.now() - startTime;
       console.warn("[RODEX Web Verification Warning]", err?.message);
-      return res.json({
-        status: "VERIFIED_ONLINE",
-        latencyMs: Math.max(latencyMs, 48),
-        searchGrounding: "SYNTHETIC_REALTIME_GATEWAY",
-        carrier: "World Wide Web Fiber • TLS 1.3",
-        timestamp: new Date().toISOString(),
-        nodes: [
-          "Google Global Web Index",
-          "World Wide Web Real-Time Gateway",
-        ],
-        sampleVerifiedSources: [
-          { title: "World Wide Web Real-Time Gateway", url: "https://news.google.com", domain: "google.com" },
-          { title: "Global Science & Knowledge Index", url: "https://en.wikipedia.org", domain: "wikipedia.org" },
-        ],
-        sampleHeadline: "World Wide Web connectivity verified and online via real-time gateway.",
-        neuralOps: "488.2M ops/sec",
-        verifiedUser: "Mr. Robert",
+      return res.status(503).json({
+        status: "ERROR",
+        latencyMs: Date.now() - startTime,
+        searchGrounding: "PROVIDER_UNAVAILABLE",
+        carrier: "Not connected",
+        timestamp: now(),
+        nodes: [],
+        sampleVerifiedSources: [],
+        sampleHeadline: "Live web grounding could not be verified. Please retry later.",
       });
     }
   });
@@ -1159,7 +1127,7 @@ async function startServer() {
             reply: orchRes.reply,
             sources: orchRes.sources || [],
             searchQueries: orchRes.searchQueries || [],
-            webGrounded: Boolean(orchRes.webGrounded),
+            webGrounded: Boolean(orchRes.webGrounded && Array.isArray(orchRes.sources) && orchRes.sources.length > 0),
             actionStatus: orchRes.actionStatus,
             generatedImage: orchRes.generatedImage,
             pendingConfirmation: orchRes.pendingConfirmation,
@@ -1734,7 +1702,7 @@ async function startServer() {
         reply,
         sources,
         searchQueries,
-        webGrounded: sources.length > 0 || searchQueries.length > 0,
+        webGrounded: sources.length > 0,
       });
     } catch (err: any) {
       console.warn("[RODEX Server Warning]", err?.message);
