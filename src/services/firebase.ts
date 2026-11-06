@@ -395,6 +395,7 @@ export const saveMemoryToFirestore = async (
   userId: string,
   item: Omit<FirestoreMemoryItem, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<string> => {
+  if (!auth.currentUser || auth.currentUser.uid !== userId) return '';
   const path = `users/${userId}/memory`;
   try {
     const memRef = collection(db, 'users', userId, 'memory');
@@ -461,6 +462,7 @@ export const saveScheduleToFirestore = async (
   userId: string,
   item: Omit<FirestoreScheduleItem, 'id' | 'createdAt'>
 ): Promise<string> => {
+  if (!auth.currentUser || auth.currentUser.uid !== userId) return '';
   const path = `users/${userId}/schedules`;
   try {
     const schedRef = collection(db, 'users', userId, 'schedules');
@@ -702,6 +704,7 @@ export const saveTaskToFirestore = async (
   userId: string,
   task: FirestoreAgentTask
 ): Promise<boolean> => {
+  if (!auth.currentUser || auth.currentUser.uid !== userId) return false;
   const path = `users/${userId}/tasks/${task.id}`;
   try {
     const taskRef = doc(db, 'users', userId, 'tasks', task.id);
