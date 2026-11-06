@@ -531,7 +531,7 @@ OPERATIONAL PRINCIPLES & CAPABILITY BOUNDARIES:
           synthesizedReply = executedTools[0].result.message;
         } else {
           synthesizedReply =
-            'I am operational and verified. My intelligence core has received your request and internal subsystems remain active. How may I assist you further?';
+            'I could not reach the AI provider to complete that request. Please try again shortly or check the configured API key and connection.';
         }
       }
     }
