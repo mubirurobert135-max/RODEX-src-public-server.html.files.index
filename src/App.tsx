@@ -1840,6 +1840,18 @@ export default function App() {
     rodexSynth.prime();
     triggerHaptic('tap');
 
+    // No visible microphone CTA: the character is the voice portal itself.
+    // Browsers still require permission; prompt from this genuine user gesture
+    // rather than claiming to capture audio without the user's consent.
+    if (!micPermissionGranted) {
+      const permitted = await requestMicPermission();
+      if (!permitted) {
+        setLastResponse('RODEX needs microphone permission for hands-free conversation. You can enable it in settings.');
+        setIsSettingsOpen(true);
+        return;
+      }
+    }
+
     // 1. Natural Barge-In: If speaking, immediately interrupt and listen
     if (state === 'speaking') {
       globalLiveConversationService.stopAllPlayback();
