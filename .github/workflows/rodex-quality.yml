@@ -74,6 +74,9 @@ jobs:
       - name: Voice response and wake reliability
         run: bun run test:voice
 
+      - name: Authentication access guards
+        run: bun run test:auth
+
       - name: Multi-user isolation
         run: bun run test:multiuser
 
