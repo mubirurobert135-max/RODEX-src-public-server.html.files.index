@@ -88,3 +88,6 @@ jobs:
 
       - name: Agent and task workflow
         run: bun run test:agent
+
+      - name: Reservation verification integrity
+        run: bun run test:booking
