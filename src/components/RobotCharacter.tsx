@@ -112,7 +112,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       <span className="rodex-dimensional-atmosphere" aria-hidden="true" />
       <svg
         className="rodex-robot-vector"
-        viewBox="0 0 600 650"
+        viewBox="100 14 400 606"
         role="presentation"
         aria-hidden="true"
         preserveAspectRatio="xMidYMid meet"
