@@ -242,9 +242,8 @@ async function runAgentTaskEngineTests() {
   }
   console.log('========================================================\n');
 
-  if (failCount > 0) {
-    process.exit(1);
-  }
+  // Firebase maintains background listeners; this is a one-shot CLI test.
+  process.exit(failCount > 0 ? 1 : 0);
 }
 
 runAgentTaskEngineTests().catch((err) => {
