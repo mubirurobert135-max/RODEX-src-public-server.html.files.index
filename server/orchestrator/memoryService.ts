@@ -1,9 +1,5 @@
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { resolveRodexDataFile, writeRodexJson } from '../services/persistentStorage';
 
 export type MemoryCategory = 'preference' | 'fact' | 'project' | 'profile' | 'routine' | 'custom';
 
@@ -47,7 +43,7 @@ export class MemoryService implements IMemoryRepository {
   private memoryCache: Map<string, MemoryEntry> = new Map();
 
   private constructor() {
-    this.storagePath = path.resolve(__dirname, '../../.rodex_memory.json');
+    this.storagePath = resolveRodexDataFile('.rodex_memory.json', '.rodex_memory.json');
     this.loadFromDisk();
   }
 
@@ -71,37 +67,17 @@ export class MemoryService implements IMemoryRepository {
             }
           }
         }
-      } else {
-        // Initialize default baseline memories for creator Robert
-        this.seedDefaultMemories();
       }
     } catch (err) {
       console.warn('[RODEX MemoryService] Warning loading memories from disk:', err);
-      this.seedDefaultMemories();
-    }
-  }
-
-  private seedDefaultMemories(): void {
-    const defaultEntries: Array<Omit<MemoryEntry, 'id' | 'createdAt' | 'updatedAt'>> = [
-      {
-        userId: 'usr_robert_1001',
-        category: 'preference',
-        key: 'assistant_style',
-        value: 'Prefers authoritative, articulate, and intellectually rigorous answers with real-time web facts.',
-        confidence: 0.98,
-        tags: ['preference', 'tone', 'style'],
-      },
-    ];
-
-    for (const entry of defaultEntries) {
-      this.saveSync(entry);
+      // A corrupt memory file is not overwritten with synthetic user memories.
     }
   }
 
   private saveToDisk(): void {
     try {
       const arr = Array.from(this.memoryCache.values());
-      fs.writeFileSync(this.storagePath, JSON.stringify(arr, null, 2), 'utf-8');
+      writeRodexJson(this.storagePath, arr);
     } catch (err) {
       console.error('[RODEX MemoryService] Error saving memories to disk:', err);
     }
