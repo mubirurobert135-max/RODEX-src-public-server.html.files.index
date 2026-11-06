@@ -1,165 +1,98 @@
-/* The original RODEX robot is isolated from its prototype screenshots at
-   runtime. No square media frame, status labels, or extraneous speech bubbles. */
+/* RODEX immersive dimensional stage.
+   The artwork is SVG geometry: no bitmap edges, clipping masks, fixed image
+   frames or dashboard fragments. All devices share the same responsive scene. */
 .rodex-robot-button {
-  position: relative;
+  --rodex-cyan: #45d6ff;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: min(96vw, 540px);
-  height: clamp(300px, 62svh, 530px);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   min-height: 0;
   padding: 0;
-  border: 0;
+  margin: 0;
   background: transparent;
   color: inherit;
-  border-radius: 50%;
-  cursor: pointer;
+  border: 0;
+  overflow: visible;
   isolation: isolate;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  perspective: 1400px;
 }
 .rodex-robot-button:focus-visible {
-  outline: 2px solid rgba(52, 211, 255, .95);
+  outline: 2px solid var(--rodex-cyan);
   outline-offset: -8px;
+  border-radius: 32px;
 }
-.rodex-robot-ambient {
+.rodex-dimensional-atmosphere {
   position: absolute;
-  inset: 5% 4% 10%;
+  inset: -10% -10%;
+  z-index: -1;
+  pointer-events: none;
   border-radius: 50%;
-  pointer-events: none;
   background:
-    radial-gradient(ellipse at 50% 58%, rgba(2, 92, 172, .20) 0%, rgba(0, 33, 67, .09) 38%, transparent 72%);
-  filter: blur(38px);
+    radial-gradient(ellipse 37% 52% at 50% 47%, rgba(5, 92, 170, .15) 0%, rgba(5, 55, 105, .07) 52%, transparent 100%);
+  filter: blur(22px);
 }
-.rodex-robot-scale {
-  position: absolute;
-  left: 50%;
-  top: 47%;
-  width: 178px;
-  height: 207px;
-  transform: translate(-50%, -50%) scale(2.04);
-  transform-origin: center center;
-  pointer-events: none;
-  perspective: 760px;
-  z-index: 3;
-}
-.rodex-robot-floating, .rodex-robot-viewport {
+.rodex-robot-vector {
   display: block;
-  position: absolute;
-  inset: 0;
-}
-.rodex-robot-floating {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+  width: 100%;
+  overflow: visible;
+  min-height: 0;
+  max-width: none;
   transform-style: preserve-3d;
+  filter: drop-shadow(0 25px 26px rgba(0, 15, 35, .25));
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.rodex-robot-model {
+  transform-box: fill-box;
+  transform-origin: center center;
   will-change: transform;
 }
-.rodex-robot-viewport {
-  width: 178px;
-  height: 207px;
-  overflow: hidden;
-}
-.rodex-robot-pose {
-  position: absolute;
-  display: block;
-  left: -112px;
-  top: -2px;
-  width: 414px;
-  height: 231px;
-  max-width: none;
-  max-height: none;
-  object-fit: fill;
-  user-select: none;
-  will-change: opacity;
-  filter: saturate(1.23) contrast(1.08) brightness(1.04)
-    drop-shadow(0 7px 8px rgba(6, 49, 106, .30));
-  pointer-events: none;
-}
-.rodex-robot-boot {
-  position: absolute;
-  left: 49px;
-  top: 17px;
-  width: 92px;
-  height: 91px;
-  border-radius: 48% 48% 48% 48%;
-  background: radial-gradient(circle at 28% 23%, #fff 0, #dbf4ff 25%, #93c8ed 67%, #4f9cd6 100%);
-  box-shadow: inset -7px -10px 14px rgba(28, 91, 148, .2), 0 0 22px rgba(0, 166, 255, .1);
-  animation: rodex-boot-breathe 2.4s ease-in-out infinite;
-}
-.rodex-robot-boot::before {
-  content: '';
-  position: absolute;
-  left: 18px;
-  top: 51px;
-  width: 72px;
-  height: 37px;
-  border-radius: 54% 48% 54% 54%;
-  background: radial-gradient(ellipse at 60% 10%, #081b32 0%, #01040c 70%);
-  box-shadow: inset 0 2px 4px rgba(89, 203, 255, .15);
-}
-.rodex-robot-boot::after {
-  content: '';
-  position: absolute;
-  top: 87px;
-  left: 17px;
-  width: 62px;
-  height: 85px;
-  border-radius: 38% 38% 50% 50%;
-  background: radial-gradient(ellipse at 29% 16%, #f4fcff, #b9e4fc 42%, #63b1e1 100%);
-}
-.rodex-robot-light-ring {
+.rodex-character-aura {
   position: absolute;
   left: 50%;
-  bottom: 7%;
-  width: min(61%, 315px);
-  height: 54px;
-  transform: translateX(-50%) perspective(260px) rotateX(64deg);
-  border: 2px solid rgba(33, 193, 255, .54);
-  border-radius: 50%;
-  box-shadow: 0 0 14px rgba(0, 172, 252, .27), inset 0 0 13px rgba(0, 146, 230, .23);
-  pointer-events: none;
-  opacity: .85;
-  animation: rodex-robot-halo 4.3s ease-in-out infinite;
-  z-index: 1;
-}
-.rodex-robot-light-ring::after {
-  content: '';
-  position: absolute;
-  inset: 8px 12%;
-  border: 1px solid rgba(20, 160, 231, .31);
-  border-radius: 50%;
-}
-.rodex-robot-ground-glow {
-  position: absolute;
-  left: 50%;
-  bottom: 7%;
-  width: 63%;
-  height: 27px;
+  bottom: 9%;
+  width: min(40%, 440px);
+  height: 10%;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse, rgba(0, 167, 247, .42), rgba(0, 86, 152, .12) 50%, transparent 75%);
-  filter: blur(13px);
   pointer-events: none;
-  z-index: 0;
+  background: radial-gradient(ellipse, rgba(0, 175, 255, .17), transparent 72%);
+  filter: blur(32px);
+  z-index: -1;
 }
-@keyframes rodex-robot-halo {
-  0%, 100% { opacity: .56; box-shadow: 0 0 12px rgba(0, 187, 255, .22); }
-  50% { opacity: .92; box-shadow: 0 0 25px rgba(0, 187, 255, .45); }
+
+/* Responsive SVG viewBox fits the entire character within the available
+   stage. The stage itself extends across the viewport without a visible box. */
+@media (orientation: portrait) {
+  .rodex-robot-vector { width: 108%; height: 100%; }
+  .rodex-dimensional-atmosphere { inset: -12%; }
 }
-@keyframes rodex-boot-breathe {
-  0%, 100% { opacity: .45; }
-  50% { opacity: .72; }
+@media (max-width: 600px) {
+  .rodex-robot-vector { width: 115%; height: 100%; }
+  .rodex-character-aura { bottom: 7%; }
 }
-@media (max-width: 600px), (max-height: 640px) {
-  .rodex-robot-button { height: clamp(235px, 50svh, 350px); width: min(99vw, 390px); }
-  .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.48); top: 46%; }
-  .rodex-robot-light-ring { bottom: 3%; width: 63%; }
-  .rodex-robot-ground-glow { bottom: 3%; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .rodex-robot-vector { width: 75%; height: 100%; }
+  .rodex-character-aura { bottom: 3%; }
 }
-@media (max-width: 360px), (max-height: 490px) {
-  .rodex-robot-button { height: clamp(196px, 45svh, 285px); width: min(98vw, 340px); }
-  .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.18); top: 47%; }
-  .rodex-robot-light-ring { bottom: 0; width: 58%; }
-  .rodex-robot-ground-glow { bottom: 0; }
+@media (min-width: 1600px) and (min-height: 900px) {
+  .rodex-robot-vector { width: 95%; height: 103%; }
+  .rodex-dimensional-atmosphere { filter: blur(43px); }
+}
+@media (min-width: 2800px) {
+  .rodex-robot-vector { width: 100%; height: 108%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rodex-robot-light-ring, .rodex-robot-boot { animation: none; }
+  .rodex-robot-model, .rodex-robot-vector { will-change: auto; }
 }
