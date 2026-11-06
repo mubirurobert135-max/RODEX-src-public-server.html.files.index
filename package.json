@@ -22,7 +22,8 @@
     "test:agent": "tsx scripts/testAgentTaskEngine.ts",
     "lint": "tsc --noEmit",
     "test:grounding": "tsx scripts/testGrounding.ts",
-    "test:voice": "tsx scripts/testVoiceResponseReliability.ts"
+    "test:voice": "tsx scripts/testVoiceResponseReliability.ts",
+    "test:auth": "tsx scripts/testAuthGuards.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
