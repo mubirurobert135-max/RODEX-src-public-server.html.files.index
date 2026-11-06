@@ -1,9 +1,5 @@
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { resolveRodexDataFile, writeRodexJson } from '../services/persistentStorage';
 
 export interface UserPersonalizationProfile {
   userId: string;
@@ -24,7 +20,7 @@ export class UserProfileService {
   private profile: UserPersonalizationProfile;
 
   private constructor() {
-    this.filePath = path.resolve(__dirname, '../../.rodex_profile.json');
+    this.filePath = resolveRodexDataFile('.rodex_profile.json', '.rodex_profile.json');
     this.profile = this.loadProfile();
   }
 
@@ -64,7 +60,7 @@ export class UserProfileService {
 
   private saveProfile(): void {
     try {
-      fs.writeFileSync(this.filePath, JSON.stringify(this.profile, null, 2), 'utf-8');
+      writeRodexJson(this.filePath, this.profile);
     } catch (err) {
       console.error('[UserProfileService] Error saving profile:', err);
     }
