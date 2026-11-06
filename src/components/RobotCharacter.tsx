@@ -41,6 +41,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
   const reducedMotion = useReducedMotion();
   const [blink, setBlink] = useState(false);
   const [gaze, setGaze] = useState({ x: 0, y: 0 });
+  const [ambientLook, setAmbientLook] = useState({ x: 0, y: 0 });
   const [gestureBeat, setGestureBeat] = useState(0);
   const spinControls = useAnimationControls();
   const gazeFrame = useRef<number | null>(null);
@@ -125,6 +126,32 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       spinControls.stop();
     };
   }, [expression, reducedMotion, spinControls]);
+
+  // Gentle, irregular idle glances, without overriding direct eye contact.
+  useEffect(() => {
+    if (reducedMotion || (expression !== 'rest' && expression !== 'think')) {
+      setAmbientLook({ x: 0, y: 0 });
+      return;
+    }
+    let cancelled = false;
+    let timer: number;
+    const look = () => {
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        if (document.visibilityState === 'visible') {
+          const options = [
+            { x: -.65, y: -.1 }, { x: 0, y: 0 },
+            { x: .75, y: -.12 }, { x: 0, y: 0 },
+            { x: -.2, y: .38 }, { x: 0, y: 0 },
+          ];
+          setAmbientLook(options[Math.floor(Math.random() * options.length)]);
+        }
+        look();
+      }, 2300 + Math.random() * 3400);
+    };
+    look();
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [expression, reducedMotion]);
 
   // Deliberately non-metronomic gestures. Mouth/noise labels never appear:
   // speaking is conveyed by face, head, arms and the output audio energy.
@@ -298,9 +325,9 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           <motion.g
             style={{ transformOrigin: '300px 207px' }}
             animate={reducedMotion ? undefined : {
-              rotate: headTilt + gaze.x * 3 + (speaking ? [-2, 1.7, 3, -1, 1, -2, 2, 0][gestureBeat] : 0),
-              x: gaze.x * 3,
-              y: gaze.y * 2 + (speaking ? Math.max(-4, -safeAudio * 6) : 0),
+              rotate: headTilt + gaze.x * 3 + ambientLook.x * 2.2 + (speaking ? [-2, 1.7, 3, -1, 1, -2, 2, 0][gestureBeat] : 0),
+              x: gaze.x * 3 + ambientLook.x * 3,
+              y: gaze.y * 2 + ambientLook.y * 2 + (speaking ? Math.max(-4, -safeAudio * 6) : 0),
             }}
             transition={{ type: 'spring', stiffness: 95, damping: 17 }}
           >
