@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { AssistantState, TaskState } from '../types';
 import { ROBOT_FRAMES } from './robotFrames';
+import { isolateRobotFrame } from './robotCutout';
 import './RobotCharacter.css';
 
 type Expression =
@@ -54,16 +55,32 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
   const levelRef = useRef(audioLevel);
   levelRef.current = audioLevel;
 
-  // All frames are local, and preloading prevents a blank silhouette on the
-  // first blink or gesture. This does not fetch content or start an AI session.
+  // Remove the demo panels and their rectangular background from all 16
+  // original robot poses. Decoding is local; no network call or AI request.
+  const [preparedFrames, setPreparedFrames] = useState<(string | undefined)[]>([]);
   useEffect(() => {
-    if (typeof Image === 'undefined') return;
-    const images = ROBOT_FRAMES.map(src => {
-      const image = new Image();
-      image.src = src;
-      return image;
+    let active = true;
+    const ownedUrls: string[] = [];
+    ROBOT_FRAMES.forEach((frame, index) => {
+      isolateRobotFrame(frame).then(url => {
+        if (!active) {
+          if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+          return;
+        }
+        if (url.startsWith('blob:')) ownedUrls.push(url);
+        setPreparedFrames(previous => {
+          const next = [...previous];
+          next[index] = url;
+          return next;
+        });
+      }).catch(error => {
+        console.warn('[RODEX character] Unable to prepare animation frame', index, error);
+      });
     });
-    return () => { images.length = 0; };
+    return () => {
+      active = false;
+      ownedUrls.forEach(url => URL.revokeObjectURL(url));
+    };
   }, []);
 
   // Behaviour is triggered by genuine assistant and voice state. Short,
@@ -211,20 +228,24 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           }}
         >
           <span className="rodex-robot-viewport">
-            <AnimatePresence initial={false}>
-              <motion.img
-                key={pose}
-                src={ROBOT_FRAMES[pose]}
-                alt=""
-                aria-hidden="true"
-                draggable={false}
-                className="rodex-robot-pose"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reducedMotion ? 0 : 0.25, ease: 'easeInOut' }}
-              />
-            </AnimatePresence>
+            {preparedFrames[pose] || preparedFrames[0] ? (
+              <AnimatePresence initial={false}>
+                <motion.img
+                  key={pose}
+                  src={preparedFrames[pose] || preparedFrames[0]}
+                  alt=""
+                  aria-hidden="true"
+                  draggable={false}
+                  className="rodex-robot-pose"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.20, ease: 'easeInOut' }}
+                />
+              </AnimatePresence>
+            ) : (
+              <span className="rodex-robot-boot" aria-hidden="true" />
+            )}
           </span>
         </motion.span>
       </span>
