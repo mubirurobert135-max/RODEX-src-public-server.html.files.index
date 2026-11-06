@@ -1,252 +1,140 @@
-/* RODEX immersive dimensional stage.
-   The artwork is SVG geometry: no bitmap edges, clipping masks, fixed image
-   frames or dashboard fragments. All devices share the same responsive scene. */
+/* RODEX AURORA | Articulated live character
+   The entire robot is vector geometry with independently animated joints.
+   No static character image, bitmap crop or hidden background illustration. */
 .rodex-robot-button {
-  --rodex-cyan: #45d6ff;
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
   padding: 0;
   margin: 0;
+  border: 0;
+  display: grid;
+  place-items: center;
   background: transparent;
   color: inherit;
-  border: 0;
   overflow: visible;
   isolation: isolate;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  perspective: 1400px;
+  perspective: 1200px;
 }
-.rodex-robot-button:focus-visible {
-  outline: 2px solid var(--rodex-cyan);
-  outline-offset: -8px;
-  border-radius: 32px;
-}
-.rodex-dimensional-atmosphere {
-  position: absolute;
-  inset: -10% -10%;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: 50%;
-  background:
-    radial-gradient(ellipse 37% 52% at 50% 47%, rgba(5, 92, 170, .15) 0%, rgba(5, 55, 105, .07) 52%, transparent 100%);
-  filter: blur(22px);
-}
-/* The holographic platform is in world space, not part of the spinning robot. */
-.rodex-holographic-floor {
-  position: absolute;
-  left: 50%;
-  bottom: 6.1%;
-  width: min(74vw, 52vh, 420px);
-  height: clamp(32px, 6.5vh, 72px);
-  transform: translateX(-50%) perspective(420px) rotateX(65deg);
-  transform-origin: center center;
-  pointer-events: none;
-  border-radius: 50%;
-  border: 2px solid rgba(37, 199, 255, .67);
-  box-shadow: 0 0 18px rgba(0, 176, 255, .31), inset 0 0 21px rgba(0, 183, 255, .23);
-  z-index: 0;
-  animation: rodex-floor-breathe 4.4s ease-in-out infinite;
-}
-.rodex-holographic-floor::before {
-  content: '';
-  position: absolute;
-  inset: 20% 15%;
-  border-radius: 50%;
-  border: 1px solid rgba(76, 198, 252, .29);
-}
-.rodex-holographic-floor::after {
-  content: '';
-  position: absolute;
-  inset: -45% -10%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(0, 180, 255, .20), transparent 67%);
-  filter: blur(16px);
-}
-@keyframes rodex-floor-breathe {
-  0%, 100% { opacity: .52; }
-  50% { opacity: .95; }
-}
-.rodex-robot-spin-shell {
+
+.rodex-aurora-svg {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  transform-origin: center 49%;
-  transform-style: preserve-3d;
-  backface-visibility: visible;
-  will-change: transform;
-  pointer-events: none;
-}
-.rodex-robot-vector {
+  z-index: 2;
   display: block;
-  position: relative;
-  flex: 0 0 auto;
-  height: 100%;
   width: 100%;
-  overflow: visible;
+  height: 100%;
   min-height: 0;
-  max-width: none;
-  transform-style: preserve-3d;
-  filter: drop-shadow(0 25px 26px rgba(0, 15, 35, .25));
+  overflow: visible;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
+  filter:
+    drop-shadow(0 28px 20px rgba(0, 6, 22, .52))
+    drop-shadow(0 0 13px rgba(0, 152, 255, .2));
+  transition: filter .38s ease;
 }
-.rodex-robot-model {
-  transform-box: fill-box;
-  transform-origin: center center;
+
+.rodex-aurora-body,
+.rodex-aurora-head,
+.rodex-aurora-left-arm,
+.rodex-aurora-right-arm,
+.rodex-aurora-hand,
+.rodex-aurora-eyes {
+  transform-box: view-box;
   will-change: transform;
 }
+
+.rodex-dimensional-atmosphere {
+  position: absolute;
+  inset: 2% -8% 3%;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 40% 39% at 52% 48%, rgba(17, 136, 238, .28) 0%, rgba(10, 87, 193, .1) 55%, transparent 100%),
+    radial-gradient(ellipse 63% 17% at 50% 84%, rgba(8, 185, 255, .13), transparent 92%);
+  filter: blur(26px);
+  opacity: .9;
+  transition: opacity .35s ease, filter .35s ease;
+}
+
 .rodex-character-aura {
   position: absolute;
   left: 50%;
-  bottom: 9%;
-  width: min(40%, 440px);
-  height: 10%;
-  transform: translateX(-50%);
-  pointer-events: none;
-  background: radial-gradient(ellipse, rgba(0, 175, 255, .17), transparent 72%);
-  filter: blur(32px);
+  bottom: 5.5%;
   z-index: -1;
-}
-
-/* Responsive SVG viewBox fits the entire character within the available
-   stage. The stage itself extends across the viewport without a visible box. */
-@media (orientation: portrait) {
-  .rodex-robot-vector { width: 100%; height: 100%; }
-  .rodex-dimensional-atmosphere { inset: -12%; }
-}
-@media (max-width: 600px) {
-  .rodex-robot-vector { width: 100%; height: 100%; }
-  .rodex-character-aura { bottom: 7%; }
-}
-@media (max-height: 500px) and (orientation: landscape) {
-  .rodex-robot-vector { width: 100%; height: 100%; }
-  .rodex-character-aura { bottom: 3%; }
-}
-@media (min-width: 1600px) and (min-height: 900px) {
-  .rodex-robot-vector { width: 100%; height: 100%; }
-  .rodex-dimensional-atmosphere { filter: blur(43px); }
-}
-@media (min-width: 2800px) {
-  .rodex-robot-vector { width: 100%; height: 100%; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .rodex-robot-model, .rodex-robot-vector, .rodex-robot-spin-shell { will-change: auto; }
-  .rodex-holographic-floor { animation: none; }
-}
-
-
-/* 2026 RODEX character finishing: dimensional depth without bitmap artwork.
-   Expression styles respond to true assistant state; no decorative status labels. */
-.rodex-robot-button {
-  --rodex-cyan: #40deff;
-  outline-offset: -3px;
-  transform: translateZ(0);
-}
-.rodex-robot-button::before {
-  content: "";
-  position: absolute;
-  width: min(67%, 530px);
-  height: 73%;
-  top: 11%;
-  left: 50%;
-  transform: translateX(-50%);
+  width: min(74%, 490px);
+  height: 10%;
   pointer-events: none;
+  transform: translateX(-50%);
   border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 47%,
-    rgba(45, 157, 255, .11) 0%,
-    rgba(1, 92, 201, .055) 44%,
-    transparent 73%);
-  filter: blur(26px);
-  opacity: .9;
-  transition: opacity .45s ease, filter .45s ease;
+  background: radial-gradient(ellipse, rgba(9, 185, 255, .27), rgba(8, 83, 180, .11) 58%, transparent 78%);
+  filter: blur(23px);
 }
-.rodex-robot-button[data-expression="wake"]::before,
-.rodex-robot-button[data-expression="focus"]::before {
+
+.rodex-aurora-character:focus-visible {
+  outline: 2px solid #50dcff;
+  outline-offset: -4px;
+  border-radius: 30px;
+}
+
+.rodex-aurora-character[data-expression="listening"] .rodex-dimensional-atmosphere,
+.rodex-aurora-character[data-expression="wake"] .rodex-dimensional-atmosphere {
   opacity: 1;
   filter: blur(19px) saturate(1.35);
 }
-.rodex-robot-button[data-expression="speak"]::before,
-.rodex-robot-button[data-expression="act"]::before,
-.rodex-robot-button[data-expression="happy"]::before {
+
+.rodex-aurora-character[data-expression="acting"] .rodex-dimensional-atmosphere,
+.rodex-aurora-character[data-expression="happy"] .rodex-dimensional-atmosphere,
+.rodex-aurora-character[data-expression="speaking"] .rodex-dimensional-atmosphere {
   opacity: 1;
-  filter: blur(19px) saturate(1.5);
+  filter: blur(17px) saturate(1.5);
 }
-.rodex-robot-vector {
-  filter:
-    drop-shadow(0 22px 22px rgba(0, 7, 21, .5))
-    drop-shadow(0 0 18px rgba(1, 142, 245, .10));
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  transition: filter .45s ease;
-}
+
 @media (hover: hover) and (pointer: fine) {
-  .rodex-robot-button:hover .rodex-robot-vector {
+  .rodex-aurora-character:hover .rodex-aurora-svg {
     filter:
-      drop-shadow(0 28px 26px rgba(0, 7, 24, .57))
-      drop-shadow(0 0 26px rgba(1, 166, 255, .25));
+      drop-shadow(0 30px 22px rgba(0, 6, 22, .55))
+      drop-shadow(0 0 20px rgba(0, 192, 255, .31));
   }
 }
-.rodex-robot-button[data-expression="focus"] .rodex-robot-vector,
-.rodex-robot-button[data-expression="wake"] .rodex-robot-vector {
-  filter:
-    drop-shadow(0 25px 24px rgba(0, 7, 24, .53))
-    drop-shadow(0 0 22px rgba(5, 172, 255, .26));
-}
-.rodex-robot-button[data-expression="act"] .rodex-robot-vector,
-.rodex-robot-button[data-expression="happy"] .rodex-robot-vector {
-  filter:
-    drop-shadow(0 25px 24px rgba(0, 7, 24, .53))
-    drop-shadow(0 0 28px rgba(13, 189, 255, .34));
-}
-.rodex-dimensional-atmosphere {
-  inset: -8% -12%;
-  background:
-    radial-gradient(ellipse 34% 45% at 50% 48%,
-      rgba(9, 108, 220, .18), rgba(6, 55, 110, .08) 63%, transparent 90%);
-  filter: blur(26px);
-}
-.rodex-holographic-floor {
-  bottom: 6.4%;
-  width: min(62vw, 49vh, 395px);
-  height: clamp(27px, 5.2vh, 61px);
-  border: 1.5px solid rgba(44, 204, 255, .58);
-  background: radial-gradient(ellipse at center,
-    rgba(3, 183, 255, .24), rgba(4, 111, 230, .075) 46%, transparent 73%);
-  box-shadow:
-    0 0 13px rgba(9, 171, 255, .26),
-    inset 0 0 20px rgba(1, 181, 255, .18);
-}
-.rodex-holographic-floor::before {
-  inset: 15% 18%;
-  border-color: rgba(147, 237, 255, .36);
-}
-.rodex-robot-spin-shell {
-  transform-origin: 50% 46%;
-}
+
+/* Preserve original silhouette on phones, tablets and wide displays.
+   The dashboard positions its stage; the SVG scales without cropping. */
 @media (max-width: 760px) and (orientation: portrait) {
-  .rodex-robot-button::before { width: 88%; height: 78%; top: 8%; }
-  .rodex-holographic-floor { bottom: 5%; width: min(65vw, 330px); }
+  .rodex-aurora-svg { width: 100%; height: 100%; }
+  .rodex-dimensional-atmosphere { inset: 0 -9% 4%; filter: blur(19px); }
+  .rodex-character-aura { bottom: 4%; width: 81%; }
 }
-@media (max-height: 520px) and (orientation: landscape) {
-  .rodex-holographic-floor { width: min(38vw, 265px); bottom: 0; }
-  .rodex-robot-button::before { height: 92%; top: 0; }
+
+@media (max-height: 515px) and (orientation: landscape) {
+  .rodex-dimensional-atmosphere { inset: -3% -15%; }
+  .rodex-character-aura { bottom: 0; }
 }
+
+@media (min-width: 1920px) {
+  .rodex-aurora-svg {
+    filter: drop-shadow(0 34px 30px rgba(0, 4, 22, .6)) drop-shadow(0 0 22px rgba(0, 170, 255, .21));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rodex-robot-button::before, .rodex-robot-vector {
+  .rodex-aurora-svg,
+  .rodex-dimensional-atmosphere {
     transition: none;
+  }
+  .rodex-aurora-body,
+  .rodex-aurora-head,
+  .rodex-aurora-left-arm,
+  .rodex-aurora-right-arm,
+  .rodex-aurora-hand,
+  .rodex-aurora-eyes {
+    will-change: auto;
   }
 }
