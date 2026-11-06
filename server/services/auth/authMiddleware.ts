@@ -15,15 +15,12 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
   try {
     const authHeader = req.headers.authorization;
     const sessionHeader = req.headers['x-rodex-session-token'] as string | undefined;
-    const queryToken = req.query.sessionToken as string | undefined;
 
     let token: string | undefined;
     if (authHeader && authHeader.startsWith('Bearer session_')) {
       token = authHeader.slice(7);
     } else if (sessionHeader && sessionHeader.startsWith('session_')) {
       token = sessionHeader;
-    } else if (queryToken && queryToken.startsWith('session_')) {
-      token = queryToken;
     }
 
     if (token) {
@@ -36,11 +33,7 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
       }
     }
 
-    // Default fallback to initial user to maintain seamless backward compatibility
-    const defaultUser = globalAuthService.getDefaultInitialUser();
-    req.user = defaultUser;
-    req.userId = defaultUser.id;
-    req.sessionToken = globalAuthService.getDefaultInitialToken();
+    // No valid credential means anonymous access, never impersonate an owner.
     next();
   } catch (err) {
     next();
