@@ -20,6 +20,7 @@ async function run() {
   assert.match(result.spokenSummary, /No reservation has been booked/i);
   assert.equal(result.task.confirmationAction, undefined);
   console.log('RODEX: unverified dining reservations never show fabricated confirmation.');
+  process.exit(0);
 }
 run().catch(error => {
   console.error(error);
