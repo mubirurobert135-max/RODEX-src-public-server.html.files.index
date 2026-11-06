@@ -195,7 +195,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
   const eyeSet = happy ? 'happy' : concerned ? 'concerned' : focused ? 'focus' : busy ? 'busy' : 'rest';
   const headTilt = concerned ? -5 : expression === 'think' ? -7 : expression === 'wake' ? 5 : 0;
   const rightGesture = expression === 'act' ? -42 : speaking && actionReply ? -39 : happy ? -44 : speaking ? -28 : expression === 'think' ? -10 : -6;
-  const leftGesture = happy ? 8 : focused ? -7 : speaking ? (gestureBeat % 3 === 0 ? 9 : 1) : 0;
+  const leftGesture = happy ? -72 : focused ? -58 : speaking ? (gestureBeat % 3 === 0 ? -74 : -65) : expression === 'think' ? -61 : -57;
   const reactiveGesture = speaking ? [-4, -14, 2, -7, 8, -4, -12, 2][gestureBeat] : 0;
 
   return (
@@ -317,27 +317,6 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
               <circle cx="219" cy="320" r="10" fill="url(#rodex-dark-seam)" stroke="#4d9bd1" strokeWidth="2"/>
               <circle cx="219" cy="320" r="5" fill="#08bfff" opacity=".8"/>
             </g>
-            <motion.g
-              className="rodex-left-arm"
-              style={{ transformOrigin: '220px 319px' }}
-              animate={reducedMotion ? undefined : {
-                rotate: leftGesture + (expression === 'wake' ? -10 : 0),
-                y: speaking ? [-1, 2, -1] : 0,
-              }}
-              transition={{ rotate: { type: 'spring', stiffness: 95, damping: 17 }, y: { duration: 2.1, repeat: speaking ? Infinity : 0 } }}
-            >
-              <path d="M211 317 C185 308 165 336 160 364 C154 399 164 436 181 442 C197 446 211 420 220 390 C227 362 226 328 211 317Z" fill="#0b2b49" opacity=".6" transform="translate(3 5)"/>
-              <path d="M211 313 C185 305 164 333 158 363 C150 400 162 434 181 438 C197 441 212 413 220 386 C228 357 226 325 211 313Z" fill="url(#rodex-armor)" stroke="#c0e7fa" strokeWidth="2.4"/>
-              <path d="M182 328 C169 352 167 381 174 398" fill="none" stroke="white" strokeOpacity=".50" strokeWidth="9" strokeLinecap="round"/>
-              <path d="M191 328 C208 319 217 329 218 349" fill="none" stroke="#4c8ab8" strokeOpacity=".25" strokeWidth="7" strokeLinecap="round"/>
-              <ellipse cx="181" cy="436" rx="17" ry="13" fill="url(#rodex-dark-seam)" stroke="#8dc6ea" strokeWidth="2"/>
-              <path d="M169 435 Q180 448 194 434" fill="none" stroke="#48d9ff" strokeWidth="2.5" opacity=".75"/>
-              <g transform="translate(-2 0)">
-                <path d="M167 442 C156 448 151 457 156 468 C158 472 165 472 169 467 L176 460 C171 470 175 477 181 476 C187 476 187 462 189 457 C188 470 194 475 198 470 Q204 463 195 446 L188 437Z" fill="url(#rodex-hand)" stroke="#c9ebfd" strokeWidth="2.2"/>
-                <path d="M163 451 Q166 447 171 445" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" opacity=".62"/>
-              </g>
-            </motion.g>
-
             {/* Right arm opens naturally on actions and is never an inert cutout. */}
             <g>
               <ellipse cx="383" cy="318" rx="30" ry="29" fill="#0c2a4a" opacity=".7"/>
@@ -396,6 +375,29 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
             <circle cx="301" cy="379" r="10" fill="#e3ffff" opacity=".65" filter="url(#rodex-neon)"/>
             <circle cx="301" cy="379" r="8" fill="#0e5bb2" stroke="#71f6ff" strokeWidth="1.8"/>
             <circle cx="301" cy="379" r="3.3" fill="#ceffff"/>
+
+            {/* Foreground hand and forearm rest across the breastplate, rather
+                than disappearing behind the torso during a natural gesture. */}
+            <motion.g
+              className="rodex-left-arm"
+              style={{ transformOrigin: '220px 319px' }}
+              animate={reducedMotion ? undefined : {
+                rotate: leftGesture + (expression === 'wake' ? -10 : 0),
+                y: speaking ? [-1, 2, -1] : 0,
+              }}
+              transition={{ rotate: { type: 'spring', stiffness: 95, damping: 17 }, y: { duration: 2.1, repeat: speaking ? Infinity : 0 } }}
+            >
+              <path d="M211 317 C185 308 165 336 160 364 C154 399 164 436 181 442 C197 446 211 420 220 390 C227 362 226 328 211 317Z" fill="#0b2b49" opacity=".6" transform="translate(3 5)"/>
+              <path d="M211 313 C185 305 164 333 158 363 C150 400 162 434 181 438 C197 441 212 413 220 386 C228 357 226 325 211 313Z" fill="url(#rodex-armor)" stroke="#c0e7fa" strokeWidth="2.4"/>
+              <path d="M182 328 C169 352 167 381 174 398" fill="none" stroke="white" strokeOpacity=".50" strokeWidth="9" strokeLinecap="round"/>
+              <path d="M191 328 C208 319 217 329 218 349" fill="none" stroke="#4c8ab8" strokeOpacity=".25" strokeWidth="7" strokeLinecap="round"/>
+              <ellipse cx="181" cy="436" rx="17" ry="13" fill="url(#rodex-dark-seam)" stroke="#8dc6ea" strokeWidth="2"/>
+              <path d="M169 435 Q180 448 194 434" fill="none" stroke="#48d9ff" strokeWidth="2.5" opacity=".75"/>
+              <g transform="translate(-2 0)">
+                <path d="M167 442 C156 448 151 457 156 468 C158 472 165 472 169 467 L176 460 C171 470 175 477 181 476 C187 476 187 462 189 457 C188 470 194 475 198 470 Q204 463 195 446 L188 437Z" fill="url(#rodex-hand)" stroke="#c9ebfd" strokeWidth="2.2"/>
+                <path d="M163 451 Q166 447 171 445" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" opacity=".62"/>
+              </g>
+            </motion.g>
 
             {/* Expressive floating head: pivot independent from body, visor and eyelids. */}
             <motion.g className="rodex-robot-head"
