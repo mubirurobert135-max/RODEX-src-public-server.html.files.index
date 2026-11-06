@@ -67,14 +67,12 @@ export class AIProviderService {
   public getModelTiers(tier: 'fast' | 'balanced' | 'deep_reasoning' = 'fast'): string[] {
     switch (tier) {
       case 'deep_reasoning':
+        return ['gemini-3.1-pro-preview', 'gemini-3.8-flash'];
       case 'balanced':
+        return ['gemini-3.8-flash', 'gemini-3.6-flash'];
       case 'fast':
       default:
-        return [
-          'gemini-3.1-flash-lite',
-          'gemini-flash-latest',
-          'gemini-3.8-flash',
-        ];
+        return ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
     }
   }
 
@@ -87,15 +85,18 @@ export class AIProviderService {
       this.initClient();
     }
 
-    if (!this.client || !process.env.GEMINI_API_KEY) {
+    if (!this.client || !isGeminiApiKeyConfigured()) {
       return {
-        text: 'RODEX Core operational in local offline mode. Provide a Gemini API key in Settings to activate neural reasoning.',
+        text: 'AI reasoning is not configured. Connect a Gemini API key in settings to enable online answers.',
         modelUsed: 'local_subsystem',
         latencyMs: Date.now() - startTime,
       };
     }
 
-    const candidateModels = this.getModelTiers(tier);
+    const candidateModels = Array.from(new Set([
+      ...(request.modelOverride ? [request.modelOverride] : []),
+      ...this.getModelTiers(tier),
+    ]));
 
     const isSearchCooldown = Date.now() < this.searchCooldownUntil;
     const tools = !isSearchCooldown && request.tools && request.tools.length > 0 ? request.tools : undefined;
@@ -112,8 +113,6 @@ export class AIProviderService {
             config: {
               systemInstruction: request.systemInstruction,
               tools,
-              temperature: request.temperature ?? 0.6,
-              topP: request.topP ?? 0.95,
               maxOutputTokens: request.maxOutputTokens ?? 800,
             },
           });
@@ -156,6 +155,12 @@ export class AIProviderService {
       }
     }
 
+    // If a verified/grounded answer was requested, never silently downgrade
+    // to an ungrounded free-form answer after grounding failed.
+    if (tools) {
+      throw new Error(`Grounded model request failed: ${lastError?.message || lastError || 'provider unavailable'}`);
+    }
+
     // 2. Direct synthesis attempt without tools
     for (const model of candidateModels) {
       try {
@@ -164,8 +169,6 @@ export class AIProviderService {
           contents: request.contents,
           config: {
             systemInstruction: request.systemInstruction,
-            temperature: request.temperature ?? 0.6,
-            topP: request.topP ?? 0.95,
             maxOutputTokens: request.maxOutputTokens ?? 800,
           },
         });
@@ -184,11 +187,7 @@ export class AIProviderService {
       }
     }
 
-    return {
-      text: 'RODEX: I have received your request and am fully operational. How can I assist you further, Robert?',
-      modelUsed: 'resilient_fallback',
-      latencyMs: Date.now() - startTime,
-    };
+    throw new Error(`Gemini generation failed: ${lastError?.message || lastError || 'all configured models unavailable'}`);
   }
 }
 
