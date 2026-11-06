@@ -20,7 +20,9 @@
     "test:orb": "tsx scripts/testOrbWake.ts",
     "test:firebase": "tsx scripts/testFirebaseIntegration.ts",
     "test:agent": "tsx scripts/testAgentTaskEngine.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:grounding": "tsx scripts/testGrounding.ts",
+    "test:voice": "tsx scripts/testVoiceResponseReliability.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
