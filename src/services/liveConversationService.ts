@@ -728,6 +728,18 @@ export class LiveConversationService {
 
   private openLiveSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // A failed/aborted handshake must never leave connectionAttempt pending.
+      let settled = false;
+      let opened = false;
+      let handshakeTimeout: ReturnType<typeof setTimeout> | null = null;
+      const settle = (error?: unknown) => {
+        if (settled) return;
+        settled = true;
+        if (handshakeTimeout !== null) clearTimeout(handshakeTimeout);
+        if (error !== undefined) reject(error);
+        else resolve();
+      };
+
       try {
         this.explicitShutdown = false;
         this.addEventTimeline('SESSION_CONNECTING', 'Initiating WebSocket connection to /api/live');
@@ -736,18 +748,26 @@ export class LiveConversationService {
 
         const ws = new WebSocket(wsUrl);
         this.ws = ws;
+        handshakeTimeout = setTimeout(() => {
+          if (opened) return;
+          this.addTrace('LIVE WS HANDSHAKE TIMED OUT');
+          settle(new Error('Live voice connection timed out'));
+          try { ws.close(); } catch (_) {}
+        }, 12_000);
 
         ws.onopen = () => {
           if (this.ws !== ws || this.explicitShutdown) {
+            settle(new Error('Live voice connection was cancelled'));
             try { ws.close(); } catch (_) {}
             return;
           }
+          opened = true;
           this.addTrace('CLIENT WEBSOCKET OPEN; WAITING FOR LIVE UPSTREAM');
           this.diag.liveConnection = 'RUNNING';
           this.diag.upstreamConnected = false;
           this.reconnectAttempts = 0;
           this.addEventTimeline('SESSION_CONNECTED', 'WebSocket connection established successfully');
-          resolve();
+          settle();
         };
 
         ws.onmessage = (event) => {
@@ -761,6 +781,11 @@ export class LiveConversationService {
         };
 
         ws.onclose = (event) => {
+          // stop() deliberately clears this.ws before the close event arrives.
+          // Settle first so a cancelled startup cannot poison the next attempt.
+          if (!opened) {
+            settle(new Error(`Live voice socket closed before opening (code ${event.code})`));
+          }
           if (this.ws !== ws) return;
           this.ws = null;
           this.diag.upstreamConnected = false;
@@ -807,12 +832,12 @@ export class LiveConversationService {
           this.addTrace('LIVE WS ERROR');
           this.diag.liveConnection = 'FAIL';
           this.addEventTimeline('SESSION_ERROR', 'WebSocket error encountered');
-          reject(err);
+          settle(err);
         };
       } catch (e) {
         this.diag.liveConnection = 'FAIL';
         this.addEventTimeline('SESSION_ERROR', `WebSocket connection exception: ${e}`);
-        reject(e);
+        settle(e);
       }
     });
   }
