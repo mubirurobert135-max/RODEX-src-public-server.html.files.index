@@ -478,3 +478,27 @@
 @media (max-width:420px) {
   .rodex-speech-wave-svg { height: 82%; }
 }
+
+
+/* Refined focus lighting: the robot is primary; orbital scenery stays quiet. */
+.rodex-stage-orbit {
+  opacity: .31;
+  filter: drop-shadow(0 0 4px rgba(0, 161, 255, .45));
+}
+.rodex-stage-orbit--reverse { opacity: .23; }
+.rodex-stage-glow {
+  filter: blur(42px);
+  opacity: .83;
+}
+.rodex-character-stage {
+  filter: none;
+  width: min(74vw, 860px);
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  .rodex-character-stage { width: 100%; }
+  .rodex-stage-orbit { opacity: .19; }
+  .rodex-stage-orbit--reverse { opacity: .15; }
+}
+@media (max-height: 515px) and (orientation: landscape) {
+  .rodex-character-stage { width: min(60vw, 610px); }
+}
