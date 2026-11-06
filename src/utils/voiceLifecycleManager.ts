@@ -397,6 +397,14 @@ export class VoiceLifecycleManager {
    * Hardware & Wake-Word Stream Startup
    */
   private async initializeHardwareAndWakeListening(): Promise<boolean> {
+    // The Gemini Live service owns the microphone and its wake recognizer.
+    // A second Web Speech hardware probe was acquiring a competing stream
+    // each time the Permissions API reported "granted".
+    if (this.liveVoiceMode) {
+      this.addDiagnosticLog('Mic hardware delegated to the exclusive Live voice pipeline');
+      this.transitionTo('MIC_READY', 'delegated_to_live_pipeline');
+      return true;
+    }
     this.addDiagnosticLog('microphone permission check started');
     this.addDiagnosticLog(`microphone permission state = ${this.permissionState}`);
 
