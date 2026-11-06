@@ -443,3 +443,38 @@
 @media (prefers-reduced-motion: reduce) {
   .rodex-notification-icon::after { box-shadow: none; }
 }
+
+/* Smooth, reference-like flowing speech energy: visual only, never a mic CTA. */
+.rodex-speech-wave-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(0, 180, 255, .46));
+}
+.rodex-quiet-wave {
+  height: 88%;
+  min-width: 0;
+  position: relative;
+  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+.rodex-quiet-wave::after {
+  content: '';
+  position: absolute;
+  left: 24%;
+  right: 24%;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 204, 255, .34), transparent);
+  box-shadow: 0 0 9px rgba(0, 185, 255, .3);
+  pointer-events: none;
+}
+.rodex-quiet-wave[data-voice-active="true"] .rodex-speech-wave-svg {
+  filter: drop-shadow(0 0 7px rgba(0, 203, 255, .7));
+}
+@media (max-width:420px) {
+  .rodex-speech-wave-svg { height: 82%; }
+}
