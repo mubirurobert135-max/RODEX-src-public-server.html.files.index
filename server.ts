@@ -1309,22 +1309,8 @@ async function startServer() {
         return res.status(400).json({ error: "Query message is required for Real-Time API." });
       }
 
-      // Check In-Memory Query Cache for ultra-fast instantaneous responses on repeated queries
-      const cacheKey = `rt:${message.trim().toLowerCase()}`;
-      const cached = queryResponseCache.get(cacheKey);
-      if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
-        return res.json({
-          status: "ok",
-          reply: cached.reply,
-          sources: cached.sources,
-          searchQueries: cached.searchQueries,
-          latencyMs: Date.now() - startTime,
-          neuralOps: "680M+ ops/sec",
-          webVerified: true,
-          timestamp: new Date().toISOString(),
-          speaker: "Mr. Robert",
-        });
-      }
+      // Real-time requests are user-, time-, and context-sensitive. Do not reuse
+      // another conversation's response from a process-wide cache.
 
       // Spotify Natural Voice Intent Intercept on PC
       const spotifyIntent = parseSpotifyVoiceIntent(message);
@@ -1599,37 +1585,12 @@ async function startServer() {
         return res.status(400).json({ error: "A message or image prompt is required." });
       }
 
-      // Check Cache for instant response if query is text-only without image and has no preceding history
-      if (message && !image && !liveConversation && (!Array.isArray(history) || history.length === 0)) {
-        const cacheKey = `chat:${message.trim().toLowerCase()}`;
-        const cached = queryResponseCache.get(cacheKey);
-        if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
-          return res.json({
-            reply: cached.reply,
-            sources: cached.sources,
-            searchQueries: cached.searchQueries,
-            webGrounded: cached.sources.length > 0 || cached.searchQueries.length > 0,
-            cached: true,
-          });
-        }
-      }
+      // No process-wide chat cache: responses may include private context, tools,
+      // search freshness or side effects, even when the text is identical.
 
       // Route text and multimodal queries through the central Intelligence Orchestrator & Tool Suite
-      if (image && image.data) {
-        const mime = image.mimeType || 'image/jpeg';
-        const imgUrl = `data:${mime};base64,${image.data}`;
-        ContextMemoryManager.updateSessionState('default', {
-          lastImage: {
-            url: imgUrl,
-            prompt: message || 'Uploaded image',
-            type: 'uploaded',
-            aspectRatio: '1:1',
-            model: 'user_upload',
-            timestamp: Date.now(),
-          },
-          lastTopic: 'Uploaded image',
-        });
-      }
+      // The uploaded image belongs to this request only. Never store its raw
+      // base64 data in the shared 'default' memory session.
 
       if (message) {
         const orchRes = await globalOrchestrator.orchestrate({
@@ -1641,20 +1602,8 @@ async function startServer() {
           preferredModel: performanceMode === 'deep_reasoning' ? 'gemini-3.1-pro-preview' : undefined,
         });
 
-        const pbData = await getSpotifyPlayback();
-
-        if (orchRes.reply && orchRes.reply.length > 5 && !orchRes.pendingConfirmation) {
-          queryResponseCache.set(`chat:${message.trim().toLowerCase()}`, {
-            reply: orchRes.reply,
-            sources: orchRes.sources || [],
-            searchQueries: orchRes.searchQueries || [],
-            cachedAt: Date.now(),
-          });
-          if (queryResponseCache.size > 100) {
-            const oldestKey = queryResponseCache.keys().next().value;
-            if (oldestKey) queryResponseCache.delete(oldestKey);
-          }
-        }
+        const wantsPlaybackStatus = /\b(spotify|music|song|track|play|pause|volume|device)\b/i.test(message);
+        const pbData = wantsPlaybackStatus ? await getSpotifyPlayback().catch(() => null) : null;
 
         return res.json({
           reply: orchRes.reply,
@@ -1781,20 +1730,6 @@ async function startServer() {
         }
       }
 
-      // Cache clean text responses for sub-millisecond retrieval
-      if (message && !image && reply && reply.length > 5) {
-        queryResponseCache.set(`chat:${message.trim().toLowerCase()}`, {
-          reply,
-          sources,
-          searchQueries,
-          cachedAt: Date.now(),
-        });
-        if (queryResponseCache.size > 100) {
-          const oldestKey = queryResponseCache.keys().next().value;
-          if (oldestKey) queryResponseCache.delete(oldestKey);
-        }
-      }
-
       return res.json({
         reply,
         sources,
@@ -1808,21 +1743,14 @@ async function startServer() {
         err?.message?.includes("RESOURCE_EXHAUSTED") ||
         err?.message?.includes("quota");
 
-      const reply = isRateLimited
-        ? "Hlo Mr Robert. I am active and listening. The cloud neural gateway is currently balancing high traffic volume, but my voice subsystems and World Wide Web link remain verified and operational. What would you like to discuss?"
-        : "Hlo Mr Robert. My voice link is active and connected to the World Wide Web. How may I assist you today?";
-
-      return res.json({
-        reply,
-        sources: [
-          {
-            title: "Google Global Web Index",
-            url: "https://news.google.com",
-            domain: "google.com",
-          },
-        ],
-        searchQueries: [req.body?.message || "Voice Query"],
-        webGrounded: true,
+      // Never synthesize a fake successful web-grounded answer on API failure.
+      return res.status(isRateLimited ? 429 : 503).json({
+        error: isRateLimited ? 'AI provider quota is exhausted. Please try again later.' : 'AI provider temporarily unavailable.',
+        reply: isRateLimited ? 'RODEX is currently rate-limited by the AI provider.' : 'RODEX could not complete this request right now.',
+        sources: [],
+        searchQueries: [],
+        webGrounded: false,
+        retryable: true,
       });
     }
   });
