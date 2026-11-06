@@ -42,3 +42,21 @@ jobs:
 
       - name: Orb and wake phrase tests
         run: bun run test:orb
+
+      - name: Web search grounding integrity
+        run: bun run test:grounding
+
+      - name: Voice response and wake reliability
+        run: bun run test:voice
+
+      - name: Multi-user isolation
+        run: bun run test:multiuser
+
+      - name: Recovery engine
+        run: bun run test:recovery
+
+      - name: Self-diagnostic checks
+        run: bun run test:doctor
+
+      - name: Agent and task workflow
+        run: bun run test:agent
