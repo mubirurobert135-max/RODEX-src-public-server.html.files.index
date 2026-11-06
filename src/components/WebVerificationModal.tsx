@@ -29,7 +29,7 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
   const [activeTab, setActiveTab] = useState<'verification' | 'api'>('verification');
   const [verifying, setVerifying] = useState(false);
   const [verificationData, setVerificationData] = useState<WebVerificationResult | null>(null);
-  const [lastVerifiedTime, setLastVerifiedTime] = useState<string>('Just now');
+  const [lastVerifiedTime, setLastVerifiedTime] = useState<string>('Not checked');
 
   // Real-Time API Test State
   const [apiPrompt, setApiPrompt] = useState('What are the latest world breaking news developments today in 2026?');
@@ -46,21 +46,22 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
     setVerifying(true);
     try {
       const res = await fetch('/api/rodex/verify-web');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (!data || !['VERIFIED_ONLINE', 'STANDBY', 'ERROR'].includes(data.status)) {
+        throw new Error('Verification endpoint returned an invalid result');
+      }
       setVerificationData(data);
       setLastVerifiedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err: any) {
       setVerificationData({
-        status: 'VERIFIED_ONLINE',
-        latencyMs: 62,
-        searchGrounding: 'OPERATIONAL_REALTIME_GATEWAY',
-        carrier: 'World Wide Web Fiber • TLS 1.3',
+        status: 'ERROR',
+        latencyMs: 0,
+        searchGrounding: 'CONNECTION_FAILED',
+        carrier: 'Unavailable',
         timestamp: new Date().toISOString(),
-        nodes: ['Google Global Web Index', 'World Wide Web Real-Time Gateway'],
-        sampleHeadline: 'World Wide Web connection verified and operating normally.',
-        neuralOps: '488.4M ops/sec',
-        verifiedUser: 'Mr. Robert',
+        nodes: [],
+        sampleVerifiedSources: [],
+        sampleHeadline: `Web verification could not be completed: ${err?.message || 'Network error'}`,
       });
       setLastVerifiedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } finally {
@@ -90,13 +91,13 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
         }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `API returned HTTP ${res.status}`);
       setApiResult(data);
     } catch (err: any) {
       setApiResult({
-        reply: `API test completed. Fallback response generated. (${err?.message || 'Gateway reached'})`,
-        latencyMs: 78,
-        neuralOps: '482.1M ops/sec',
-        webVerified: true,
+        reply: `API request failed: ${err?.message || 'Network unavailable'}`,
+        sources: [],
+        webVerified: false,
       });
     } finally {
       setApiLoading(false);
@@ -121,10 +122,10 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-white tracking-wide">WORLD WIDE WEB VERIFIED</h2>
+                <h2 className="text-sm font-bold text-white tracking-wide">WEB CONNECTION DIAGNOSTICS</h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  ONLINE
+                  {verificationData?.status === 'VERIFIED_ONLINE' ? 'VERIFIED' : verificationData?.status === 'STANDBY' ? 'STANDBY' : 'NOT VERIFIED'}
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 font-mono">
@@ -176,7 +177,7 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
                   <span className="text-[10px] text-neutral-400 uppercase font-mono">Web Link</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span className="text-xs font-bold text-white">VERIFIED</span>
+                    <span className="text-xs font-bold text-white">{verificationData?.status === 'VERIFIED_ONLINE' ? 'VERIFIED' : 'UNAVAILABLE'}</span>
                   </div>
                 </div>
                 <div className="p-3 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex flex-col justify-between">
@@ -184,24 +185,24 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
                   <div className="flex items-center gap-1.5 mt-1">
                     <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                     <span className="text-xs font-mono font-bold text-cyan-300">
-                      {verificationData?.latencyMs ? `${verificationData.latencyMs}ms` : '64ms'}
+                      {verificationData?.latencyMs != null ? `${verificationData.latencyMs}ms` : '—'}
                     </span>
                   </div>
                 </div>
                 <div className="p-3 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex flex-col justify-between">
-                  <span className="text-[10px] text-neutral-400 uppercase font-mono">Neural Ops</span>
+                  <span className="text-[10px] text-neutral-400 uppercase font-mono">Cited Sources</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                     <span className="text-xs font-mono font-bold text-amber-300">
-                      {verificationData?.neuralOps || '486.2M/s'}
+                      {verificationData?.sampleVerifiedSources?.length ?? 0}
                     </span>
                   </div>
                 </div>
                 <div className="p-3 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex flex-col justify-between">
-                  <span className="text-[10px] text-neutral-400 uppercase font-mono">Verified Speaker</span>
+                  <span className="text-[10px] text-neutral-400 uppercase font-mono">Check Result</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     <ShieldCheck className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span className="text-xs font-bold text-white truncate">Mr. Robert</span>
+                    <span className="text-xs font-bold text-white truncate">{verificationData?.status || 'PENDING'}</span>
                   </div>
                 </div>
               </div>
@@ -244,11 +245,11 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
                 <div className="space-y-2 text-[11px] font-mono">
                   <div className="flex justify-between py-1 border-b border-neutral-900">
                     <span className="text-neutral-400">Carrier Protocol:</span>
-                    <span className="text-neutral-200">{verificationData?.carrier || 'World Wide Web Fiber • TLS 1.3 / HTTP/2'}</span>
+                    <span className="text-neutral-200">{verificationData?.carrier || 'Unknown'}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-neutral-900">
                     <span className="text-neutral-400">Search Grounding Engine:</span>
-                    <span className="text-emerald-400">Google Search Global Real-Time Grounding</span>
+                    <span className="text-emerald-400">{verificationData?.searchGrounding || 'NOT_TESTED'}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-neutral-900">
                     <span className="text-neutral-400">Target Epoc / Date:</span>
@@ -353,7 +354,7 @@ export const WebVerificationModal: React.FC<WebVerificationModalProps> = ({
                   </span>
                   {apiResult?.latencyMs && (
                     <span className="text-[10px] font-mono text-emerald-400">
-                      Returned in {apiResult.latencyMs}ms • {apiResult.neuralOps}
+                      Returned in {apiResult.latencyMs}ms
                     </span>
                   )}
                 </div>
