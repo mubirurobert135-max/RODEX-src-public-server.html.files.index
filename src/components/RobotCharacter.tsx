@@ -202,6 +202,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
     <button
       type="button"
       className="rodex-robot-button"
+      data-expression={expression}
       onClick={onClick}
       aria-label="Speak with RODEX"
       title="Speak with RODEX"
