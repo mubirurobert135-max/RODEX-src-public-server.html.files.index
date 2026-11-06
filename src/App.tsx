@@ -2085,8 +2085,19 @@ export default function App() {
             <button
               id="audio-mute-toggle"
               onClick={() => {
-                if (rodexSynth.isSpeaking()) rodexSynth.stop();
-                setIsMuted(!isMuted);
+                const nextMuted = !isMuted;
+                if (nextMuted) {
+                  // Stopping an utterance deliberately suppresses stale onEnd
+                  // callbacks. Update the conversation state here instead.
+                  if (rodexSynth.isSpeaking()) rodexSynth.stop();
+                  if (state === 'speaking') {
+                    globalLiveConversationService.stopAllPlayback();
+                    globalSpeechManager.setSelfSpeaking(false);
+                    setTtsState('idle');
+                    setState(micPermissionGranted ? 'listening' : 'idle');
+                  }
+                }
+                setIsMuted(nextMuted);
               }}
               title={isMuted ? 'Unmute voice output' : 'Mute voice output'}
               className="p-1.5 rounded-full text-neutral-500 hover:text-white transition-all cursor-pointer"
