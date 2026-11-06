@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { getResolvedGeminiApiKey } from './geminiConfig';
+import { extractWebGrounding } from './orchestrator/grounding';
 
 export interface GroundedSearchResult {
   text: string;
@@ -54,70 +55,40 @@ export class MediaGroundingService {
    * Google Search Grounding with gemini-3.5-flash
    */
   public static async executeSearchGrounding(query: string): Promise<GroundedSearchResult> {
-    const ai = this.getClient();
-    const model = 'gemini-3.5-flash';
-
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: query,
-        config: {
-          tools: [{ googleSearch: {} }],
-        },
-      });
-
-      const text = response.text || 'No information retrieved.';
-      const sources: Array<{ title: string; url: string; domain?: string }> = [];
-      const searchQueries: string[] = [];
-
-      const candidate = response.candidates?.[0];
-      const metadata = candidate?.groundingMetadata;
-
-      if (metadata?.webSearchQueries) {
-        searchQueries.push(...metadata.webSearchQueries);
-      }
-
-      if (metadata?.groundingChunks) {
-        for (const chunk of metadata.groundingChunks) {
-          if (chunk.web?.uri) {
-            try {
-              const parsed = new URL(chunk.web.uri);
-              sources.push({
-                title: chunk.web.title || parsed.hostname,
-                url: chunk.web.uri,
-                domain: parsed.hostname.replace(/^www\./, ''),
-              });
-            } catch (_) {
-              sources.push({
-                title: chunk.web.title || chunk.web.uri,
-                url: chunk.web.uri,
-              });
-            }
-          }
-        }
-      }
-
-      return {
-        text,
-        sources,
-        searchQueries,
-        searchEntryPoint: metadata?.searchEntryPoint?.renderedContent,
-        modelUsed: model,
-      };
-    } catch (err: any) {
-      console.error('[Search Grounding Error]', err);
-      // Fallback to standard fast generation
-      const fallbackRes = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: query,
-      });
-      return {
-        text: fallbackRes.text || 'Search grounding unavailable at this moment.',
-        sources: [],
-        searchQueries: [query],
-        modelUsed: 'gemini-3.8-flash (fallback)',
-      };
+    if (!getResolvedGeminiApiKey()) {
+      throw new Error('Gemini key is not configured for live web search.');
     }
+    const ai = this.getClient();
+    let lastError = 'Google Search returned no verifiable citations.';
+    const trimmedQuery = query.trim().slice(0, 900);
+    if (!trimmedQuery) throw new Error('Search query cannot be empty.');
+
+    for (const model of ['gemini-3.8-flash', 'gemini-3.6-flash']) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: trimmedQuery,
+          config: { tools: [{ googleSearch: {} }] },
+        });
+        const metadata = response.candidates?.[0]?.groundingMetadata;
+        const grounded = extractWebGrounding(metadata);
+        if (!grounded.webGrounded || !response.text?.trim()) {
+          lastError = `${model}: response lacked grounding citations.`;
+          continue;
+        }
+        return {
+          text: response.text.trim(),
+          sources: grounded.sources,
+          searchQueries: grounded.searchQueries,
+          searchEntryPoint: metadata?.searchEntryPoint?.renderedContent,
+          modelUsed: model,
+        };
+      } catch (error: any) {
+        lastError = error?.message || String(error);
+        if (/\b(401|403|429|RESOURCE_EXHAUSTED|quota|API key)\b/i.test(lastError)) break;
+      }
+    }
+    throw new Error(`Live grounded search unavailable: ${lastError}`);
   }
 
   /**
