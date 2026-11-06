@@ -1,36 +1,36 @@
-/* RODEX's character-first interface. No visible diagnostic labels, speech
-   bubbles, or artificial "I am listening" indicators around the robot. */
+/* The original RODEX robot is isolated from its prototype screenshots at
+   runtime. No square media frame, status labels, or extraneous speech bubbles. */
 .rodex-robot-button {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: min(94vw, 460px);
-  height: clamp(248px, 56svh, 470px);
+  width: min(96vw, 540px);
+  height: clamp(300px, 62svh, 530px);
   min-height: 0;
   padding: 0;
   border: 0;
-  border-radius: 36px;
-  color: inherit;
   background: transparent;
+  color: inherit;
+  border-radius: 50%;
   cursor: pointer;
   isolation: isolate;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-
 .rodex-robot-button:focus-visible {
-  outline: 2px solid #20c9ff;
-  outline-offset: -10px;
+  outline: 2px solid rgba(52, 211, 255, .95);
+  outline-offset: -8px;
 }
 .rodex-robot-ambient {
   position: absolute;
-  inset: 4% 3% 10%;
+  inset: 5% 4% 10%;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(2, 104, 177, .28) 0%, rgba(0, 28, 49, .13) 40%, transparent 73%);
-  filter: blur(25px);
+  background:
+    radial-gradient(ellipse at 50% 58%, rgba(2, 92, 172, .20) 0%, rgba(0, 33, 67, .09) 38%, transparent 72%);
+  filter: blur(38px);
 }
 .rodex-robot-scale {
   position: absolute;
@@ -38,10 +38,10 @@
   top: 47%;
   width: 178px;
   height: 207px;
-  transform: translate(-50%, -50%) scale(1.86);
+  transform: translate(-50%, -50%) scale(2.04);
   transform-origin: center center;
-  perspective: 620px;
   pointer-events: none;
+  perspective: 760px;
   z-index: 3;
 }
 .rodex-robot-floating, .rodex-robot-viewport {
@@ -49,75 +49,117 @@
   position: absolute;
   inset: 0;
 }
-.rodex-robot-floating { transform-style: preserve-3d; will-change: transform; }
-.rodex-robot-pose { will-change: opacity; }
+.rodex-robot-floating {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
 .rodex-robot-viewport {
   width: 178px;
   height: 207px;
   overflow: hidden;
-  /* The source frames also show a prototype dashboard. Crop and feather them
-     so ONLY the approved white/blue robot is ever visible in the live app. */
-  -webkit-mask-image: radial-gradient(ellipse 85% 80% at 50% 46%, black 62%, transparent 99%);
-  mask-image: radial-gradient(ellipse 85% 80% at 50% 46%, black 62%, transparent 99%);
 }
 .rodex-robot-pose {
-  display: block;
   position: absolute;
+  display: block;
   left: -112px;
   top: -2px;
   width: 414px;
   height: 231px;
   max-width: none;
   max-height: none;
-  user-select: none;
   object-fit: fill;
-  filter: saturate(1.34) contrast(1.11) brightness(1.06) drop-shadow(0 0 2px rgba(27, 180, 255, .32));
+  user-select: none;
+  will-change: opacity;
+  filter: saturate(1.23) contrast(1.08) brightness(1.04)
+    drop-shadow(0 7px 8px rgba(6, 49, 106, .30));
   pointer-events: none;
+}
+.rodex-robot-boot {
+  position: absolute;
+  left: 49px;
+  top: 17px;
+  width: 92px;
+  height: 91px;
+  border-radius: 48% 48% 48% 48%;
+  background: radial-gradient(circle at 28% 23%, #fff 0, #dbf4ff 25%, #93c8ed 67%, #4f9cd6 100%);
+  box-shadow: inset -7px -10px 14px rgba(28, 91, 148, .2), 0 0 22px rgba(0, 166, 255, .1);
+  animation: rodex-boot-breathe 2.4s ease-in-out infinite;
+}
+.rodex-robot-boot::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: 51px;
+  width: 72px;
+  height: 37px;
+  border-radius: 54% 48% 54% 54%;
+  background: radial-gradient(ellipse at 60% 10%, #081b32 0%, #01040c 70%);
+  box-shadow: inset 0 2px 4px rgba(89, 203, 255, .15);
+}
+.rodex-robot-boot::after {
+  content: '';
+  position: absolute;
+  top: 87px;
+  left: 17px;
+  width: 62px;
+  height: 85px;
+  border-radius: 38% 38% 50% 50%;
+  background: radial-gradient(ellipse at 29% 16%, #f4fcff, #b9e4fc 42%, #63b1e1 100%);
 }
 .rodex-robot-light-ring {
   position: absolute;
   left: 50%;
-  bottom: 9%;
-  width: min(68%, 292px);
-  height: 53px;
-  transform: translateX(-50%) perspective(240px) rotateX(64deg);
-  border: 3px solid rgba(30, 195, 255, .8);
+  bottom: 7%;
+  width: min(61%, 315px);
+  height: 54px;
+  transform: translateX(-50%) perspective(260px) rotateX(64deg);
+  border: 2px solid rgba(33, 193, 255, .54);
   border-radius: 50%;
-  box-shadow: 0 0 17px rgba(0, 187, 255, .55), inset 0 0 12px rgba(0, 187, 255, .42);
+  box-shadow: 0 0 14px rgba(0, 172, 252, .27), inset 0 0 13px rgba(0, 146, 230, .23);
   pointer-events: none;
-  opacity: .82;
-  animation: rodex-robot-halo 3.9s ease-in-out infinite;
+  opacity: .85;
+  animation: rodex-robot-halo 4.3s ease-in-out infinite;
   z-index: 1;
+}
+.rodex-robot-light-ring::after {
+  content: '';
+  position: absolute;
+  inset: 8px 12%;
+  border: 1px solid rgba(20, 160, 231, .31);
+  border-radius: 50%;
 }
 .rodex-robot-ground-glow {
   position: absolute;
   left: 50%;
-  bottom: 8%;
+  bottom: 7%;
   width: 63%;
-  height: 23px;
+  height: 27px;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse, rgba(0, 177, 255, .67), rgba(0, 75, 163, .2) 50%, transparent 73%);
-  filter: blur(15px);
+  background: radial-gradient(ellipse, rgba(0, 167, 247, .42), rgba(0, 86, 152, .12) 50%, transparent 75%);
+  filter: blur(13px);
   pointer-events: none;
   z-index: 0;
 }
 @keyframes rodex-robot-halo {
-  0%, 100% { opacity: .6; box-shadow: 0 0 11px rgba(0, 187, 255, .37); }
-  50% { opacity: 1; box-shadow: 0 0 23px rgba(0, 187, 255, .64); }
+  0%, 100% { opacity: .56; box-shadow: 0 0 12px rgba(0, 187, 255, .22); }
+  50% { opacity: .92; box-shadow: 0 0 25px rgba(0, 187, 255, .45); }
+}
+@keyframes rodex-boot-breathe {
+  0%, 100% { opacity: .45; }
+  50% { opacity: .72; }
 }
 @media (max-width: 600px), (max-height: 640px) {
-  .rodex-robot-button { height: clamp(205px, 47svh, 335px); width: min(98vw, 370px); }
-  .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.37); top: 46%; }
-  .rodex-robot-light-ring { bottom: 3%; }
-  .rodex-robot-ground-glow { bottom: 2%; }
+  .rodex-robot-button { height: clamp(235px, 50svh, 350px); width: min(99vw, 390px); }
+  .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.48); top: 46%; }
+  .rodex-robot-light-ring { bottom: 3%; width: 63%; }
+  .rodex-robot-ground-glow { bottom: 3%; }
 }
 @media (max-width: 360px), (max-height: 490px) {
-  .rodex-robot-button { height: clamp(180px, 42svh, 255px); width: min(98vw, 320px); }
-  .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.14); top: 46%; }
+  .rodex-robot-button { height: clamp(196px, 45svh, 285px); width: min(98vw, 340px); }
+  .rodex-robot-scale { transform: translate(-50%, -50%) scale(1.18); top: 47%; }
   .rodex-robot-light-ring { bottom: 0; width: 58%; }
   .rodex-robot-ground-glow { bottom: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rodex-robot-light-ring { animation: none; }
-  .rodex-robot-pose { transition: none; }
+  .rodex-robot-light-ring, .rodex-robot-boot { animation: none; }
 }
