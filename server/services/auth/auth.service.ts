@@ -1,10 +1,6 @@
 import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { resolveRodexDataFile, writeRodexJson } from '../persistentStorage';
 
 export interface UserVoiceProfile {
   voiceURI?: string;
@@ -90,18 +86,8 @@ export class AuthService {
   private readonly SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
   private constructor() {
-    const dataDir = path.resolve(__dirname, '../../../data');
-    if (!fs.existsSync(dataDir)) {
-      try {
-        fs.mkdirSync(dataDir, { recursive: true });
-      } catch (err) {
-        console.warn('[AuthService] Could not create data dir, using root directory:', err);
-      }
-    }
-
-    this.usersFilePath = path.resolve(__dirname, '../../.rodex_users.json');
-    this.sessionsFilePath = path.resolve(__dirname, '../../.rodex_sessions.json');
-
+    this.usersFilePath = resolveRodexDataFile('.rodex_users.json', 'server/.rodex_users.json');
+    this.sessionsFilePath = resolveRodexDataFile('.rodex_sessions.json', 'server/.rodex_sessions.json');
     this.loadFromDisk();
   }
 
@@ -181,7 +167,9 @@ export class AuthService {
           this.sessions.clear();
           const now = Date.now();
           for (const s of parsed) {
-            if (s && s.token && new Date(s.expiresAt).getTime() > now) {
+            if (s && s.token && new Date(s.expiresAt).getTime() > now &&
+              // Reject the revoked, globally predictable legacy seed session.
+              crypto.createHash('sha256').update(s.token).digest('hex') !== 'c9dde403aa4882fe2152549100b6bd7e5467a28b61991c2ab0c631d00d14d804') {
               this.sessions.set(s.token, s);
             }
           }
@@ -191,16 +179,13 @@ export class AuthService {
       console.warn('[AuthService] Error loading sessions from disk:', err);
     }
 
-    // Seed default initial user for Robert if user database is empty
-    if (this.users.size === 0) {
-      this.seedInitialUser();
-    }
+    // New installs start empty. Only deliberate registration creates users.
   }
 
   private saveUsersToDisk(): void {
     try {
       const arr = Array.from(this.users.values());
-      fs.writeFileSync(this.usersFilePath, JSON.stringify(arr, null, 2), 'utf-8');
+      writeRodexJson(this.usersFilePath, arr);
     } catch (err) {
       console.error('[AuthService] Error saving users to disk:', err);
     }
@@ -209,68 +194,10 @@ export class AuthService {
   private saveSessionsToDisk(): void {
     try {
       const arr = Array.from(this.sessions.values());
-      fs.writeFileSync(this.sessionsFilePath, JSON.stringify(arr, null, 2), 'utf-8');
+      writeRodexJson(this.sessionsFilePath, arr);
     } catch (err) {
       console.error('[AuthService] Error saving sessions to disk:', err);
     }
-  }
-
-  private seedInitialUser(): void {
-    const salt = this.generateSalt();
-    const passwordHash = this.hashPassword('robert123', salt);
-    const answerSalt = this.generateSalt();
-    const answerHash = this.hashPassword('rodex', answerSalt);
-    const now = new Date().toISOString();
-
-    const initialUser: UserAccount = {
-      id: 'usr_robert_1001',
-      username: 'robert',
-      email: 'mubirurobert135@gmail.com',
-      displayName: 'Robert',
-      passwordHash,
-      salt,
-      securityQuestion: 'What is your primary AI project?',
-      securityAnswerHash: answerHash,
-      securityAnswerSalt: answerSalt,
-      role: 'user',
-      profile: {
-        preferredName: 'Robert',
-        honorific: 'Mr. Robert',
-        responseStyle: 'balanced',
-        tone: 'professional',
-        timezone: 'Africa/Kampala',
-        customDirectives: ['Prioritize verified, factual information and clear reasoning.'],
-      },
-      voiceProfile: {
-        pitch: 1.0,
-        rate: 1.0,
-        autoSpeak: true,
-      },
-      connectedServices: {},
-      permissions: {
-        microphone: true,
-        contacts: true,
-        spotify: true,
-        gmail: true,
-        terminal: true,
-      },
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.users.set(initialUser.id, initialUser);
-    this.saveUsersToDisk();
-
-    // Create a permanent default active session for seamless first-load access
-    const defaultSession: UserSession = {
-      token: 'session_robert_default_initial_key',
-      userId: initialUser.id,
-      createdAt: now,
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      lastActive: now,
-    };
-    this.sessions.set(defaultSession.token, defaultSession);
-    this.saveSessionsToDisk();
   }
 
   public registerUser(params: {
@@ -578,18 +505,6 @@ export class AuthService {
     return user?.connectedServices?.[service] || null;
   }
 
-  public getDefaultInitialUser(): SafeUser {
-    const user = this.users.get('usr_robert_1001') || Array.from(this.users.values())[0];
-    if (user) {
-      return this.sanitizeUser(user);
-    }
-    this.seedInitialUser();
-    return this.sanitizeUser(this.users.get('usr_robert_1001')!);
-  }
-
-  public getDefaultInitialToken(): string {
-    return 'session_robert_default_initial_key';
-  }
 }
 
 export const globalAuthService = AuthService.getInstance();
