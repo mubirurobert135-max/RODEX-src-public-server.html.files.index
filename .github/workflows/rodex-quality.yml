@@ -34,6 +34,31 @@ jobs:
       - name: Production build
         run: bun run build
 
+      - name: HTTP production smoke test
+        run: |
+          NODE_ENV=production PORT=42685 node dist/server.cjs >/tmp/rodex-smoke.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 25); do
+            if curl -fsS http://127.0.0.1:42685/health >/tmp/rodex-health.json; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/rodex-smoke.log
+            exit 1
+          fi
+          grep -q '"server":"up"' /tmp/rodex-health.json
+          curl -fsS http://127.0.0.1:42685/health/ready | grep -q '"server":"up"'
+          curl -fsS http://127.0.0.1:42685/ | grep -q '<title>RODEX</title>'
+          # With no credentials, web verification must NOT report fake success.
+          code=$(curl -sS -o /tmp/rodex-web.json -w '%{http_code}' http://127.0.0.1:42685/api/rodex/verify-web)
+          test "$code" = "503"
+          grep -q '"status":"STANDBY"' /tmp/rodex-web.json
+
       - name: Real-time response tests
         run: bun run test:realtime
 
