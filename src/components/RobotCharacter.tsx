@@ -187,6 +187,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       onPointerLeave={resetGaze}
     >
       <span className="rodex-dimensional-atmosphere" aria-hidden="true" />
+      <span className="rodex-holographic-floor" aria-hidden="true" />
       <motion.span className="rodex-robot-spin-shell" animate={spinControls} style={{ transformStyle: 'preserve-3d' }}>
         <svg
         className="rodex-robot-vector"
@@ -244,19 +245,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           </filter>
         </defs>
 
-        {/* Full-width atmospheric environment, not a character container. */}
-        <ellipse cx="300" cy="330" rx="290" ry="310" fill="url(#rdx-air)" />
-        <ellipse cx="300" cy="563" rx="192" ry="36" fill="url(#rdx-floor)" />
-        <motion.ellipse
-          cx="300" cy="562" rx="173" ry="26" fill="none"
-          stroke="#16caff" strokeWidth="2.2"
-          strokeOpacity=".67"
-          animate={reducedMotion ? undefined : { rx: [166, 178, 166], opacity: [.56, .88, .56] }}
-          transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <ellipse cx="300" cy="562" rx="134" ry="16" fill="none" stroke="#42a7fb" strokeWidth="1" strokeOpacity=".22" />
-        <ellipse cx="300" cy="553" rx="85" ry="12" fill="#0185de" opacity=".25" filter="url(#rdx-shadow)" />
-
+        {/* Character geometry alone rotates; stage atmosphere stays anchored. */}
         <motion.g
           className="rodex-robot-model"
           style={{ transformOrigin: '50% 47%' }}
