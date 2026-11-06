@@ -147,3 +147,106 @@
   .rodex-robot-model, .rodex-robot-vector, .rodex-robot-spin-shell { will-change: auto; }
   .rodex-holographic-floor { animation: none; }
 }
+
+
+/* 2026 RODEX character finishing: dimensional depth without bitmap artwork.
+   Expression styles respond to true assistant state; no decorative status labels. */
+.rodex-robot-button {
+  --rodex-cyan: #40deff;
+  outline-offset: -3px;
+  transform: translateZ(0);
+}
+.rodex-robot-button::before {
+  content: "";
+  position: absolute;
+  width: min(67%, 530px);
+  height: 73%;
+  top: 11%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 47%,
+    rgba(45, 157, 255, .11) 0%,
+    rgba(1, 92, 201, .055) 44%,
+    transparent 73%);
+  filter: blur(26px);
+  opacity: .9;
+  transition: opacity .45s ease, filter .45s ease;
+}
+.rodex-robot-button[data-expression="wake"]::before,
+.rodex-robot-button[data-expression="focus"]::before {
+  opacity: 1;
+  filter: blur(19px) saturate(1.35);
+}
+.rodex-robot-button[data-expression="speak"]::before,
+.rodex-robot-button[data-expression="act"]::before,
+.rodex-robot-button[data-expression="happy"]::before {
+  opacity: 1;
+  filter: blur(19px) saturate(1.5);
+}
+.rodex-robot-vector {
+  filter:
+    drop-shadow(0 22px 22px rgba(0, 7, 21, .5))
+    drop-shadow(0 0 18px rgba(1, 142, 245, .10));
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: filter .45s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .rodex-robot-button:hover .rodex-robot-vector {
+    filter:
+      drop-shadow(0 28px 26px rgba(0, 7, 24, .57))
+      drop-shadow(0 0 26px rgba(1, 166, 255, .25));
+  }
+}
+.rodex-robot-button[data-expression="focus"] .rodex-robot-vector,
+.rodex-robot-button[data-expression="wake"] .rodex-robot-vector {
+  filter:
+    drop-shadow(0 25px 24px rgba(0, 7, 24, .53))
+    drop-shadow(0 0 22px rgba(5, 172, 255, .26));
+}
+.rodex-robot-button[data-expression="act"] .rodex-robot-vector,
+.rodex-robot-button[data-expression="happy"] .rodex-robot-vector {
+  filter:
+    drop-shadow(0 25px 24px rgba(0, 7, 24, .53))
+    drop-shadow(0 0 28px rgba(13, 189, 255, .34));
+}
+.rodex-dimensional-atmosphere {
+  inset: -8% -12%;
+  background:
+    radial-gradient(ellipse 34% 45% at 50% 48%,
+      rgba(9, 108, 220, .18), rgba(6, 55, 110, .08) 63%, transparent 90%);
+  filter: blur(26px);
+}
+.rodex-holographic-floor {
+  bottom: 6.4%;
+  width: min(62vw, 49vh, 395px);
+  height: clamp(27px, 5.2vh, 61px);
+  border: 1.5px solid rgba(44, 204, 255, .58);
+  background: radial-gradient(ellipse at center,
+    rgba(3, 183, 255, .24), rgba(4, 111, 230, .075) 46%, transparent 73%);
+  box-shadow:
+    0 0 13px rgba(9, 171, 255, .26),
+    inset 0 0 20px rgba(1, 181, 255, .18);
+}
+.rodex-holographic-floor::before {
+  inset: 15% 18%;
+  border-color: rgba(147, 237, 255, .36);
+}
+.rodex-robot-spin-shell {
+  transform-origin: 50% 46%;
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  .rodex-robot-button::before { width: 88%; height: 78%; top: 8%; }
+  .rodex-holographic-floor { bottom: 5%; width: min(65vw, 330px); }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .rodex-holographic-floor { width: min(38vw, 265px); bottom: 0; }
+  .rodex-robot-button::before { height: 92%; top: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-robot-button::before, .rodex-robot-vector {
+    transition: none;
+  }
+}
