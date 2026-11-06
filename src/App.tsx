@@ -2041,13 +2041,17 @@ export default function App() {
           </div>
         )}
 
-        {/* Top Minimal Brand Header */}
-        <header className="w-full px-5 py-3.5 flex items-start justify-between z-20 bg-transparent shrink-0">
-          {/* TOP-LEFT: RODEX Brand + More Button immediately below */}
-          <div className="flex flex-col items-start gap-1">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
-              <span className="font-bold text-white text-sm">RODEX</span>
+        {/* Quiet, compact navigation: the robot remains the visual focus. */}
+        <header className="w-full max-w-6xl mx-auto px-4 sm:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3 flex items-center justify-between gap-4 z-20 bg-transparent shrink-0">
+          <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,.09)] shrink-0">
+                <span className="font-bold text-lg sm:text-xl text-cyan-300" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>R</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold tracking-[.16em] text-white text-sm sm:text-base leading-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>RODEX</span>
+                <span className="text-[9px] tracking-[.17em] uppercase text-slate-500 leading-tight mt-0.5">Personal AI</span>
+              </div>
             </div>
             <button
               id="header-more-btn"
@@ -2055,11 +2059,11 @@ export default function App() {
                 triggerHaptic('tap');
                 setIsMoreMenuOpen(true);
               }}
-              className="px-2.5 py-1 rounded-full bg-neutral-900/90 border border-neutral-800/90 hover:border-cyan-500/50 text-neutral-300 hover:text-white flex items-center gap-1.5 text-[11px] font-medium active:scale-95 transition-all cursor-pointer shadow-sm"
-              title="Open System Features & More"
+              className="px-3.5 py-2 rounded-full bg-white/[0.06] border border-white/10 hover:bg-white/[0.11] hover:border-cyan-300/35 text-slate-200 hover:text-white flex items-center gap-2 text-xs font-semibold active:scale-95 transition-all cursor-pointer"
+              title="Open RODEX features"
             >
-              <span>More</span>
-              <Menu className="w-3 h-3 text-cyan-400" />
+              <Menu className="w-4 h-4 text-cyan-300" />
+              <span>Explore</span>
             </button>
           </div>
 
@@ -2100,7 +2104,7 @@ export default function App() {
                 setIsMuted(nextMuted);
               }}
               title={isMuted ? 'Unmute voice output' : 'Mute voice output'}
-              className="p-1.5 rounded-full text-neutral-500 hover:text-white transition-all cursor-pointer"
+              className="p-2.5 rounded-full text-neutral-400 bg-white/[0.06] border border-white/10 hover:bg-white/[0.12] hover:text-white transition-all cursor-pointer"
             >
               {isMuted ? (
                 <VolumeX className="w-4 h-4 text-neutral-600" />
@@ -2112,7 +2116,7 @@ export default function App() {
         </header>
 
         {/* Center: Approved expressive RODEX robot, powered by real assistant events */}
-        <div className="flex-1 flex flex-col items-center justify-center relative px-4 w-full my-0 py-0 overflow-visible">
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative px-4 w-full my-0 py-0 overflow-visible">
           {/* Subtle Ambient Radial Glow */}
           <div
             className={`absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none transition-colors duration-700 ${currentOrbTheme.ambientGlowClass}`}
