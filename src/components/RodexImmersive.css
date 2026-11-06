@@ -1,0 +1,335 @@
+/* RODEX AI — approved immersive midnight/cyan visual system.
+   Controls remain functional; visual chrome is intentionally minimal.
+   This layout uses no baked-in screenshots, mic button, feature labels or frames. */
+.rodex-home {
+  --rdx-blue:#00bdff;
+  --rdx-ink:#020712;
+  --rdx-frost:rgba(12,32,62,.52);
+  position:relative;
+  isolation:isolate;
+  background:
+    radial-gradient(ellipse 39% 42% at 51% 58%, rgba(0,87,185,.31),transparent 92%),
+    radial-gradient(ellipse 46% 38% at 82% 48%,rgba(0,72,143,.17),transparent 96%),
+    radial-gradient(ellipse 45% 45% at 15% 55%,rgba(0,44,110,.21),transparent 96%),
+    linear-gradient(140deg,#00040b 2%,#030e22 44%,#020714 80%,#01040a 100%);
+  min-height:0;
+  height:100%;
+  overflow:hidden;
+}
+.rodex-home::before {
+  content:"";
+  position:absolute;
+  inset:-24% -15%;
+  z-index:0;
+  pointer-events:none;
+  opacity:.39;
+  background:
+    radial-gradient(circle at 18% 33%,rgba(7,124,250,.56) 0 1px,transparent 2px),
+    radial-gradient(circle at 70% 62%,rgba(7,124,250,.59) 0 1.1px,transparent 2px),
+    radial-gradient(circle at 56% 17%,rgba(49,211,255,.33) 0 .9px,transparent 2px),
+    radial-gradient(circle at 91% 23%,rgba(0,128,255,.4) 0 1px,transparent 2px);
+  background-size:185px 175px,240px 205px,305px 237px,375px 285px;
+  animation:rodex-constellation-drift 36s linear infinite alternate;
+}
+.rodex-home::after {
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  z-index:0;
+  inset:0;
+  background:
+    linear-gradient(105deg,transparent 19%,rgba(0,110,240,.07) 28%,transparent 34%),
+    linear-gradient(-82deg,transparent 64%,rgba(0,91,214,.075) 74%,transparent 80%);
+}
+.rodex-home-header {
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  z-index:45;
+  width:100%;
+  padding:clamp(14px,2vh,28px) clamp(18px,3.3vw,72px);
+  padding-top:max(clamp(14px,2vh,28px),env(safe-area-inset-top));
+  gap:16px;
+  flex-shrink:0;
+}
+.rodex-brand {
+  display:inline-flex;
+  align-items:center;
+  gap:clamp(10px,1vw,16px);
+  min-width:0;
+}
+.rodex-brand-mark {
+  position:relative;
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  width:clamp(38px,3.2vw,52px);
+  height:clamp(38px,3.2vw,52px);
+  border-radius:32%;
+  background:linear-gradient(142deg,#20f0ff 0%,#007dea 54%,#174bff 95%);
+  box-shadow:0 0 22px rgba(0,161,255,.22),inset 0 1px 1px rgba(255,255,255,.3);
+  transform:rotate(-8deg);
+}
+.rodex-brand-mark::after {
+  content:"";
+  width:51%;
+  height:55%;
+  border-radius:39% 46% 48% 27%;
+  background:#001a37;
+  box-shadow:inset 1px 3px 6px rgba(0,0,0,.4);
+}
+.rodex-brand-word {
+  font-family:'Space Grotesk',sans-serif;
+  font-size:clamp(18px,2vw,34px);
+  line-height:1;
+  font-weight:700;
+  letter-spacing:-.04em;
+  color:#f8fbff;
+  white-space:nowrap;
+  text-shadow:0 0 14px rgba(0,97,170,.09);
+}
+.rodex-brand-word span { color:#22d6ff; }
+.rodex-top-actions { display:flex;align-items:center;gap:clamp(7px,.9vw,16px); }
+.rodex-glass-icon {
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:clamp(42px,3.25vw,58px);
+  height:clamp(42px,3.25vw,58px);
+  color:#e9f6ff;
+  border:1px solid rgba(102,173,237,.24);
+  border-radius:50%;
+  cursor:pointer;
+  background:linear-gradient(145deg,rgba(25,60,108,.48),rgba(5,16,35,.56));
+  box-shadow:inset 0 1px rgba(255,255,255,.07),0 7px 24px rgba(0,0,0,.22);
+  backdrop-filter:blur(14px);
+  transition:transform .2s,border-color .2s,background .2s;
+}
+.rodex-glass-icon:hover,.rodex-glass-icon:focus-visible {
+  border-color:rgba(65,208,255,.72);
+  background:rgba(0,113,191,.3);
+  transform:translateY(-2px);
+  outline:none;
+}
+.rodex-glass-icon:focus-visible {outline:2px solid #42d4ff;outline-offset:3px;}
+.rodex-scene {
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex:1 1 auto;
+  min-height:0;
+  width:100%;
+  align-items:center;
+  justify-content:center;
+  overflow:visible;
+  padding:0;
+}
+.rodex-stage-orbit {
+  position:absolute;
+  pointer-events:none;
+  left:50%;
+  top:47%;
+  width:min(83vw,1100px);
+  height:min(53vh,500px);
+  border-top:2px solid rgba(1,142,255,.28);
+  border-right:1px solid rgba(1,186,255,.45);
+  border-bottom:1px solid rgba(1,158,255,.13);
+  border-left:1px solid transparent;
+  border-radius:50%;
+  filter:drop-shadow(0 0 6px rgba(0,128,250,.5));
+  transform:translate(-50%,-50%) rotate(-30deg);
+  animation:rodex-orbit-turn 28s linear infinite;
+  opacity:.66;
+  z-index:0;
+}
+.rodex-stage-orbit--reverse {
+  width:min(62vw,830px);
+  height:min(57vh,550px);
+  top:44%;
+  border-top:1px solid rgba(0,220,255,.23);
+  border-left:2px solid rgba(13,151,255,.27);
+  border-right:0;
+  border-bottom:1px solid transparent;
+  transform:translate(-50%,-50%) rotate(37deg);
+  animation-duration:41s;
+  animation-direction:reverse;
+  opacity:.4;
+}
+.rodex-stage-glow {
+  position:absolute;
+  left:50%;
+  top:51%;
+  width:min(65vw,860px);
+  height:min(80vh,700px);
+  transform:translate(-50%,-50%);
+  background:radial-gradient(ellipse,rgba(0,94,200,.23),rgba(0,60,135,.065) 54%,transparent 72%);
+  filter:blur(42px);
+  pointer-events:none;
+}
+.rodex-character-stage {
+  position:relative;
+  flex:0 1 auto;
+  height:100%;
+  width:min(75vw,800px);
+  min-width:0;
+  min-height:0;
+  z-index:2;
+  filter:drop-shadow(0 6px 24px rgba(0,123,255,.2));
+}
+.rodex-quiet-dock {
+  position:relative;
+  z-index:40;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  width:100%;
+  padding:4px 16px max(16px,env(safe-area-inset-bottom));
+}
+.rodex-quiet-dock-inner {
+  width:min(72vw,950px);
+  height:clamp(62px,9vh,100px);
+  display:flex;
+  gap:clamp(6px,2.2vw,24px);
+  align-items:center;
+  justify-content:space-between;
+  padding:clamp(8px,1.1vw,14px) clamp(10px,1.4vw,22px);
+  border-radius:999px;
+  border:1px solid rgba(45,171,255,.45);
+  background:linear-gradient(180deg,rgba(21,64,115,.56),rgba(6,21,47,.76));
+  backdrop-filter:blur(23px);
+  box-shadow:0 0 0 1px rgba(7,78,155,.05),0 0 30px rgba(0,119,255,.14),inset 0 1px rgba(196,237,255,.18);
+}
+.rodex-quiet-dock-icon {
+  display:grid;
+  flex:0 0 auto;
+  place-items:center;
+  width:clamp(43px,4.5vw,60px);
+  height:clamp(43px,4.5vw,60px);
+  border:1px solid rgba(161,207,248,.17);
+  border-radius:50%;
+  color:#d7f5ff;
+  background:radial-gradient(circle at 25% 10%,rgba(83,166,255,.33),rgba(2,12,35,.35) 75%);
+  cursor:pointer;
+  transition:border-color .2s,transform .2s,box-shadow .2s;
+}
+.rodex-quiet-dock-icon:hover,.rodex-quiet-dock-icon:focus-visible {
+  border-color:rgba(58,207,255,.8);
+  transform:scale(1.06);
+  box-shadow:0 0 15px rgba(0,180,255,.19);
+  outline:none;
+}
+.rodex-quiet-dock-icon:focus-visible {outline:2px solid #49d7ff;outline-offset:3px;}
+.rodex-quiet-wave {
+  min-width:0;
+  flex:1 1 auto;
+  display:flex;
+  height:70%;
+  align-items:center;
+  justify-content:center;
+  gap:2.1px;
+  overflow:hidden;
+  pointer-events:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+}
+.rodex-quiet-wave > span {
+  width:max(2px,.31%);
+  flex:0 0 2px;
+  height:var(--bar-height,14%);
+  border-radius:99px;
+  background:linear-gradient(180deg,#05bbff 0%,#86ecff 53%,#076bfa 100%);
+  box-shadow:0 0 9px rgba(0,186,255,.37);
+  opacity:var(--wave-opacity,.68);
+  transform-origin:center;
+  animation:rodex-wave-breathe 1.9s ease-in-out infinite;
+  animation-delay:var(--bar-delay,0s);
+}
+.rodex-quiet-wave[data-voice-active="true"] > span {
+  animation-duration:.7s;
+  background:linear-gradient(180deg,#53ecff,#b6f9ff 48%,#01a4ff);
+}
+.rodex-quiet-wave[data-voice-active="false"] > span { opacity:.3; }
+.rodex-live-stop {
+  position:absolute;
+  right:clamp(16px,2.4vw,38px);
+  bottom:100%;
+  margin-bottom:8px;
+  padding:8px 12px;
+  border-radius:50px;
+  background:rgba(77,17,38,.87);
+  border:1px solid rgba(254,96,119,.46);
+  color:#fff;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  font:600 12px 'Space Grotesk',sans-serif;
+  cursor:pointer;
+}
+.rodex-voice-permission {
+  position:relative;
+  z-index:55;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  max-width:92vw;
+  margin:0 auto 9px;
+  padding:8px 13px;
+  border-radius:17px;
+  border:1px solid rgba(64,164,255,.28);
+  background:rgba(5,23,50,.86);
+  color:#d9f0ff;
+  font:500 clamp(11px,1.1vw,13px) 'Space Grotesk',sans-serif;
+  backdrop-filter:blur(15px);
+}
+.rodex-voice-permission button {
+  padding:8px 12px;
+  border:1px solid rgba(71,194,252,.45);
+  border-radius:14px;
+  color:#eaffff;
+  background:rgba(11,113,185,.44);
+  font-weight:700;
+  cursor:pointer;
+}
+@keyframes rodex-constellation-drift {to {transform:translate3d(4%,2%,0);}}
+@keyframes rodex-orbit-turn {from{transform:translate(-50%,-50%) rotate(-30deg);}to{transform:translate(-50%,-50%) rotate(330deg);}}
+@keyframes rodex-wave-breathe {0%,100%{transform:scaleY(.35);}50%{transform:scaleY(1.2);}}
+@media (max-width:760px) {
+  .rodex-home-header {padding-left:16px;padding-right:16px;}
+  .rodex-stage-orbit {width:130vw;height:37vh;opacity:.4;}
+  .rodex-stage-orbit--reverse {width:100vw;height:41vh;}
+  .rodex-character-stage {width:100%;height:100%;max-height:100%;}
+  .rodex-quiet-dock-inner {width:min(94vw,620px);height:66px;}
+  .rodex-quiet-wave {gap:1px;}
+  .rodex-quiet-wave > span {flex-basis:1px;}
+}
+@media (max-width:420px) {
+  .rodex-home-header{padding:12px 14px;}
+  .rodex-brand-mark {width:35px;height:35px;}
+  .rodex-brand-word {font-size:20px;}
+  .rodex-top-actions {gap:8px;}
+  .rodex-glass-icon {width:41px;height:41px;}
+  .rodex-quiet-dock-inner {height:60px;}
+  .rodex-quiet-dock-icon {height:41px;width:41px;}
+  .rodex-quiet-wave > span:nth-child(2n) {display:none;}
+  .rodex-voice-permission {font-size:11px;flex-wrap:wrap;text-align:center;}
+}
+@media (max-height:480px) and (orientation:landscape) {
+  .rodex-home-header {padding-top:8px;padding-bottom:5px;}
+  .rodex-brand-mark {width:30px;height:30px;}
+  .rodex-brand-word {font-size:18px;}
+  .rodex-character-stage {width:min(50vw,700px);}
+  .rodex-quiet-dock {padding-bottom:7px;}
+  .rodex-quiet-dock-inner {height:49px;max-width:540px;}
+  .rodex-quiet-dock-icon {height:35px;width:35px;}
+}
+@media (min-width:1920px) and (min-height:1000px) {
+  .rodex-character-stage {width:min(70vw,1100px);}
+  .rodex-quiet-dock-inner {max-width:1200px;}
+}
+@media (prefers-reduced-motion:reduce) {
+  .rodex-home::before,.rodex-stage-orbit,.rodex-quiet-wave>span {animation:none;}
+}
