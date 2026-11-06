@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Persistent application data and credentials must never be committed.
+data/
+server/.rodex_users.json
+server/.rodex_sessions.json
+.rodex_memory.json
+.rodex_profile.json
+*.json.bak
