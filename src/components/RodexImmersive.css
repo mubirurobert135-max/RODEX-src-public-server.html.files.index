@@ -333,3 +333,113 @@
 @media (prefers-reduced-motion:reduce) {
   .rodex-home::before,.rodex-stage-orbit,.rodex-quiet-wave>span {animation:none;}
 }
+
+/* Final image match: cinematic screen geometry and responsive robot staging. */
+.rodex-home {
+  background:
+    radial-gradient(ellipse 36% 35% at 53% 64%, rgba(0, 120, 234, .31), transparent 98%),
+    radial-gradient(ellipse 34% 44% at 98% 47%, rgba(0, 105, 205, .24), transparent 99%),
+    radial-gradient(ellipse 36% 50% at 5% 62%, rgba(0, 75, 145, .17), transparent 99%),
+    linear-gradient(125deg, #000611 0%, #021329 46%, #000918 78%, #00040c 100%);
+}
+.rodex-home-header { z-index: 50; }
+.rodex-brand-mark {
+  border-radius: 33%;
+  background: linear-gradient(130deg, #0fcefa, #05d9e7 22%, #006de8 65%, #1a30d2 100%);
+  box-shadow: 0 1px 2px rgba(207, 248, 255, .3) inset, 0 0 17px rgba(0, 163, 245, .3);
+}
+.rodex-notification-icon::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #02d3ff;
+  box-shadow: 0 0 10px rgba(25, 227, 255, .94);
+}
+.rodex-scene {
+  isolation: isolate;
+  background: transparent;
+}
+.rodex-stage-glow {
+  width: min(77vw, 1200px);
+  height: min(94vh, 880px);
+  background:
+    radial-gradient(ellipse 38% 50% at 50% 57%, rgba(0, 130, 240, .23), transparent 100%),
+    radial-gradient(ellipse 56% 44% at 50% 85%, rgba(0, 79, 177, .16), transparent 100%);
+  filter: blur(35px);
+}
+.rodex-stage-orbit {
+  border-top: 2px solid rgba(7, 169, 255, .65);
+  border-right: 1px solid rgba(42, 151, 255, .25);
+  border-bottom: 2px dotted rgba(0, 178, 255, .11);
+  filter: drop-shadow(0 0 7px rgba(0, 153, 255, .73));
+}
+.rodex-stage-orbit--reverse {
+  opacity: .44;
+  border-top: 2px solid rgba(0, 184, 255, .36);
+  border-left: 1px solid rgba(0, 158, 255, .42);
+}
+.rodex-character-stage {
+  width: min(72vw, 820px);
+  max-width: none;
+  pointer-events: auto;
+}
+.rodex-quiet-dock-inner {
+  width: min(67vw, 1100px);
+  background: linear-gradient(180deg, rgba(28, 74, 130, .59), rgba(3, 22, 58, .86));
+  border: 1.6px solid rgba(47, 178, 255, .72);
+  box-shadow:
+    0 0 32px rgba(0, 135, 255, .18),
+    inset 0 1px 0 rgba(180, 242, 255, .24),
+    inset 0 -9px 20px rgba(0, 100, 215, .09);
+}
+.rodex-quiet-wave[data-voice-active="true"] > span {
+  height: min(100%, calc(var(--bar-height) * 1.05));
+  opacity: .95;
+}
+.rodex-quiet-wave:not([data-voice-active="true"]) > span {
+  opacity: .48;
+}
+
+/* The six feature labels remain visible on phones; reserve a physical shelf
+   beneath the robot to avoid overlapping its face and gesture area. */
+@media (max-width: 760px) and (orientation: portrait) {
+  .rodex-character-stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: calc(100% - clamp(124px, 20vh, 180px));
+    margin: 0;
+  }
+  .rodex-stage-orbit {
+    top: 32%;
+    width: 120vw;
+    height: 42vh;
+  }
+  .rodex-stage-orbit--reverse {
+    top: 27%;
+    width: 100vw;
+    height: 38vh;
+  }
+  .rodex-quiet-dock-inner {
+    width: min(96vw, 620px);
+    border-radius: 28px;
+  }
+  .rodex-quiet-wave > span:nth-child(2n) { display: block; }
+}
+@media (max-height: 515px) and (orientation: landscape) {
+  .rodex-character-stage { width: min(60vw, 610px); height: 100%; position: relative; }
+  .rodex-quiet-dock-inner { height: 45px; width: min(52vw, 600px); }
+  .rodex-quiet-wave > span:nth-child(3n) { display: none; }
+}
+@media (min-width: 2000px) {
+  .rodex-character-stage { width: min(65vw, 1450px); }
+  .rodex-quiet-dock-inner { width: min(65vw, 1460px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-notification-icon::after { box-shadow: none; }
+}
