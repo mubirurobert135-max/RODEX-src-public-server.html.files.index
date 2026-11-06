@@ -36,7 +36,7 @@ jobs:
 
       - name: HTTP production smoke test
         run: |
-          NODE_ENV=production PORT=42685 node dist/server.cjs >/tmp/rodex-smoke.log 2>&1 &
+          NODE_ENV=production PORT=42685 node dist/server.mjs >/tmp/rodex-smoke.log 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           ready=0
