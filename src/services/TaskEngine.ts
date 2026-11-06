@@ -383,135 +383,62 @@ export class TaskEngineService {
     entities: { partySize?: number; time?: string; location?: string; quietPreference?: boolean },
     onStateProgress?: (speechUpdate: string, state: TaskState) => void
   ): Promise<{ task: AgentTask; spokenPrompt: string }> {
-    const partySize = entities.partySize || 3;
-    const requestedTime = entities.time || '7:00 PM';
-    const location = entities.location || 'Kampala Road';
-    const venueName = entities.quietPreference ? 'Mythos Greek Grill' : 'Cafe Javas';
-    const availableTime = '8:00 PM';
-
-    const taskId = `task-dining-${Date.now()}`;
-    const initialTask: AgentTask = {
-      id: taskId,
-      title: 'Restaurant Booking',
+    const partySize = Math.max(1, Math.round(entities.partySize || 2));
+    const time = entities.time || 'this evening';
+    const location = entities.location || 'your area';
+    // This application does not currently have an authenticated booking
+    // provider. Never fabricate restaurant discovery, availability or slots.
+    const message = `I cannot verify a live table for ${partySize} at ${time} near ${location} yet. Please check a reservation provider or call the restaurant before treating any table as available.`;
+    const task: AgentTask = {
+      id: `task-dining-${Date.now()}`,
+      title: 'Restaurant availability',
       category: 'restaurant_booking',
-      goal: `${partySize} guests · Tonight · Near ${location}`,
-      state: 'PLANNING',
+      goal: `${partySize} guests · ${time} · Near ${location}`,
+      state: 'FAILED',
       currentStepIndex: 0,
-      steps: [
-        { id: 's1', stepNumber: 1, title: 'Venue Discovery', description: `Searching verified dining venues near ${location}`, status: 'pending', toolName: 'web_search' },
-        { id: 's2', stepNumber: 2, title: 'Check Availability', description: `Checking ${partySize} guests for tonight at ${requestedTime}`, status: 'pending', toolName: 'booking_service' },
-        { id: 's3', stepNumber: 3, title: 'Compare Timeslots', description: 'Comparing alternate reservation slots', status: 'pending', toolName: 'schedule_analyzer' },
-        { id: 's4', stepNumber: 4, title: 'Human Confirmation', description: 'Awaiting your booking confirmation', status: 'pending', toolName: 'permission_gate' },
-        { id: 's5', stepNumber: 5, title: 'Finalize & Schedule', description: 'Update schedule and record preference to memory', status: 'pending', toolName: 'schedule_service' },
-      ],
+      steps: [{
+        id: 'venue-verification',
+        stepNumber: 1,
+        title: 'Verify live availability',
+        description: 'No authenticated live reservation provider is connected.',
+        status: 'failed',
+        toolName: 'booking_service',
+        error: 'Live availability not verified',
+      }],
+      resultSummary: message,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-
-    this.currentActiveTask = initialTask;
+    this.currentActiveTask = task;
     this.notify();
-    this.persistCurrentTask();
-
-    onStateProgress?.(`Searching dining availability for ${partySize} guests tonight...`, 'PLANNING');
-
-    // Step 1: Venue Discovery
-    await new Promise((r) => setTimeout(r, 650));
-    this.updateActiveTask((t) => {
-      t.state = 'EXECUTING';
-      t.steps[0].status = 'completed';
-      t.steps[0].description = `Located top-tier venue: ${venueName} (${location})`;
-      t.steps[1].status = 'executing';
-      return t;
-    });
-
-    // Step 2: Check Availability
-    await new Promise((r) => setTimeout(r, 700));
-    this.updateActiveTask((t) => {
-      t.steps[1].status = 'completed';
-      t.steps[1].description = `${requestedTime} is fully booked`;
-      t.steps[2].status = 'executing';
-      return t;
-    });
-
-    // Step 3: Compare Timeslots
-    await new Promise((r) => setTimeout(r, 650));
-    const waitingTask = this.updateActiveTask((t) => {
-      t.steps[2].status = 'completed';
-      t.steps[2].description = `Open table located at ${availableTime}`;
-      t.steps[3].status = 'executing';
-      t.state = 'WAITING_FOR_USER';
-      t.alternativeProposal = `Requested ${requestedTime} is unavailable. Open table confirmed for ${availableTime} at ${venueName}.`;
-      t.confirmationPrompt = `I found an available table for ${partySize} at ${availableTime} at ${venueName}. Should I confirm this reservation?`;
-      t.confirmationAction = {
-        label: `Confirm ${availableTime} at ${venueName}`,
-        actionId: 'confirm_restaurant_booking',
-        params: {
-          venue: venueName,
-          partySize,
-          time: availableTime,
-          date: 'Tonight',
-        },
-      };
-      return t;
-    })!;
-
-    const spokenPrompt = `I checked availability for ${partySize} tonight. ${requestedTime} is unavailable, but an open table is available at ${availableTime} at ${venueName}. Should I confirm it for you?`;
-    onStateProgress?.(spokenPrompt, 'WAITING_FOR_USER');
-
-    return { task: waitingTask, spokenPrompt };
+    void this.persistCurrentTask();
+    onStateProgress?.(message, 'FAILED');
+    return { task, spokenPrompt: message };
   }
 
-  /**
-   * Finalizes the Restaurant Booking on user confirmation
-   */
   public async confirmRestaurantBooking(
-    params?: any,
+    _params?: any,
     onStateProgress?: (speechUpdate: string, state: TaskState) => void
   ): Promise<{ task: AgentTask; spokenSummary: string }> {
-    const venue = params?.venue || 'Cafe Javas';
-    const time = params?.time || '8:00 PM';
-    const partySize = params?.partySize || 3;
-
-    this.updateActiveTask((t) => {
-      t.state = 'EXECUTING';
-      t.steps[3].status = 'completed';
-      t.steps[3].description = 'User confirmation received';
-      t.steps[4].status = 'executing';
-      return t;
-    });
-
-    // Add to Firebase Schedule & Memory
-    try {
-      await saveScheduleToFirestore(this.activeUserId, {
-        title: `Dinner at ${venue} (${partySize} guests)`,
-        datetime: `Tonight, ${time}`,
-        status: 'confirmed',
-        priority: 'high',
-        recurrence: 'once',
-      });
-
-      await saveMemoryToFirestore(this.activeUserId, {
-        key: 'Dining Preference',
-        value: `Prefers ${venue} for evening dining reservations with ${partySize} guests.`,
-        category: 'preference',
-        confidence: 0.95,
-      });
-    } catch (_) {}
-
-    await new Promise((r) => setTimeout(r, 600));
-
-    const completedTask = this.updateActiveTask((t) => {
-      t.steps[4].status = 'completed';
-      t.steps[4].description = `Reservation confirmed & added to your schedule for ${time}`;
-      t.state = 'COMPLETED';
-      t.resultSummary = `Confirmed. Table for ${partySize} at ${venue} (${time}) is booked and added to your schedule.`;
-      return t;
-    })!;
-
-    const spokenSummary = `Done. Your table for ${partySize} at ${venue} at ${time} is confirmed and added to your schedule.`;
-    onStateProgress?.(spokenSummary, 'COMPLETED');
-
-    return { task: completedTask, spokenSummary };
+    const message = 'No reservation has been booked. RODEX needs a real booking-provider confirmation before it can confirm a table or add it to your schedule.';
+    if (!this.currentActiveTask) {
+      this.createTaskPlan('Reservation confirmation', [
+        { title: 'Obtain booking confirmation', description: 'Provider confirmation is required.' },
+      ], { category: 'restaurant_booking' });
+    }
+    const task = this.updateActiveTask((current) => ({
+      ...current,
+      state: 'FAILED',
+      confirmationAction: undefined,
+      confirmationPrompt: undefined,
+      resultSummary: message,
+      steps: current.steps.map(step => ({
+        ...step,
+        status: step.status === 'completed' ? 'completed' as const : 'failed' as const,
+      })),
+    }))!;
+    onStateProgress?.(message, 'FAILED');
+    return { task, spokenSummary: message };
   }
 
   /**
