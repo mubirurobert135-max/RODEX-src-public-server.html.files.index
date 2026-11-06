@@ -489,7 +489,7 @@ async function startServer() {
       database: "connected_in_memory",
       voiceServices: "ready",
       message: hasKey
-        ? "All core dependencies verified and operational."
+        ? "Gemini API key is configured; external service reachability is checked separately."
         : "Gemini API key not configured; running in local fallback mode.",
       timestamp: new Date().toISOString(),
     });
@@ -502,7 +502,8 @@ async function startServer() {
       assistant: "RODEX",
       version: "1.2.0",
       hasKey: isGeminiApiKeyConfigured(),
-      webVerified: true,
+      webVerified: false,
+      webVerification: "not_tested",
       realTimeApi: true,
     });
   });
@@ -2293,7 +2294,7 @@ Content: "${content}"`;
   }
 
   const server = app.listen(PORT, "0.0.0.0", () => {
-    const apiKeyStatus = isGeminiApiKeyConfigured() ? "PRESENT & VALIDATED" : "MISSING (FALLBACK ACTIVE)";
+    const apiKeyStatus = isGeminiApiKeyConfigured() ? "PRESENT (NOT LIVE-VERIFIED)" : "MISSING (FALLBACK ACTIVE)";
     console.log(`====================================================`);
     console.log(` 🚀 RODEX VOICE ASSISTANT SERVER INITIALIZED        `);
     console.log(`====================================================`);
