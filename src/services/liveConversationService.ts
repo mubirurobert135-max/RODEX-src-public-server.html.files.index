@@ -143,6 +143,7 @@ export function matchWakePhrase(text: string): { matched: boolean; phrase: strin
 
 export class LiveConversationService {
   private ws: WebSocket | null = null;
+  private connectionAttempt: Promise<void> | null = null;
   private inputAudioCtx: AudioContext | null = null;
   private pendingStartupAudioCtx: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -714,6 +715,18 @@ export class LiveConversationService {
    * Connect WebSocket with exponential backoff, jitter, and event timeline logging
    */
   private async connectWebSocketOnly(): Promise<void> {
+    if (this.isConnected()) return;
+    if (this.connectionAttempt) return this.connectionAttempt;
+    const attempt = this.openLiveSocket();
+    this.connectionAttempt = attempt;
+    try {
+      await attempt;
+    } finally {
+      if (this.connectionAttempt === attempt) this.connectionAttempt = null;
+    }
+  }
+
+  private openLiveSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         this.explicitShutdown = false;
@@ -721,9 +734,14 @@ export class LiveConversationService {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/api/live`;
 
-        this.ws = new WebSocket(wsUrl);
+        const ws = new WebSocket(wsUrl);
+        this.ws = ws;
 
-        this.ws.onopen = () => {
+        ws.onopen = () => {
+          if (this.ws !== ws || this.explicitShutdown) {
+            try { ws.close(); } catch (_) {}
+            return;
+          }
           this.addTrace('CLIENT WEBSOCKET OPEN; WAITING FOR LIVE UPSTREAM');
           this.diag.liveConnection = 'RUNNING';
           this.diag.upstreamConnected = false;
@@ -732,7 +750,8 @@ export class LiveConversationService {
           resolve();
         };
 
-        this.ws.onmessage = (event) => {
+        ws.onmessage = (event) => {
+          if (this.ws !== ws || this.explicitShutdown) return;
           try {
             const data = JSON.parse(event.data);
             this.handleServerMessage(data);
@@ -741,7 +760,9 @@ export class LiveConversationService {
           }
         };
 
-        this.ws.onclose = (event) => {
+        ws.onclose = (event) => {
+          if (this.ws !== ws) return;
+          this.ws = null;
           this.diag.upstreamConnected = false;
           if (!this.explicitShutdown) this.diag.liveConnection = 'FAIL';
           this.addTrace(`LIVE WS CLOSED (code: ${event.code}, reason: ${event.reason})`);
@@ -768,7 +789,8 @@ export class LiveConversationService {
 
           if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
           this.reconnectTimer = setTimeout(() => {
-            if (!this.explicitShutdown && this.isMicLive) {
+            this.reconnectTimer = null;
+            if (!this.explicitShutdown && this.isMicLive && !this.isConnected()) {
               this.connectWebSocketOnly().then(() => {
                 if (this.mediaStream) {
                   this.startMicProcessing();
@@ -780,7 +802,8 @@ export class LiveConversationService {
           }, backoffMs);
         };
 
-        this.ws.onerror = (err) => {
+        ws.onerror = (err) => {
+          if (this.ws !== ws || this.explicitShutdown) return;
           this.addTrace('LIVE WS ERROR');
           this.diag.liveConnection = 'FAIL';
           this.addEventTimeline('SESSION_ERROR', 'WebSocket error encountered');
@@ -1780,10 +1803,11 @@ export class LiveConversationService {
       }
     }
     if (this.ws) {
-      try {
-        if (this.ws.readyState === WebSocket.OPEN) this.ws.close();
-      } catch (_) {}
+      const previousSocket = this.ws;
       this.ws = null;
+      try {
+        if (previousSocket.readyState !== WebSocket.CLOSED) previousSocket.close();
+      } catch (_) {}
     }
     this.isMicLive = false;
     this.isConversationActive = false;
