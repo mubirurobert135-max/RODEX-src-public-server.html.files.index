@@ -9,6 +9,9 @@ export class SpeechSynthesizer {
   private _isPaused: boolean = false;
   private activeQueue: SpeechSynthesisUtterance[] = [];
   private queueIndex: number = 0;
+  // A new generation invalidates callbacks from cancelled/interrupted speech.
+  private playbackToken: number = 0;
+  private startFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -53,6 +56,13 @@ export class SpeechSynthesizer {
   }
 
   public stop() {
+    // Invalidate events from old utterances before speechSynthesis.cancel()
+    // synchronously or asynchronously emits an 'end'/'error' event.
+    this.playbackToken++;
+    if (this.startFallbackTimer !== null) {
+      clearTimeout(this.startFallbackTimer);
+      this.startFallbackTimer = null;
+    }
     if (this.resumeTimer) {
       clearInterval(this.resumeTimer);
       this.resumeTimer = null;
@@ -94,6 +104,8 @@ export class SpeechSynthesizer {
 
     // Stop any ongoing speech and clear prior queue
     this.stop();
+    const playbackToken = this.playbackToken;
+    const isCurrentPlayback = () => this.playbackToken === playbackToken;
 
     // Clean markdown, JSON formatting, XML, emojis, and symbols for natural spoken speech
     const cleanSpokenText = text
@@ -193,6 +205,7 @@ export class SpeechSynthesizer {
     }
 
     const speakNextChunk = () => {
+      if (!isCurrentPlayback()) return;
       if (!this.synth || this.queueIndex >= this.activeQueue.length) {
         this.stop();
         options.onEnd?.();
@@ -203,6 +216,7 @@ export class SpeechSynthesizer {
       this.currentUtterance = current;
 
       current.onstart = () => {
+        if (!isCurrentPlayback()) return;
         this._isPaused = false;
         if (!hasTriggeredStart) {
           hasTriggeredStart = true;
@@ -211,6 +225,7 @@ export class SpeechSynthesizer {
       };
 
       current.onend = () => {
+        if (!isCurrentPlayback()) return;
         this.queueIndex++;
         if (this.queueIndex < this.activeQueue.length) {
           speakNextChunk();
@@ -221,6 +236,7 @@ export class SpeechSynthesizer {
       };
 
       current.onerror = (e: any) => {
+        if (!isCurrentPlayback()) return;
         if (e?.error === 'interrupted' || e?.error === 'canceled') {
           console.info('[RODEX TTS Interrupted/Canceled]', { error: e?.error, chunkIndex: this.queueIndex });
           this.stop();
@@ -258,6 +274,7 @@ export class SpeechSynthesizer {
 
     // Watchdog timer to automatically resume synthesis if browser stalls
     this.resumeTimer = setInterval(() => {
+      if (!isCurrentPlayback()) return;
       if (this.synth) {
         if (this.synth.paused) {
           this.synth.resume();
@@ -274,8 +291,11 @@ export class SpeechSynthesizer {
     speakNextChunk();
 
     // Fallback if browser delays onstart event
-    setTimeout(() => {
-      if (!hasTriggeredStart && this.currentUtterance) {
+    this.startFallbackTimer = setTimeout(() => {
+      this.startFallbackTimer = null;
+      // Only report speaking after playback truly begins, and never let a
+      // cancelled utterance switch the robot back into its speaking pose.
+      if (isCurrentPlayback() && !hasTriggeredStart && this.currentUtterance && this.synth?.speaking) {
         hasTriggeredStart = true;
         options.onStart?.();
       }
