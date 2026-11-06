@@ -504,7 +504,6 @@ async function startServer() {
       hasKey: isGeminiApiKeyConfigured(),
       webVerified: true,
       realTimeApi: true,
-      neuralOps: "480M+ ops/sec",
     });
   });
 
@@ -1318,7 +1317,7 @@ async function startServer() {
 
         return res.json({
           status: "ok",
-          reply: `Hlo Mr Robert. ${spotifyReply}`,
+          reply: spotifyReply,
           sources: [
             {
               title: "Spotify PC Connect Controller",
@@ -1328,10 +1327,8 @@ async function startServer() {
           ],
           searchQueries: [`Spotify: ${message}`],
           latencyMs: Date.now() - startTime,
-          neuralOps: "512.4M ops/sec",
-          webVerified: true,
+          webVerified: false,
           timestamp: new Date().toISOString(),
-          speaker: "Mr. Robert",
           spotify: {
             action: spotifyIntent.action,
             playback: pbData.playback,
@@ -1370,10 +1367,8 @@ async function startServer() {
           sources: orchRes.sources || [],
           searchQueries: orchRes.searchQueries || [],
           latencyMs: Date.now() - startTime,
-          neuralOps: "720M+ ops/sec",
-          webVerified: true,
+          webVerified: Boolean(orchRes.webGrounded && (orchRes.sources?.length || 0) > 0),
           timestamp: new Date().toISOString(),
-          speaker: "Mr. Robert",
           actionStatus: orchRes.actionStatus,
           generatedImage: orchRes.generatedImage,
           orchestrationTrace: orchRes.trace,
@@ -1382,16 +1377,14 @@ async function startServer() {
       }
 
 
-      if (!process.env.GEMINI_API_KEY) {
+      if (!isGeminiApiKeyConfigured()) {
         return res.json({
           status: "ok",
           reply: "RODEX Real-Time API operational in local mode. Connect Gemini API Key in Settings to unlock real-time World Wide Web grounding.",
           sources: [],
           latencyMs: Date.now() - startTime,
-          neuralOps: "491.2M ops/sec",
           webVerified: false,
           timestamp: new Date().toISOString(),
-          speaker: "Mr. Robert",
         });
       }
 
@@ -1416,11 +1409,12 @@ async function startServer() {
       }
       contents.push({ role: "user", parts: [{ text: message }] });
 
+      const needsLiveSearch = /\b(latest|today|current|recent|news|weather|price|market|2026|live|now)\b/i.test(message);
       const response = await generateWithModelFallback(ai, {
         contents,
         systemInstruction,
-        temperature: 0.6,
-        maxOutputTokens: 250,
+        tools: needsLiveSearch ? [{ googleSearch: {} }] : undefined,
+        maxOutputTokens: 350,
       });
 
       const latencyMs = Date.now() - startTime;
@@ -1453,8 +1447,7 @@ async function startServer() {
         sources,
         searchQueries,
         latencyMs,
-        neuralOps: `${(720 + Math.random() * 120).toFixed(1)}M ops/sec`,
-        webVerified: true,
+        webVerified: sources.length > 0,
         timestamp: new Date().toISOString(),
         speaker: "User",
       });
@@ -1465,26 +1458,17 @@ async function startServer() {
         err?.message?.includes("RESOURCE_EXHAUSTED") ||
         err?.message?.includes("quota");
 
-      const fallbackReply = isRateLimited
-        ? "I am here and operational. The cloud gateway is temporarily balancing request volume, but my voice link and web channels remain active. How may I assist you?"
-        : "I am active and connected to live intelligence. How may I assist you today?";
-
-      return res.json({
-        status: "ok",
-        reply: fallbackReply,
-        sources: [
-          {
-            title: "Google Global Web Index",
-            url: "https://news.google.com",
-            domain: "google.com",
-          },
-        ],
-        searchQueries: [req.body?.message || "Real-Time Query"],
-        latencyMs: Math.max(Date.now() - startTime, 52),
-        neuralOps: "750.0M ops/sec",
-        webVerified: true,
-        timestamp: new Date().toISOString(),
-        speaker: "User",
+      return res.status(isRateLimited ? 429 : 503).json({
+        status: 'error',
+        error: isRateLimited
+          ? 'AI provider quota is exhausted. Please try again later.'
+          : 'AI provider could not complete the real-time request.',
+        reply: 'RODEX could not complete this request right now.',
+        sources: [],
+        searchQueries: [],
+        latencyMs: Date.now() - startTime,
+        webVerified: false,
+        retryable: true,
       });
     }
   });
@@ -1501,7 +1485,7 @@ async function startServer() {
     res.setHeader("Connection", "keep-alive");
 
     try {
-      if (!process.env.GEMINI_API_KEY) {
+      if (!isGeminiApiKeyConfigured()) {
         res.write(`data: ${JSON.stringify({ chunk: "RODEX Real-Time API: Live key required for web grounding stream." })}\n\n`);
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         return res.end();
@@ -1520,13 +1504,16 @@ async function startServer() {
         },
       });
 
+      const verifiedSources = new Map<string, { title: string; url: string; domain: string }>();
       for await (const chunk of streamResponse) {
         if (chunk.text) {
           res.write(`data: ${JSON.stringify({ chunk: chunk.text })}\n\n`);
         }
+        const grounding = extractWebGrounding(chunk.candidates?.[0]?.groundingMetadata);
+        for (const source of grounding.sources) verifiedSources.set(source.url, source);
       }
 
-      res.write(`data: ${JSON.stringify({ done: true, webVerified: true })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true, webVerified: verifiedSources.size > 0, sources: Array.from(verifiedSources.values()) })}\n\n`);
       res.end();
     } catch (err: any) {
       res.write(`data: ${JSON.stringify({ error: err?.message || "Stream error" })}\n\n`);
