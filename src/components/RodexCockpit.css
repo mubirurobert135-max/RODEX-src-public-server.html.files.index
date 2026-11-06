@@ -1,0 +1,212 @@
+/* RODEX cockpit: all visible controls are real interactive features.
+   The neon rails and cards mirror the approved design without relying on an
+   unresponsive screenshot. The microphone is intentionally not represented. */
+.rodex-cockpit {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+}
+.rodex-nav-rail {
+  position: absolute;
+  top: 48%;
+  left: clamp(16px, 2.15vw, 54px);
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: clamp(8px, 2.5vh, 28px);
+  width: clamp(57px, 5.1vw, 88px);
+  padding: clamp(13px, 2vh, 29px) 7px;
+  border: 1px solid rgba(13, 153, 250, .61);
+  border-radius: 999px;
+  background: linear-gradient(116deg, rgba(3, 24, 53, .88), rgba(2, 20, 42, .46) 45%, rgba(9, 33, 69, .76));
+  backdrop-filter: blur(22px);
+  box-shadow: inset 0 2px 20px rgba(0, 168, 255, .04), 0 0 18px rgba(0, 116, 235, .1), 0 9px 36px rgba(0, 0, 0, .18);
+  pointer-events: auto;
+}
+.rodex-nav-rail-btn {
+  border: 1px solid transparent;
+  border-radius: 17px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  width: clamp(38px, 3.6vw, 58px);
+  height: clamp(38px, 3.6vw, 58px);
+  color: rgba(247, 250, 255, .89);
+  cursor: pointer;
+  transition: background .22s, box-shadow .22s, transform .22s, color .22s;
+}
+.rodex-nav-rail-btn:hover {
+  color: white;
+  background: rgba(9, 133, 228, .21);
+  transform: translateY(-2px);
+}
+.rodex-nav-rail-btn.is-active {
+  color: #ffffff;
+  background: radial-gradient(circle at 34% 17%, rgba(69, 217, 255, .59), rgba(0, 97, 217, .97) 49%, rgba(0, 50, 113, .98) 100%);
+  border-color: rgba(75, 227, 255, .69);
+  box-shadow: 0 0 20px rgba(0, 151, 255, .64), inset 0 0 14px rgba(87, 233, 255, .15);
+}
+.rodex-feature-column {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(13px, 2.6vh, 30px);
+  position: absolute;
+  top: 49%;
+  transform: translateY(-50%);
+  width: clamp(162px, 16vw, 290px);
+  pointer-events: auto;
+}
+.rodex-feature-left {
+  left: clamp(119px, 13.6vw, 354px);
+}
+.rodex-feature-right {
+  right: clamp(24px, 5.7vw, 140px);
+}
+.rodex-feature-button {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  width: 100%;
+  min-height: clamp(56px, 8.1vh, 85px);
+  padding: 12px clamp(11px, 1.55vw, 27px);
+  gap: clamp(9px, 1.1vw, 20px);
+  border-radius: 999px;
+  border: 1px solid rgba(20, 163, 252, .78);
+  background: linear-gradient(156deg, rgba(20, 83, 144, .7) 0%, rgba(1, 33, 69, .67) 54%, rgba(13, 52, 95, .71) 100%);
+  box-shadow:
+    inset 0 2px 1px rgba(167, 234, 255, .14),
+    inset 0 -7px 19px rgba(3, 87, 193, .17),
+    0 0 17px rgba(0, 173, 255, .18),
+    0 10px 24px rgba(0, 0, 0, .17);
+  backdrop-filter: blur(22px);
+  color: #f4fbff;
+  font-size: clamp(13px, 1.4vw, 19px);
+  font-weight: 500;
+  letter-spacing: -.025em;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transform-origin: center;
+  transition: box-shadow .23s ease, border-color .23s ease, background .23s ease, filter .23s ease;
+}
+.rodex-feature-button:focus-visible, .rodex-nav-rail-btn:focus-visible {
+  outline: 2px solid #a0f5ff;
+  outline-offset: 3px;
+}
+.rodex-feature-left .rodex-feature-button:nth-child(1) { transform: rotate(5deg); }
+.rodex-feature-left .rodex-feature-button:nth-child(2) { transform: rotate(1.3deg); }
+.rodex-feature-left .rodex-feature-button:nth-child(3) { transform: rotate(-4deg); }
+.rodex-feature-right .rodex-feature-button:nth-child(1) { transform: rotate(-4deg); }
+.rodex-feature-right .rodex-feature-button:nth-child(2) { transform: rotate(-2deg); }
+.rodex-feature-right .rodex-feature-button:nth-child(3) { transform: rotate(3deg); }
+.rodex-feature-button:hover {
+  border-color: rgba(117, 235, 255, .97);
+  background: linear-gradient(141deg, rgba(17, 115, 181, .82), rgba(2, 46, 95, .76));
+  box-shadow: inset 0 1px rgba(223, 248, 255, .24), 0 0 25px rgba(0, 170, 255, .42), 0 10px 22px rgba(0, 0, 0, .22);
+  filter: brightness(1.08);
+}
+.rodex-feature-icon {
+  width: clamp(22px, 2.25vw, 34px);
+  height: clamp(22px, 2.25vw, 34px);
+  flex: 0 0 auto;
+  color: #0bddff;
+  filter: drop-shadow(0 0 7px rgba(0, 198, 255, .62));
+}
+.rodex-feature-chevron {
+  color: rgba(233, 251, 255, .78);
+  width: clamp(15px, 1.25vw, 20px);
+  height: clamp(15px, 1.25vw, 20px);
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.rodex-feature-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Compact laptop / landscape tablet: preserve the full rail and six cards. */
+@media (max-width: 1190px) {
+  .rodex-feature-column { width: clamp(143px, 16.5vw, 198px); gap: clamp(10px, 2.2vh, 20px); }
+  .rodex-feature-left { left: clamp(79px, 11vw, 155px); }
+  .rodex-feature-right { right: clamp(9px, 3vw, 45px); }
+  .rodex-feature-button { min-height: clamp(49px, 7.6vh, 70px); padding-inline: 11px; }
+  .rodex-feature-icon { width: 25px; height: 25px; }
+  .rodex-nav-rail { left: 9px; }
+}
+/* Portrait tablets, phones and compact landscape devices:
+   move the six cards below the character instead of hiding them. */
+@media (max-width: 760px) {
+  .rodex-nav-rail {
+    top: 7px;
+    left: 7px;
+    width: 43px;
+    transform: none;
+    gap: clamp(5px, 1.2vh, 11px);
+    padding: 7px 3px;
+    border-radius: 30px;
+  }
+  .rodex-nav-rail-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 12px;
+  }
+  .rodex-nav-rail-btn svg { width: 20px; height: 20px; }
+  .rodex-feature-column {
+    top: auto;
+    bottom: clamp(3px, 1.5vh, 11px);
+    transform: none;
+    gap: clamp(5px, 1vh, 9px);
+    width: auto;
+  }
+  .rodex-feature-left {
+    left: clamp(54px, 12vw, 72px);
+    right: calc(50% + 5px);
+  }
+  .rodex-feature-right {
+    left: calc(50% + 5px);
+    right: 8px;
+  }
+  .rodex-feature-button {
+    transform: none !important;
+    border-radius: 14px;
+    height: clamp(35px, 5.7vh, 47px);
+    min-height: clamp(35px, 5.7vh, 47px);
+    padding: 4px clamp(7px, 1.8vw, 10px);
+    gap: clamp(5px, 1vw, 8px);
+    font-size: clamp(10px, 2.65vw, 12px);
+    box-shadow: 0 0 11px rgba(0, 155, 255, .18), inset 0 1px rgba(180, 231, 255, .12);
+  }
+  .rodex-feature-icon { width: 18px; height: 18px; }
+  .rodex-feature-chevron { width: 14px; height: 14px; }
+}
+@media (max-width: 360px) {
+  .rodex-feature-left { left: 47px; }
+  .rodex-feature-right { right: 3px; }
+  .rodex-feature-button { font-size: 10px; padding-inline: 5px; }
+  .rodex-feature-icon { width: 15px; height: 15px; }
+  .rodex-feature-chevron { width: 12px; height: 12px; }
+  .rodex-nav-rail { width: 39px; left: 3px; padding-inline: 2px; }
+  .rodex-nav-rail-btn { width: 33px; height: 33px; }
+}
+@media (max-height: 515px) and (orientation: landscape) {
+  .rodex-nav-rail { left: 8px; top: 50%; transform: translateY(-50%); gap: 4px; padding: 5px; width: 43px; }
+  .rodex-nav-rail-btn { width: 31px; height: 31px; }
+  .rodex-feature-column { top: 50%; bottom: auto; transform: translateY(-50%); width: clamp(125px, 18vw, 160px); gap: 6px; }
+  .rodex-feature-left { left: clamp(55px, 9vw, 88px); right: auto; }
+  .rodex-feature-right { left: auto; right: 6px; }
+  .rodex-feature-button { height: clamp(30px, 9vh, 44px); min-height: clamp(30px, 9vh, 44px); font-size: 11px; }
+}
+@media (min-width: 2000px) {
+  .rodex-nav-rail { top: 48%; }
+  .rodex-feature-column { width: clamp(280px, 16vw, 410px); gap: clamp(24px, 2.8vh, 54px); }
+  .rodex-feature-button { min-height: clamp(83px, 8.4vh, 122px); font-size: clamp(19px, 1.3vw, 27px); }
+  .rodex-feature-icon { width: clamp(33px, 2.1vw, 49px); height: clamp(33px, 2.1vw, 49px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-feature-button,.rodex-nav-rail-btn { transition: none; }
+}
