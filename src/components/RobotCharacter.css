@@ -75,23 +75,23 @@
 /* Responsive SVG viewBox fits the entire character within the available
    stage. The stage itself extends across the viewport without a visible box. */
 @media (orientation: portrait) {
-  .rodex-robot-vector { width: 108%; height: 100%; }
+  .rodex-robot-vector { width: 100%; height: 100%; }
   .rodex-dimensional-atmosphere { inset: -12%; }
 }
 @media (max-width: 600px) {
-  .rodex-robot-vector { width: 115%; height: 100%; }
+  .rodex-robot-vector { width: 100%; height: 100%; }
   .rodex-character-aura { bottom: 7%; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
-  .rodex-robot-vector { width: 75%; height: 100%; }
+  .rodex-robot-vector { width: 100%; height: 100%; }
   .rodex-character-aura { bottom: 3%; }
 }
 @media (min-width: 1600px) and (min-height: 900px) {
-  .rodex-robot-vector { width: 95%; height: 103%; }
+  .rodex-robot-vector { width: 100%; height: 100%; }
   .rodex-dimensional-atmosphere { filter: blur(43px); }
 }
 @media (min-width: 2800px) {
-  .rodex-robot-vector { width: 100%; height: 108%; }
+  .rodex-robot-vector { width: 100%; height: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rodex-robot-model, .rodex-robot-vector { will-change: auto; }
