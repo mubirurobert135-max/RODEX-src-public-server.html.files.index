@@ -199,7 +199,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
 
   const eyeSet = happy ? 'happy' : concerned ? 'concerned' : focused ? 'focus' : busy ? 'busy' : 'rest';
   const headTilt = concerned ? -5 : expression === 'think' ? -7 : expression === 'wake' ? 5 : 0;
-  const rightGesture = expression === 'act' ? -28 : speaking && actionReply ? -25 : happy ? -19 : speaking ? -12 : expression === 'think' ? -9 : 0;
+  const rightGesture = expression === 'act' ? -67 : speaking && actionReply ? -62 : happy ? -57 : speaking ? -44 : expression === 'think' ? -18 : -9;
   const leftGesture = happy ? 16 : focused ? -8 : speaking ? (gestureBeat % 3 === 0 ? 17 : 5) : 0;
   const reactiveGesture = speaking ? [-4, -14, 2, -7, 8, -4, -12, 2][gestureBeat] : 0;
 
@@ -249,6 +249,18 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
             <stop offset="78%" stopColor="#91c5e9" />
             <stop offset="100%" stopColor="#417ab1" />
           </linearGradient>
+          <linearGradient id="rdx-chrome" x1="15%" y1="10%" x2="90%" y2="90%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="36%" stopColor="#b4e4fe" />
+            <stop offset="70%" stopColor="#558fb8" />
+            <stop offset="100%" stopColor="#123e64" />
+          </linearGradient>
+          <radialGradient id="rdx-blue-core" cx="39%" cy="32%" r="71%">
+            <stop offset="0%" stopColor="#d8fdff" />
+            <stop offset="39%" stopColor="#2adfff" />
+            <stop offset="76%" stopColor="#007ef3" />
+            <stop offset="100%" stopColor="#062d79" />
+          </radialGradient>
           <linearGradient id="rdx-visor" x1="20%" y1="0%" x2="75%" y2="100%">
             <stop offset="0%" stopColor="#0c1c2b" />
             <stop offset="36%" stopColor="#000712" />
@@ -297,6 +309,8 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
             <path d="M193 309 C176 303 158 320 151 346 C143 373 144 426 153 448 C161 469 178 467 190 450 C210 423 214 357 210 331 C207 321 202 313 193 309Z"
               fill="url(#rdx-arm)" stroke="#b7ddfa" strokeWidth="2" />
             <path d="M159 358 C158 332 172 319 185 320" fill="none" stroke="#fff" strokeWidth="11" strokeLinecap="round" opacity=".32" />
+            <ellipse cx="174" cy="452" rx="17" ry="14" fill="url(#rdx-chrome)" stroke="#ccefff" strokeWidth="2" />
+            <path d="M161 454 Q169 469 183 456" fill="none" stroke="#15b2ff" strokeWidth="2.3" opacity=".6" />
           </motion.g>
           <motion.g
             className="rodex-right-arm"
@@ -310,6 +324,12 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
             <path d="M398 310 C417 303 438 326 446 351 C460 391 453 440 438 453 C424 468 410 458 401 442 C390 421 384 357 389 329 C391 318 394 314 398 310Z"
               fill="url(#rdx-arm)" stroke="#b5dbf8" strokeWidth="2" />
             <path d="M404 321 C426 325 436 349 437 375" fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round" opacity=".27" />
+            <g className="rodex-right-palm">
+              <ellipse cx="426" cy="446" rx="18" ry="16" fill="url(#rdx-chrome)" stroke="#d3f1ff" strokeWidth="1.8" />
+              <path d="M416 450 Q411 462 414 474 Q419 483 424 473 L426 466 Q425 483 432 483 Q438 481 435 465 Q438 482 444 479 Q451 475 443 456 Q452 469 457 463 Q461 456 444 442"
+                fill="url(#rdx-arm)" stroke="#c9edff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M426 463 L429 475 M435 463 L439 473" fill="none" stroke="#149cee" strokeOpacity=".48" strokeWidth="2" />
+            </g>
           </motion.g>
 
           {/* Rounded tapered, pearlescent body with real depth cues. */}
@@ -320,6 +340,22 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           <path d="M245 306 C231 343 245 414 272 476" stroke="#fff" strokeWidth="17" strokeLinecap="round" fill="none" opacity=".17" />
           <path d="M354 311 C367 367 348 457 315 509" stroke="#3379a5" strokeWidth="17" strokeLinecap="round" fill="none" opacity=".15" />
           <ellipse cx="299" cy="314" rx="57" ry="11" fill="#ffffff" opacity=".16" />
+          {/* The premium O-shaped energy core and segmented shoulder armor are
+              part of RODEX's body, not new overlay controls. */}
+          <path d="M229 296 C242 284 265 282 271 304 C266 324 244 337 221 322 Q216 310 229 296Z"
+            fill="url(#rdx-chrome)" stroke="#b6e6ff" strokeWidth="2" />
+          <path d="M371 296 C357 282 335 282 330 304 C335 324 356 337 380 322 Q386 308 371 296Z"
+            fill="url(#rdx-chrome)" stroke="#b6e6ff" strokeWidth="2" />
+          <path d="M244 331 Q300 349 357 329" fill="none" stroke="#1de4ff" strokeWidth="2.6" strokeOpacity=".64" />
+          <circle cx="300" cy="388" r="24" fill="#18528a" opacity=".55" />
+          <motion.circle cx="300" cy="388" r="17" fill="none" stroke="#46dcff"
+            strokeWidth="6" filter="url(#rdx-soft-glow)" opacity=".5"
+            animate={reducedMotion ? undefined : { opacity: speaking ? [.35,.75,.35] : [.3,.5,.3] }}
+            transition={{ duration: speaking ? .9 : 3.1, repeat: Infinity, ease: 'easeInOut' }} />
+          <circle cx="300" cy="388" r="16.5" fill="none" stroke="url(#rdx-blue-core)" strokeWidth="7" />
+          <circle cx="300" cy="388" r="6.5" fill="#075990" />
+          <path d="M266 452 Q301 479 335 451" fill="none" stroke="#65ddff" strokeWidth="1.8" strokeOpacity=".55" />
+          
 
           {/* Large floating helmet, dark glass visor and luminous eyes. */}
           <motion.g
@@ -335,6 +371,12 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
               fill="url(#rdx-helmet)" stroke="#d3efff" strokeWidth="2.5" />
             <path d="M211 125 C229 86 268 76 299 77" stroke="#fff" strokeWidth="21" strokeLinecap="round" opacity=".40" fill="none" />
             <path d="M196 188 C194 167 199 149 206 132" stroke="#fff" strokeWidth="6" strokeLinecap="round" opacity=".33" fill="none" />
+            {/* Dimensional cyan ear ports echo the approved glossy concept. */}
+            <ellipse cx="189" cy="217" rx="20" ry="34" fill="#1a629b" stroke="#daf5ff" strokeWidth="3" />
+            <ellipse cx="186" cy="217" rx="14" ry="27" fill="#092747" stroke="#3be4ff" strokeWidth="3.5" />
+            <ellipse cx="186" cy="217" rx="8" ry="20" fill="#053568" />
+            <ellipse cx="422" cy="214" rx="13" ry="28" fill="#104c85" stroke="#bfeaff" strokeWidth="2" />
+            <ellipse cx="425" cy="214" rx="7" ry="20" fill="#03244a" stroke="#00cfff" strokeWidth="2.5" />
             <path d="M205 210 C221 175 261 162 311 164 C369 165 401 186 407 220 C415 258 376 289 309 293 C257 291 216 275 205 247 C200 233 200 221 205 210Z"
               fill="url(#rdx-visor)" stroke="#152a41" strokeWidth="3" />
             <path d="M216 209 C237 178 277 172 322 172" fill="none" stroke="#69b9ee" strokeWidth="3.5" strokeLinecap="round" opacity=".17" />
@@ -370,8 +412,10 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
                 </>
               ) : (
                 <>
-                  <path d="M239 223 Q260 225 280 239 M332 237 Q351 222 373 220" fill="none" stroke="#00afff" strokeWidth="19" strokeLinecap="round" opacity={speaking ? '.95' : '.8'} filter="url(#rdx-soft-glow)" />
-                  <path d="M239 223 Q260 225 280 239 M332 237 Q351 222 373 220" fill="none" stroke="url(#rdx-eye)" strokeWidth={speaking ? '10' : '8'} strokeLinecap="round" />
+                  <path d={busy ? "M239 226 Q260 223 280 237 M332 237 Q351 223 373 222" : "M239 235 Q259 211 280 234 M332 234 Q353 210 373 233"}
+                    fill="none" stroke="#00afff" strokeWidth="19" strokeLinecap="round" opacity={speaking ? '.95' : '.8'} filter="url(#rdx-soft-glow)" />
+                  <path d={busy ? "M239 226 Q260 223 280 237 M332 237 Q351 223 373 222" : "M239 235 Q259 211 280 234 M332 234 Q353 210 373 233"}
+                    fill="none" stroke="url(#rdx-eye)" strokeWidth={speaking ? '10' : '8'} strokeLinecap="round" />
                 </>
               )}
             </motion.g>
