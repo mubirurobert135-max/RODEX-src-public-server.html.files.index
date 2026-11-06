@@ -227,6 +227,22 @@ export default function App() {
 
   // Audio and Speech State
   const [audioLevel, setAudioLevel] = useState(0);
+  const lastAudioPaintRef = useRef(0);
+  const lastHapticRef = useRef(0);
+  // Throttle UI renders, not the audio capture/playback pipeline.
+  const renderLiveAudio = useCallback((inputLevel: number, outputLevel: number) => {
+    const sample = outputLevel > 0 ? outputLevel : inputLevel;
+    const level = Math.max(0, Math.min(1, Number.isFinite(sample) ? sample : 0));
+    const now = performance.now();
+    if (now - lastAudioPaintRef.current >= 45 || level === 0) {
+      lastAudioPaintRef.current = now;
+      setAudioLevel(current => Math.abs(current - level) > .035 ? level : current);
+    }
+    if (level > .35 && now - lastHapticRef.current > 350) {
+      lastHapticRef.current = now;
+      triggerSubtlePulse(8);
+    }
+  }, []);
   const [pitchHz, setPitchHz] = useState<number>(124);
   const [transcript, setTranscript] = useState('');
   const [lastResponse, setLastResponse] = useState<string>(
@@ -697,7 +713,7 @@ export default function App() {
         if (level > 0.35) {
           triggerSubtlePulse(8);
         }
-      }, 50);
+      }, 90);
 
       if (bargeInAnimationFrameRef.current) {
         cancelAnimationFrame(bargeInAnimationFrameRef.current);
@@ -881,12 +897,8 @@ export default function App() {
           }
         },
         onAudioLevel: (inputLevel, outputLevel) => {
-          const activeLevel = outputLevel > 0 ? outputLevel : inputLevel;
-          setAudioLevel(activeLevel);
-          if (activeLevel > 0.35) {
-            triggerSubtlePulse(8);
-          }
-        },
+        renderLiveAudio(inputLevel, outputLevel);
+      },
         onInputTranscript: (userText) => {
           setTranscript(userText);
           setMessages((prev) => {
@@ -1728,11 +1740,7 @@ export default function App() {
         }
       },
       onAudioLevel: (inputLevel, outputLevel) => {
-        const activeLevel = outputLevel > 0 ? outputLevel : inputLevel;
-        setAudioLevel(activeLevel);
-        if (activeLevel > 0.35) {
-          triggerSubtlePulse(8);
-        }
+        renderLiveAudio(inputLevel, outputLevel);
       },
       onWakeDetected: (wakeText) => {
         console.info('[RODEX Live Wake Detected]', wakeText);
@@ -1814,10 +1822,19 @@ export default function App() {
       },
     });
 
-    // Auto-boot normal voice mode without requiring Orb click
-    globalLiveConversationService.startNormalOrbVoice().catch((err) => {
-      console.warn('[Auto-Start Live Voice Notice]', err);
-    });
+    // Resume automatically only for returning users with prior permission.
+    // A first-time microphone prompt requires direct user interaction.
+    const autoResume = async () => {
+      try {
+        const permission = await navigator.permissions?.query({ name: 'microphone' as PermissionName });
+        if (permission?.state === 'granted') {
+          await globalLiveConversationService.startNormalOrbVoice();
+        }
+      } catch {
+        console.info('[RODEX Voice] Permission status unavailable: tap robot to enable.');
+      }
+    };
+    void autoResume();
 
     return () => {
       const cleanupGeneration = ++liveVoiceMountGeneration;
@@ -1844,13 +1861,10 @@ export default function App() {
     // No visible microphone CTA: the character is the voice portal itself.
     // Browsers still require permission; prompt from this genuine user gesture
     // rather than claiming to capture audio without the user's consent.
-    if (!micPermissionGranted) {
-      const permitted = await requestMicPermission();
-      if (!permitted) {
-        setLastResponse('RODEX needs microphone permission for hands-free conversation. You can enable it in settings.');
-        setIsSettingsOpen(true);
-        return;
-      }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setLastResponse('Voice capture is unavailable in this browser or blocked by its permissions policy.');
+      setIsSettingsOpen(true);
+      return;
     }
 
     // 1. Natural Barge-In: If speaking, immediately interrupt and listen
@@ -1865,8 +1879,16 @@ export default function App() {
     // 2. If voice engine is not connected or mic is not active, start it
     if (!globalLiveConversationService.isConnected() || !globalLiveConversationService.getIsMicLive()) {
       await globalLiveConversationService.startNormalOrbVoice().catch((err) => {
-        console.warn('[Orb Voice Start Error]', err);
+        console.warn('[RODEX Voice Start Error]', err);
       });
+      if (globalLiveConversationService.getIsMicLive()) {
+        setMicPermissionGranted(true);
+        setDiagPermission('granted');
+        globalSpeechManager.setMicPermission(true);
+      } else {
+        setLastResponse('Voice could not start. Check browser microphone permission and connection.');
+        setIsSettingsOpen(true);
+      }
       return;
     }
 
