@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useAnimationControls, useReducedMotion } from 'motion/react';
 import type { AssistantState, TaskState } from '../types';
 import './RobotCharacter.css';
 
@@ -41,6 +41,8 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
   const reducedMotion = useReducedMotion();
   const [blink, setBlink] = useState(false);
   const [gaze, setGaze] = useState({ x: 0, y: 0 });
+  const [gestureBeat, setGestureBeat] = useState(0);
+  const spinControls = useAnimationControls();
   const gazeFrame = useRef<number | null>(null);
   const safeAudio = Math.min(1, Math.max(0, audioLevel || 0));
   const actionReply = /\b(opened|opening|launched|launching|playing|searching|found|sent|navigating|youtube|browser)\b/i.test(lastResponse);
@@ -73,6 +75,80 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
     };
   }, [reducedMotion, expression]);
 
+  // The reference is used for motion language, never for character identity.
+  // A full turn is a purposeful welcome or celebration, not an endless idle loop.
+  // The outer HTML layer supplies perspective and spring-guided rotation;
+  // the independent inner body/face/arms keep moving during the turn.
+  useEffect(() => {
+    let cancelled = false;
+    spinControls.stop();
+
+    if (reducedMotion || document.visibilityState === 'hidden') {
+      spinControls.set({ rotateY: 0, rotateZ: 0, scale: 1 });
+      return;
+    }
+
+    const play = async () => {
+      if (expression === 'wake' || expression === 'happy') {
+        spinControls.set({ rotateY: 0, rotateZ: 0, scale: 1 });
+        await spinControls.start({
+          rotateY: [0, -23, 83, 177, 270, 360],
+          rotateZ: [0, -2.3, 0, 1.5, 0, 0],
+          scale: [1, 1.025, 1.045, 1.015, 1.035, 1],
+          transition: {
+            duration: expression === 'wake' ? 1.65 : 1.85,
+            times: [0, .15, .37, .59, .82, 1],
+            ease: 'easeInOut',
+          },
+        });
+        if (!cancelled) spinControls.set({ rotateY: 0, rotateZ: 0, scale: 1 });
+      } else if (expression === 'act') {
+        // Look toward the task, then naturally return to the user.
+        await spinControls.start({
+          rotateY: [0, -12, -34, -23, 0],
+          rotateZ: [0, -.6, 1, 0, 0],
+          transition: { duration: 1.7, ease: 'easeInOut' },
+        });
+      } else {
+        await spinControls.start({
+          rotateY: expression === 'think' ? -13 : expression === 'focus' ? 6 : 0,
+          rotateZ: 0,
+          scale: 1,
+          transition: { type: 'spring', stiffness: 75, damping: 18 },
+        });
+      }
+    };
+
+    void play();
+    return () => {
+      cancelled = true;
+      spinControls.stop();
+    };
+  }, [expression, reducedMotion, spinControls]);
+
+  // Deliberately non-metronomic gestures. Mouth/noise labels never appear:
+  // speaking is conveyed by face, head, arms and the output audio energy.
+  useEffect(() => {
+    if (reducedMotion || (!speaking && expression !== 'think' && expression !== 'focus')) {
+      setGestureBeat(0);
+      return;
+    }
+    let timer: number;
+    let cancelled = false;
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        if (document.visibilityState === 'visible') setGestureBeat(beat => (beat + 1) % 8);
+        schedule();
+      }, speaking ? 480 + Math.random() * 490 : 1250 + Math.random() * 750);
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [speaking, expression, reducedMotion]);
+
   useEffect(() => () => {
     if (gazeFrame.current !== null) window.cancelAnimationFrame(gazeFrame.current);
   }, []);
@@ -97,7 +173,8 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
   const eyeSet = happy ? 'happy' : concerned ? 'concerned' : focused ? 'focus' : busy ? 'busy' : 'rest';
   const headTilt = concerned ? -5 : expression === 'think' ? -7 : expression === 'wake' ? 5 : 0;
   const rightGesture = expression === 'act' ? -28 : speaking && actionReply ? -25 : happy ? -19 : speaking ? -12 : expression === 'think' ? -9 : 0;
-  const leftGesture = happy ? 16 : focused ? -8 : speaking ? 9 : 0;
+  const leftGesture = happy ? 16 : focused ? -8 : speaking ? (gestureBeat % 3 === 0 ? 17 : 5) : 0;
+  const reactiveGesture = speaking ? [-4, -14, 2, -7, 8, -4, -12, 2][gestureBeat] : 0;
 
   return (
     <button
@@ -110,7 +187,8 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       onPointerLeave={resetGaze}
     >
       <span className="rodex-dimensional-atmosphere" aria-hidden="true" />
-      <svg
+      <motion.span className="rodex-robot-spin-shell" animate={spinControls} style={{ transformStyle: 'preserve-3d' }}>
+        <svg
         className="rodex-robot-vector"
         viewBox="100 14 400 606"
         role="presentation"
@@ -183,16 +261,14 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           className="rodex-robot-model"
           style={{ transformOrigin: '50% 47%' }}
           animate={reducedMotion ? undefined : {
-            y: speaking ? [1, -7, 1] : busy ? [0, -6, 0] : [0, -13, 0],
-            rotateZ: expression === 'think' ? [0, -2, 0] : [0, .7, 0],
-            rotateY: gaze.x * 4,
-            rotateX: -gaze.y * 3,
+            y: speaking ? [0, -(7 + safeAudio * 7), 0] : busy ? [0, -9, 0] : [0, -14, 0],
+            x: expression === 'think' ? [-3, 4, -3] : 0,
+            rotateZ: expression === 'think' ? [0, -2.4, 0] : focused ? [0, 1.1, 0] : [0, .65, 0],
           }}
           transition={{
             y: { duration: speaking ? 1.8 : 4.1, repeat: Infinity, ease: 'easeInOut' },
             rotateZ: { duration: 4.2, repeat: Infinity, ease: 'easeInOut' },
-            rotateY: { duration: .25 },
-            rotateX: { duration: .25 },
+            x: { duration: 4.8, repeat: Infinity, ease: 'easeInOut' },
           }}
         >
           {/* The limbs are separate articulated elements; they never clip. */}
@@ -209,7 +285,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           <motion.g
             className="rodex-right-arm"
             style={{ transformOrigin: '402px 313px' }}
-            animate={reducedMotion ? undefined : { rotate: rightGesture, y: speaking ? [0, -4, 0] : 0 }}
+            animate={reducedMotion ? undefined : { rotate: rightGesture + reactiveGesture, y: speaking ? [0, -4 - safeAudio * 3, 0] : 0 }}
             transition={{
               rotate: { type: 'spring', stiffness: 105, damping: 15 },
               y: { repeat: speaking ? Infinity : 0, duration: .78, ease: 'easeInOut' },
@@ -233,9 +309,9 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           <motion.g
             style={{ transformOrigin: '300px 207px' }}
             animate={reducedMotion ? undefined : {
-              rotate: headTilt + gaze.x * 3,
+              rotate: headTilt + gaze.x * 3 + (speaking ? [-2, 1.7, 3, -1, 1, -2, 2, 0][gestureBeat] : 0),
               x: gaze.x * 3,
-              y: gaze.y * 2,
+              y: gaze.y * 2 + (speaking ? Math.max(-4, -safeAudio * 6) : 0),
             }}
             transition={{ type: 'spring', stiffness: 95, damping: 17 }}
           >
@@ -292,7 +368,8 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
             transition={{ duration: speaking ? .55 : 3.5, repeat: Infinity, ease: 'easeInOut' }}
           />
         </motion.g>
-      </svg>
+        </svg>
+      </motion.span>
       <span className="rodex-character-aura" aria-hidden="true" />
     </button>
   );
