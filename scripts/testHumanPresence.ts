@@ -90,6 +90,9 @@ const checks: [string, boolean][] = [
     scene3D.includes('raw.head')],
   ['Articulated lips, eyelids and head gaze respond to real events',
     scene3D.includes('c.blink') &&
+    scene3D.includes("gl.getUniformLocation(p, 'uBlink')") &&
+    scene3D.includes('lidMask') &&
+    !scene3D.includes('const lid = c.blink') &&
     scene3D.includes('c.mouth') &&
     scene3D.includes('c.yaw') &&
     scene3D.includes("state === 'speaking'") &&
