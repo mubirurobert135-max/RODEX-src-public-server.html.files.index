@@ -169,6 +169,7 @@ export class LiveConversationService {
   private outputAudioCtx: AudioContext | null = null;
   private outputGainNode: GainNode | null = null;
   private outputAnalyser: AnalyserNode | null = null;
+  private outputGraphConnected = false;
   private nextPlaybackTime = 0;
   private activeSources: AudioBufferSourceNode[] = [];
   private isSpeaking = false;
@@ -294,6 +295,10 @@ export class LiveConversationService {
     if (!this.outputAudioCtx || this.outputAudioCtx.state === 'closed') {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.outputAudioCtx = new AudioCtx({ sampleRate: 24000 });
+      // Rebuild the entire graph when its AudioContext has been replaced.
+      this.outputGainNode = null;
+      this.outputAnalyser = null;
+      this.outputGraphConnected = false;
       this.diag.audioContextSampleRate = this.outputAudioCtx.sampleRate;
     }
 
@@ -309,12 +314,13 @@ export class LiveConversationService {
       this.outputAnalyser.smoothingTimeConstant = 0.15;
     }
 
-    try {
-      this.outputGainNode.disconnect();
-      this.outputAnalyser.disconnect();
+    // Connect only once: disconnecting the analyser for every incoming PCM
+    // packet can momentarily silence the speaker and cause audible gaps.
+    if (!this.outputGraphConnected) {
       this.outputGainNode.connect(this.outputAnalyser);
       this.outputAnalyser.connect(this.outputAudioCtx.destination);
-    } catch (_) {}
+      this.outputGraphConnected = true;
+    }
 
     this.diag.audioContextState = this.outputAudioCtx.state;
     this.diag.audioGraphActive = 'PASS';
