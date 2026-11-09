@@ -327,7 +327,7 @@ async function generateWithModelFallback(
   }
 
   // If all models hit rate limits, return a graceful fallback response object instead of throwing
-  const fallbackMessage = "I am listening and operational, Mr. Robert. My voice subsystems and live link remain verified and active. How may I assist you?";
+  const fallbackMessage = "I couldn't reach my AI service just now. Please try again in a moment. If the problem continues, check RODEX Diagnostics for the connection error.";
   return {
     text: fallbackMessage,
     candidates: [
