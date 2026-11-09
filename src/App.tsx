@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { HumanoidPresence } from './components/HumanoidPresence';
 import { RODEXWorkspace } from './components/RODEXWorkspace';
+import { RODEXFloatingCompanion } from './components/RODEXFloatingCompanion';
 import { RodexSpeechWave } from './components/RodexSpeechWave';
 import './components/RodexImmersive.css';
 import { ActionBar } from './components/ActionBar';
@@ -2337,6 +2338,39 @@ export default function App() {
           </form>
           <RodexSpeechWave state={state} audioLevel={audioLevel}/>
         </footer>
+
+        {/* Keep the approved humanoid present as a compact, controllable
+            companion while existing tool/modal workspaces cover the page.
+            Chat remains unobstructed and has its own close navigation. */}
+        <RODEXFloatingCompanion
+          active={isWorkspaceOpen && !isChatOpen && (
+            activeMode !== 'home' || isMediaStudioOpen || isGmailOpen ||
+            isScheduleOpen || isMemoryOpen || isDoctorOpen || isCapabilityOpen ||
+            isWebVerifyOpen || isSpotifyOpen || isMediaHubOpen || isSecurityOpen ||
+            isUpdateOpen || isMoreMenuOpen || isSettingsOpen
+          )}
+          state={state}
+          taskState={activeTask?.state}
+          audioLevel={audioLevel}
+          onSpeak={handleOrbClick}
+          onExpand={() => {
+            setIsWorkspaceOpen(false);
+            setActiveMode('home');
+            setIsMediaStudioOpen(false);
+            setIsGmailOpen(false);
+            setIsScheduleOpen(false);
+            setIsMemoryOpen(false);
+            setIsDoctorOpen(false);
+            setIsCapabilityOpen(false);
+            setIsWebVerifyOpen(false);
+            setIsSpotifyOpen(false);
+            setIsMediaHubOpen(false);
+            setIsSecurityOpen(false);
+            setIsUpdateOpen(false);
+            setIsMoreMenuOpen(false);
+            setIsSettingsOpen(false);
+          }}
+        />
 
         {/* Slide-up Chat History Sheet */}
         <ChatSheet
