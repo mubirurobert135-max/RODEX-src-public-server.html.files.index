@@ -294,7 +294,13 @@ export class LiveConversationService {
   } {
     if (!this.outputAudioCtx || this.outputAudioCtx.state === 'closed') {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      this.outputAudioCtx = new AudioCtx({ sampleRate: 24000 });
+      try {
+        this.outputAudioCtx = new AudioCtx({ sampleRate: 24000 });
+      } catch {
+        // Some browsers only support hardware output rates, e.g. 44.1/48 kHz.
+        // Web Audio converts decoded 24 kHz model buffers automatically.
+        this.outputAudioCtx = new AudioCtx();
+      }
       // Rebuild the entire graph when its AudioContext has been replaced.
       this.outputGainNode = null;
       this.outputAnalyser = null;
@@ -514,7 +520,16 @@ export class LiveConversationService {
       return;
     }
     if (this.initializationInProgress) {
-      console.info('[RODEX ENGINE] INIT_IN_PROGRESS');
+      // A returning user's auto-resume and a physical tap can overlap.
+      // Joining the in-flight start avoids incorrectly claiming the mic failed.
+      this.addTrace('[RODEX ENGINE] WAITING FOR IN-FLIGHT STARTUP');
+      const waitStarted = Date.now();
+      while (!this.diag.upstreamConnected && !this.lastError && Date.now() - waitStarted < 15000) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      }
+      if (!this.diag.upstreamConnected) {
+        throw new Error(this.lastError || 'RODEX voice startup timed out. Tap again to retry.');
+      }
       return;
     }
 
@@ -656,8 +671,9 @@ export class LiveConversationService {
       // A connection failure must release the mic/audio graph as well, otherwise
       // a later retry can inherit a live-but-unusable stream.
       this.stop();
-      this.diag.lastErrorMessage = `MIC ERROR: ${errMsg}`;
-      this.diag.voiceEngine = 'MIC_ERROR';
+      this.lastError = errMsg;
+      this.diag.lastErrorMessage = `VOICE START ERROR: ${errMsg}`;
+      this.diag.voiceEngine = 'STARTUP_ERROR';
       this.diag.orbVoiceState = 'ERROR';
       this.diag.liveConnection = 'FAIL';
       this.addTrace(`MIC ERROR: ${errMsg}`);
@@ -799,6 +815,7 @@ export class LiveConversationService {
   private openLiveSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        let socketOpened = false;
         this.explicitShutdown = false;
         this.addEventTimeline('SESSION_CONNECTING', 'Initiating WebSocket connection to /api/live');
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -808,6 +825,7 @@ export class LiveConversationService {
         this.ws = ws;
 
         ws.onopen = () => {
+          socketOpened = true;
           if (this.ws !== ws || this.explicitShutdown) {
             try { ws.close(); } catch (_) {}
             return;
@@ -833,6 +851,9 @@ export class LiveConversationService {
         ws.onclose = (event) => {
           if (this.ws !== ws) return;
           this.ws = null;
+          if (!socketOpened) {
+            reject(new Error(`RODEX voice server unavailable (socket closed: ${event.code}). Confirm /api/live is deployed on the same host.`));
+          }
           this.diag.upstreamConnected = false;
           if (!this.explicitShutdown) this.diag.liveConnection = 'FAIL';
           this.addTrace(`LIVE WS CLOSED (code: ${event.code}, reason: ${event.reason})`);
@@ -877,7 +898,7 @@ export class LiveConversationService {
           this.addTrace('LIVE WS ERROR');
           this.diag.liveConnection = 'FAIL';
           this.addEventTimeline('SESSION_ERROR', 'WebSocket error encountered');
-          reject(err);
+          reject(new Error('RODEX voice WebSocket failed to connect. Confirm HTTPS, /api/live and the server logs.'));
         };
       } catch (e) {
         this.diag.liveConnection = 'FAIL';
