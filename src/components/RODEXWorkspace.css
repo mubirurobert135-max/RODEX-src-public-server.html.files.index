@@ -1,0 +1,94 @@
+/* RODEX Adaptive Hybrid Workspace — pure black, white UI and graphite depth.
+   No hidden features: contextual actions dispatch existing project handlers. */
+.rodex-workspace {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: min(1480px, 100%);
+  height: 100%;
+  padding: clamp(12px, 1.8vw, 30px);
+  margin: 0 auto;
+  color: #fff;
+  z-index: 20;
+  background: #000;
+  overflow: hidden;
+}
+.rodex-workspace-head {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:20px; padding:0 0 clamp(12px,2.3vh,24px);
+  border-bottom:1px solid #242424; flex:0 0 auto;
+}
+.rodex-workspace-title h1 {
+  font: 600 clamp(24px,3vw,39px)/1.2 'Sora',system-ui,sans-serif;
+  color:#fff; margin:5px 0 8px; letter-spacing:-.055em;
+}
+.rodex-workspace-title p {margin:0;color:#fff;opacity:.77;font-size:clamp(11px,1vw,14px);}
+.rodex-workspace-eyebrow {font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#fff;opacity:.68;}
+.rodex-workspace-close {
+  flex:0 0 auto; min-height:44px; display:inline-flex;align-items:center;gap:8px;
+  border:1px solid #505050;border-radius:12px;background:#161616;color:white;
+  padding:0 14px; font-size:13px;font-weight:650;cursor:pointer;
+}
+.rodex-workspace-close:hover {background:#2b2b2b;border-color:#fff;}
+.rodex-workspace-columns {display:grid;grid-template-columns:minmax(0,1fr) minmax(208px,26%);
+  align-items:stretch;gap:clamp(12px,1.5vw,24px);flex:1 1 auto;min-height:0;padding-top:clamp(12px,2vw,28px);}
+.rodex-workspace-main {min-width:0;min-height:0;display:flex;flex-direction:column;gap:clamp(12px,2vh,24px);overflow-y:auto;overscroll-behavior-y:contain;padding:0 2px 8px;}
+.rodex-workspace-section-head {display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.rodex-workspace-section-head h2 {font-size:clamp(14px,1.5vw,19px);font-weight:600;color:#fff;letter-spacing:-.03em;}
+.rodex-workspace-feature-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.rodex-workspace-feature {
+  position:relative;min-height:148px;border:1px solid #414141;border-radius:18px;
+  background:#101010;color:#fff;display:flex;flex-direction:column;align-items:flex-start;
+  padding:clamp(15px,2vw,23px);gap:10px;text-align:left;cursor:pointer;
+  transition:background .18s,border-color .18s,transform .18s;
+}
+.rodex-workspace-feature:hover {border-color:#e8e8e8;background:#191919;transform:translateY(-2px);}
+.rodex-workspace-feature strong {font-size:clamp(13px,1.3vw,17px);font-weight:600;}
+.rodex-workspace-feature span {font-size:clamp(11px,1vw,13px);line-height:1.5;color:#fff;opacity:.75;max-width:27ch;}
+.rodex-workspace-feature-arrow {position:absolute;right:18px;top:20px;opacity:.7;}
+.rodex-workspace-tools {display:flex;flex-direction:column;gap:13px;}
+.rodex-workspace-more {min-height:34px;padding-inline:10px;border:1px solid #454545;border-radius:9px;color:#fff;font-size:12px;background:#151515;cursor:pointer;}
+.rodex-workspace-shortcuts {display:flex;gap:9px;flex-wrap:wrap;}
+.rodex-workspace-shortcut {display:inline-flex;align-items:center;gap:8px;min-height:41px;padding:8px 13px;border-radius:11px;border:1px solid #494949;background:#131313;color:#fff;cursor:pointer;font-size:12px;}
+.rodex-workspace-shortcut:hover {background:#303030;border-color:#fff;}
+.rodex-workspace-ask {display:flex;align-items:center;gap:12px;min-height:55px;margin-top:auto;border-radius:15px;border:1px solid #555;background:#131313;padding:6px 8px 6px 16px;}
+.rodex-workspace-ask input {min-width:0;flex:1;border:0;background:transparent;color:#fff;font:400 14px 'Manrope',system-ui,sans-serif;outline:none;}
+.rodex-workspace-ask input::placeholder {color:#fff;opacity:.65;}
+.rodex-workspace-ask button {width:41px;height:41px;flex:0 0 41px;border-radius:11px;border:1px solid #fff;background:#fff;color:#000;display:grid;place-items:center;cursor:pointer;}
+.rodex-workspace-ask button:disabled {opacity:.32;cursor:not-allowed;}
+.rodex-workspace-companion {min-width:0;display:flex;flex-direction:column;border:1px solid #494949;border-radius:20px;overflow:hidden;background:#090909;}
+.rodex-workspace-companion-head {display:flex;align-items:center;justify-content:space-between;gap:8px;padding:15px;border-bottom:1px solid #292929;color:#fff;font-weight:600;letter-spacing:.08em;font-size:13px;}
+.rodex-workspace-companion-head button {display:grid;place-items:center;width:39px;height:39px;border:1px solid #404040;background:#191919;border-radius:10px;color:#fff;cursor:pointer;}
+.rodex-workspace-companion-visual {position:relative;display:flex;flex:1 1 auto;min-height:0;align-items:flex-end;justify-content:center;overflow:hidden;background:#000;}
+.rodex-workspace-companion-bottom {padding:11px;border-top:1px solid #292929;}
+.rodex-workspace-companion-bottom button {display:flex;align-items:center;justify-content:center;gap:8px;min-height:45px;width:100%;color:#fff;background:#171717;border:1px solid #555;border-radius:11px;cursor:pointer;font-size:12px;}
+.rodex-workspace-companion-bottom button:hover {background:#2c2c2c;}
+.rodex-workspace :is(button,input):focus-visible {outline:2px solid #fff;outline-offset:3px;}
+@media(max-width:840px) {
+  .rodex-workspace-columns {grid-template-columns:minmax(0,1fr) 170px;}
+  .rodex-workspace-feature {min-height:128px;}
+}
+@media(max-width:620px) {
+  .rodex-workspace {padding:14px 14px max(14px,env(safe-area-inset-bottom));}
+  .rodex-workspace-title h1 {font-size:27px;}
+  .rodex-workspace-columns {display:flex;flex-direction:column-reverse;overflow-y:auto;gap:12px;padding-top:12px;}
+  .rodex-workspace-main {flex:0 0 auto;overflow:visible;}
+  .rodex-workspace-companion {min-height:150px;max-height:190px;flex:0 0 170px;display:grid;grid-template-columns:120px 1fr;grid-template-rows:1fr 55px;}
+  .rodex-workspace-companion-head {grid-column:2;grid-row:1;border-bottom:0;align-self:start;}
+  .rodex-workspace-companion-visual {grid-column:1;grid-row:1/3;min-height:0;}
+  .rodex-workspace-companion-bottom {grid-column:2;grid-row:2;border-top:0;align-self:end;}
+  .rodex-workspace-feature-grid {gap:9px;}
+  .rodex-workspace-feature {min-height:131px;padding:14px;gap:8px;}
+  .rodex-workspace-feature-arrow {right:12px;top:13px;}
+  .rodex-workspace-shortcut {min-height:44px;}
+}
+@media(max-height:520px) and (orientation:landscape) {
+  .rodex-workspace {overflow-y:auto;}
+  .rodex-workspace-columns {min-height:400px;flex:0 0 auto;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .rodex-workspace-feature {transition:none;}
+  .rodex-workspace-feature:hover {transform:none;}
+}
