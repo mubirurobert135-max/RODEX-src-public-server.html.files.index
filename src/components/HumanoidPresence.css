@@ -1,130 +1,92 @@
-/* RODEX Human Presence / pearl-white humanoid with neutral materials.
-   Visual movement follows real state and audio amplitude; no fake waveform. */
+/* RODEX: a responsive 3D character, never a stretched picture.
+   Only fallback devices display the original approved cutout. */
 .rodex-human-presence {
-  --rodex-speech-level: 0;
-  --rodex-speech-bob: 0px;
-  --rodex-look-x: 0px;
-  --rodex-look-y: 0px;
-  --rodex-look-tilt: 0deg;
-  --rodex-attention-y: 0px;
-  --rodex-attention-scale: 1;
   position: relative;
-  display: flex;
+  width: 100%;
   height: 100%;
-  width: min(43vw, 630px);
   min-width: 0;
   min-height: 0;
-  align-items: center;
-  justify-content: center;
   isolation: isolate;
-  flex: 0 1 auto;
-}
-.rodex-human-portrait-button {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  margin: 0;
-  border: none;
-  background: transparent;
-  align-items: flex-end;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   overflow: hidden;
-  cursor: pointer;
-  position: relative;
-  border-radius: 16px;
-  -webkit-tap-highlight-color: transparent;
+  background: transparent;
+  --rodex-look-tilt: 0deg;
+  --rodex-speech-bob: 0px;
 }
-.rodex-human-portrait-button:focus-visible,
-.rodex-human-expand:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
-}
-.rodex-human-portrait,
-.rodex-human-mouth-motion {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-drag: none;
-  transform-origin: 50% 44%;
-}
-.rodex-human-portrait {
-  animation: rodex-natural-breathing 7s ease-in-out infinite;
-  filter: drop-shadow(0 18px 28px rgba(0,0,0,.45));
-  transform:
-    translate3d(
-      var(--rodex-look-x),
-      calc(var(--rodex-look-y) + var(--rodex-attention-y) - var(--rodex-speech-bob)),
-      0
-    )
-    rotate(var(--rodex-look-tilt))
-    scale(var(--rodex-attention-scale));
-  transition: transform .38s cubic-bezier(.22,.74,.3,1), filter .35s ease;
-}
-.rodex-human-presence[data-expression="attentive"] {
-  --rodex-attention-y: -3px;
-  --rodex-attention-scale: 1.008;
-}
-.rodex-human-presence[data-expression="speaking"] {
-  --rodex-attention-y: -1px;
-  --rodex-attention-scale: 1.012;
-}
-.rodex-human-presence[data-expression="engaged"] {
-  --rodex-attention-y: -2px;
-  --rodex-attention-scale: 1.006;
-}
-.rodex-human-presence[data-expression="concerned"] {
-  --rodex-attention-y: 2px;
-}
-.rodex-human-mouth-motion {
+.rodex3d-scene {
   position: absolute;
   inset: 0;
-  clip-path: ellipse(12% 2.4% at 51% 64%);
-  transform-origin: 51% 64%;
-  transform: scaleY(calc(1 + (var(--rodex-speech-level) * .11)));
-  transition: transform 100ms linear;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+.rodex3d-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  background: transparent;
+}
+.rodex-human-interact {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  color: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rodex-human-interact:focus-visible,
+.rodex-human-expand:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -5px;
+}
+.rodex-human-portrait {
+  display: block;
+  height: 100%;
+  width: 100%;
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: center center;
+  user-select: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
 }
 .rodex-human-presence--compact {
   width: 100%;
   height: 100%;
-  max-width: 100%;
-}
-.rodex-human-presence--compact .rodex-human-portrait-button {
-  border-radius: 14px;
 }
 .rodex-human-expand {
   position: absolute;
+  z-index: 3;
   right: 10px;
   top: 10px;
   width: 38px;
   height: 38px;
   border-radius: 11px;
   border: 1px solid #555;
-  background: rgba(12,12,12,.87);
+  background: rgba(12,12,12,.91);
   color: #fff;
   display: grid;
   place-items: center;
   cursor: pointer;
-  z-index: 2;
 }
 .rodex-human-expand:hover { background: #333; }
-@keyframes rodex-natural-breathing {
-  0%,100% { translate: 0 0; }
-  50% { translate: 0 -3px; }
+.rodex-human-presence--compact .rodex-human-expand {
+  right: 5px; top: 5px; width: 29px; height: 29px;
 }
 @media (max-width: 900px) {
   .rodex-human-presence:not(.rodex-human-presence--compact) {
-    width: min(92vw, 540px);
-    height: min(100%, 67vh);
+    width: 100%;
+    height: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rodex-human-portrait, .rodex-human-mouth-motion {
-    animation: none !important;
-    transition: none !important;
-  }
-  .rodex-human-portrait { transform: none !important; }
+  .rodex-human-portrait { animation: none !important; transition: none !important; transform: none !important; }
+  .rodex-human-interact { transition: none !important; }
 }
