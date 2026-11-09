@@ -128,7 +128,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       type="button"
       className="rodex-robot-button rodex-aurora-character"
       aria-label="Talk to RODEX"
-      title="Talk to RODEX"
+      aria-pressed={listening}
       onClick={onClick}
       onPointerMove={moveEyes}
       onPointerLeave={resetEyes}
@@ -171,6 +171,20 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
             <stop offset="31%" stopColor="#122b4e"/>
             <stop offset="75%" stopColor="#061226"/>
             <stop offset="100%" stopColor="#0b2a50"/>
+          </linearGradient>
+          {/* Sapphire-tinted optical coating with controlled studio reflections. */}
+          <linearGradient id={`${id}-visorSheen`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#d8f6ff" stopOpacity=".28"/>
+            <stop offset="38%" stopColor="#8abfe8" stopOpacity=".075"/>
+            <stop offset="55%" stopColor="#bfeaff" stopOpacity=".015"/>
+            <stop offset="100%" stopColor="#40a6db" stopOpacity=".12"/>
+          </linearGradient>
+          <linearGradient id={`${id}-machinedRim`} x1="10%" y1="0%" x2="95%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff"/>
+            <stop offset="27%" stopColor="#b4d8e9"/>
+            <stop offset="55%" stopColor="#3a7a9e"/>
+            <stop offset="73%" stopColor="#e7f6fb"/>
+            <stop offset="100%" stopColor="#316585"/>
           </linearGradient>
           <radialGradient id={`${id}-visor`} cx="42%" cy="20%" r="94%">
             <stop offset="0%" stopColor="#18314c"/>
@@ -308,6 +322,15 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           <path d="M451 380 C482 393 497 424 487 471 C480 514 462 551 445 580 C467 531 467 471 452 413Z"
             fill="#0a2f67" opacity=".28"/>
           <path d="M314 394 C347 372 426 369 456 396" fill="none" stroke="#ffffff" strokeWidth="9" strokeOpacity=".5" strokeLinecap="round"/>
+          {/* Fine automotive-style metal seams and inset structural panels. */}
+          <path d="M303 413 C310 390 332 382 355 379 M424 378 C457 383 476 395 483 417"
+            fill="none" stroke={paint('machinedRim')} strokeWidth="2.2" strokeOpacity=".75" strokeLinecap="round"/>
+          <path d="M333 531 C345 570 365 603 389 624 C420 593 440 556 449 524"
+            fill="none" stroke="#f4fdff" strokeOpacity=".36" strokeWidth="2.4"/>
+          <path d="M342 535 C353 565 367 586 383 604"
+            fill="none" stroke="#0b5688" strokeOpacity=".26" strokeWidth="1.6"/>
+          <ellipse cx="391" cy="596" rx="5" ry="2" fill="#9bd4e5" opacity=".6"/>
+          <path d="M380 600 H401" fill="none" stroke="#153c61" strokeOpacity=".38" strokeWidth="1.3"/>
           <path d="M300 452 C300 497 318 546 349 589" fill="none" stroke="#d5f6ff" strokeOpacity=".28" strokeWidth="6"/>
           <path d="M467 445 Q475 498 432 581" fill="none" stroke="#295a8a" strokeOpacity=".46" strokeWidth="4"/>
           <path d="M311 465 C324 518 340 550 368 587" fill="none" stroke="#056dc9" strokeOpacity=".23" strokeWidth="3"/>
@@ -323,7 +346,12 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           ))}
           {/* Dark chest's negative space isolates the bright circular core. */}
           <ellipse cx="391" cy="450" rx="49" ry="54" fill="#b7e6ff" opacity=".2" filter={paint('glow')}/>
+          <circle cx="391" cy="450" r="48" fill="none" stroke={paint('machinedRim')} strokeWidth="3.4" opacity=".9"/>
           <circle cx="391" cy="450" r="43" fill={paint('dark')} stroke="#88caef" strokeWidth="6"/>
+          {[0,1,2,3,4,5,6,7].map(index => (
+            <path key={index} d="M391 404 L391 410" transform={`rotate(${index*45} 391 450)`}
+              stroke="#b9edf7" strokeWidth="2" strokeLinecap="round" opacity=".75"/>
+          ))}
           <circle cx="391" cy="450" r="34" fill="#02132b" stroke="#0e9be8" strokeWidth="5"/>
           <motion.circle cx="391" cy="450" r="24" fill="none" stroke="#00baff" strokeWidth={7 + energy*3}
             animate={reducedMotion ? undefined : { opacity: active ? [.78,1,.78] : [.62,.85,.62] }}
@@ -376,6 +404,10 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
               fill={paint('dark')} opacity=".75" transform="translate(0 6)"/>
             <path d="M207 233 C204 139 264 80 361 75 C470 67 539 137 540 225 C542 292 510 338 452 359 C399 377 331 368 278 349 C228 330 210 280 207 233Z"
               fill={paint('helmet')} stroke="#e5f7ff" strokeWidth="5.6"/>
+            <path d="M222 199 C237 118 297 87 362 83 C451 78 503 130 525 204"
+              fill="none" stroke="#ffffff" strokeOpacity=".34" strokeWidth="2.6" strokeLinecap="round"/>
+            <path d="M231 299 C249 340 302 358 371 363 C449 366 499 334 516 296"
+              fill="none" stroke="#133a62" strokeOpacity=".32" strokeWidth="3"/>
             <path d="M238 141 C255 106 293 90 337 89" stroke="white" strokeOpacity=".83" strokeWidth="17" strokeLinecap="round" fill="none"/>
             <path d="M234 171 C236 139 250 117 273 104" stroke="white" strokeOpacity=".35" strokeWidth="8" fill="none" strokeLinecap="round"/>
             <path d="M481 123 C515 164 529 202 521 250" stroke="#3979ad" strokeOpacity=".45" strokeWidth="12" strokeLinecap="round" fill="none"/>
@@ -398,10 +430,19 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
               fill="#04213c" stroke="#91d7f6" strokeWidth="8"/>
             <path d="M252 198 C282 175 333 167 385 170 C439 167 483 181 505 206 C526 233 513 284 484 304 C454 329 312 332 269 308 C234 288 232 225 252 198Z"
               fill={paint('visor')} stroke="#020c1d" strokeWidth="3.4"/>
+            <path d="M245 197 C278 172 329 161 388 163 C450 160 492 175 513 204"
+              fill="none" stroke={paint('machinedRim')} strokeWidth="4" strokeOpacity=".84" strokeLinecap="round"/>
+            <path d="M263 315 C306 340 458 343 492 316"
+              fill="none" stroke="#a1d1e1" strokeWidth="2.5" opacity=".62"/>
             <g clipPath={paint('visorClip')}>
               <path d="M242 206 C280 170 356 167 419 179 C462 188 490 209 506 227 L510 198 Q469 146 348 159 Q271 158 240 191Z"
                 fill={paint('glass')}/>
               <path d="M251 201 C310 173 375 176 444 189" fill="none" stroke="#8defff" strokeOpacity=".13" strokeWidth="17" strokeLinecap="round"/>
+              <path d="M255 198 C305 176 360 176 399 182 C439 188 475 208 500 234 L506 249 C485 216 443 195 387 190 C329 184 285 190 255 211Z"
+                fill={paint('visorSheen')}/>
+              <path d="M263 217 C301 194 355 192 401 197" fill="none"
+                stroke="#eaffff" strokeOpacity=".085" strokeWidth="3" strokeLinecap="round"/>
+              <path d="M470 286 L493 267" stroke="#def7ff" strokeOpacity=".1" strokeWidth="6" strokeLinecap="round"/>
               <path d="M265 308 C328 336 439 333 490 303" fill="none" stroke="#057dc4" strokeWidth="4" opacity=".19"/>
               <ellipse cx="321" cy="184" rx="92" ry="18" fill="#9bdfff" opacity=".09" filter={paint('soft')}/>
               <ellipse cx="488" cy="259" rx="16" ry="57" fill="#9bdfff" opacity=".08" filter={paint('soft')}/>
