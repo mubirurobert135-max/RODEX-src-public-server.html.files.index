@@ -500,6 +500,10 @@ export class LiveConversationService {
       // Reuse the capture stream but permit a direct user tap to repair a
       // disconnected socket; do not silently return with a dead connection.
       if (!this.isConnected()) await this.connectWebSocketOnly();
+      await this.waitForUpstreamReady();
+      if (this.inputAudioCtx?.state === 'suspended') {
+        void this.inputAudioCtx.resume().catch(() => {});
+      }
       this.addTrace('[RODEX ENGINE] EXISTING MICROPHONE STREAM REUSED');
       return;
     }
@@ -547,7 +551,13 @@ export class LiveConversationService {
       // Keep startup resources local until this attempt is still current. React
       // StrictMode runs effect setup/cleanup/setup in development; without this
       // guard, two pending getUserMedia() calls can overwrite the same singleton.
-      pendingInputAudioCtx = new AudioCtx({ sampleRate: 16000 });
+      // Older Safari/WebView versions can reject a requested sample rate.
+      // The capture callback resamples when the actual context rate differs.
+      try {
+        pendingInputAudioCtx = new AudioCtx({ sampleRate: 16000 });
+      } catch {
+        pendingInputAudioCtx = new AudioCtx();
+      }
       this.pendingStartupAudioCtx = pendingInputAudioCtx;
       this.addTrace(`INPUT AUDIO CONTEXT INITIAL STATE: ${pendingInputAudioCtx.state}`);
       if (pendingInputAudioCtx.state === 'suspended') {
@@ -609,7 +619,9 @@ export class LiveConversationService {
 
       // Establish the Live connection only after this startup owns the microphone.
       this.diag.liveConnection = 'RUNNING';
+      this.lastError = null;
       await this.connectWebSocketOnly();
+      await this.waitForUpstreamReady();
       if (!isCurrentStart()) {
         this.addTrace('STALE STARTUP CANCELLED AFTER LIVE CONNECTION');
         return;
@@ -645,6 +657,7 @@ export class LiveConversationService {
       this.addTrace(`MIC ERROR: ${errMsg}`);
       this.setStatus('error');
       this.callbacks.onError?.(errMsg);
+      throw new Error(errMsg);
     }
   }
 
@@ -744,6 +757,27 @@ export class LiveConversationService {
   /**
    * Connect WebSocket with exponential backoff, jitter, and event timeline logging
    */
+  /**
+   * A local WebSocket OPEN is not proof that Gemini accepted the upstream session.
+   * Do not activate listening or greet until the server sends "connected".
+   */
+  private async waitForUpstreamReady(timeoutMs = 12000): Promise<void> {
+    const started = Date.now();
+    while (!this.diag.upstreamConnected) {
+      if (this.explicitShutdown || this.lastError) {
+        throw new Error(this.lastError || 'RODEX Live session was closed before becoming ready.');
+      }
+      if (!this.isConnected()) {
+        throw new Error('RODEX voice socket disconnected before Gemini became ready.');
+      }
+      if (Date.now() - started >= timeoutMs) {
+        throw new Error('Gemini voice handshake timed out. Check the server API key, connection and quota.');
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    }
+    this.addTrace('UPSTREAM VERIFIED: LIVE MICROPHONE STREAM READY');
+  }
+
   private async connectWebSocketOnly(): Promise<void> {
     if (this.isConnected()) return;
     if (this.connectionAttempt) return this.connectionAttempt;
@@ -877,9 +911,10 @@ export class LiveConversationService {
     this.addTrace('PCM AUDIO STREAM STARTED (16kHz 16-bit Little-Endian)');
 
     this.audioProcessor.onaudioprocess = (e) => {
-      if (this.ws?.readyState !== WebSocket.OPEN) return;
+      if (this.ws?.readyState !== WebSocket.OPEN || !this.diag.upstreamConnected) return;
 
-      const inputChannelData = e.inputBuffer.getChannelData(0);
+      const rawAudio = e.inputBuffer.getChannelData(0);
+      const inputChannelData = this.resampleTo16k(rawAudio, e.inputBuffer.sampleRate);
 
       let sum = 0;
       for (let i = 0; i < inputChannelData.length; i++) {
@@ -952,6 +987,17 @@ export class LiveConversationService {
 
     this.micSource.connect(this.audioProcessor);
     this.audioProcessor.connect(this.inputAudioCtx.destination);
+    // A suspended input graph makes the robot appear to listen without sending
+    // a single PCM frame. Surface the exact state in diagnostics and retry.
+    if (this.inputAudioCtx.state !== 'running') {
+      const inputCtx = this.inputAudioCtx;
+      void inputCtx.resume().then(() => {
+        this.addTrace('MICROPHONE AUDIO CONTEXT: ' + inputCtx.state.toUpperCase());
+      }).catch((err: any) => {
+        this.diag.lastErrorMessage = 'Microphone audio blocked: ' + (err?.message || String(err));
+        this.addTrace(this.diag.lastErrorMessage);
+      });
+    }
     // A WebSocket handshake may finish AFTER a user taps the robot.
     // Never reset a real active conversation back to idle on connection.
     this.diag.orbVoiceState = this.isConversationActive ? 'LISTENING' : 'IDLE';
@@ -1832,6 +1878,22 @@ export class LiveConversationService {
       this.addTrace('OUTPUT COMPLETE');
       this.setStatus('listening');
     };
+  }
+
+  /** Convert browser device rates (44.1/48 kHz) to Gemini's 16 kHz PCM. */
+  private resampleTo16k(samples: Float32Array, inputRate: number): Float32Array {
+    if (inputRate === 16000 || !Number.isFinite(inputRate) || inputRate <= 0) return samples;
+    const ratio = inputRate / 16000;
+    const count = Math.max(1, Math.round(samples.length / ratio));
+    const output = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const start = i * ratio;
+      const lower = Math.min(samples.length - 1, Math.floor(start));
+      const upper = Math.min(samples.length - 1, lower + 1);
+      const fraction = start - lower;
+      output[i] = samples[lower] * (1 - fraction) + samples[upper] * fraction;
+    }
+    return output;
   }
 
   private float32ToPcm16(float32: Float32Array): ArrayBuffer {
