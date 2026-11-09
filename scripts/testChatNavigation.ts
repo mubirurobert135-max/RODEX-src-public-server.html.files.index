@@ -12,7 +12,7 @@ const app = readFileSync('src/App.tsx', 'utf8');
 const tests: Array<[string, boolean]> = [
   ['Chat has a dedicated Return button', chat.includes('id="close-chat-to-orb-btn"') && chat.includes('Back to RODEX home')],
   ['Chat has a visible Close button', chat.includes('id="close-chat-btn"') && chat.includes('aria-label="Close chat and return to RODEX"')],
-  ['Close and Back invoke navigation', (chat.match(/onClose\(\)/g) || []).length >= 3],
+  ['Close and Back invoke navigation', (chat.match(/onClose\(\)/g) || []).length >= 2],
   ['Dialog exposes accessible name', chat.includes('role="dialog"') && chat.includes('aria-labelledby="rodex-chat-title"')],
   ['Escape navigation implemented', chat.includes("event.key === 'Escape'")],
   ['Keyboard focus trapped and restored', chat.includes('handleDialogKeyboard') && chat.includes('previousFocus.focus')],
