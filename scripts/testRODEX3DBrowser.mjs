@@ -23,9 +23,11 @@ try {
   async function inspect(label) {
     // Test actual rendered GPU pixels, not merely a DOM canvas placeholder.
     await page.waitForTimeout(850);
-    const stats = await canvas.evaluate((el) => {
+    const stats = await canvas.evaluate((el) => new Promise(resolve => {
+      // Read before browser composition resets the default WebGL drawing buffer.
+      requestAnimationFrame(() => {
       const gl = el.getContext('webgl2');
-      if (!gl) return { webgl: false };
+      if (!gl) { resolve({ webgl: false }); return; }
       const w = el.width, h = el.height;
       const sample = new Uint8Array(4);
       let nonEmpty = 0;
@@ -37,12 +39,13 @@ try {
         }
       }
       const bounds = el.getBoundingClientRect();
-      return {
+      resolve({
         webgl: true, width: w, height: h,
         boxWidth: Math.round(bounds.width), boxHeight: Math.round(bounds.height),
         nonEmpty, error: gl.getError(),
-      };
-    });
+      });
+      });
+    }));
     assert.equal(stats.webgl, true, label + ': WebGL2 context missing');
     assert.ok(stats.width > 200 && stats.height > 120, label + ': invalid canvas size');
     assert.ok(stats.nonEmpty >= 3, label + ': 3D framebuffer is blank: ' + JSON.stringify(stats));
@@ -51,8 +54,8 @@ try {
     return stats;
   }
 
-  await inspect('desktop 1440x900');
   await page.screenshot({ path: '/tmp/rodex-3d-desktop.png' });
+  await inspect('desktop 1440x900');
   await page.setViewportSize({ width: 390, height: 844 });
   await inspect('phone 390x844');
   await page.screenshot({ path: '/tmp/rodex-3d-phone.png' });
