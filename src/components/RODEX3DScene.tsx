@@ -307,10 +307,9 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     const bodyY = Math.sin(c.breath) * .012;
     const yaw = c.yaw, pitch = c.pitch;
     // Sculpted shoulders, chest sockets and articulated metallic neck.
-    draw(raw.sphere, GRAPHITE, [0, -1.82 + bodyY, -.40], [.95, .23, .32], c);
-    // Shoulder pivots are deliberately recessed behind the original bust.
-    draw(raw.sphere, GRAPHITE, [-.67, -1.69 + bodyY, -.35], [.34, .18, .23], c);
-    draw(raw.sphere, GRAPHITE, [.67, -1.69 + bodyY, -.35], [.34, .18, .23], c);
+    // The reference-approved character is a neck-and-head android bust:
+    // retain its silhouette instead of inventing large shoulder discs.
+    draw(raw.sphere, GRAPHITE, [0, -1.82 + bodyY, -.48], [.45, .15, .25], c);
     draw(raw.sphere, GRAPHITE, [0, -1.12 + bodyY, -.14], [.34, .75, .34], c);
     draw(raw.sphere, SILVER, [-.30, -1.24 + bodyY, .12], [.070, .55, .10], c);
     draw(raw.sphere, SILVER, [.30, -1.24 + bodyY, .12], [.070, .55, .10], c);
