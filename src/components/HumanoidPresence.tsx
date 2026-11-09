@@ -37,14 +37,14 @@ export const HumanoidPresence: React.FC<HumanoidPresenceProps> = ({
           alt="" draggable={false} decoding="async"/>
       ) : (
         <RODEX3DScene compact={compact} onUnavailable={onUnavailable}
-          signal={{ state, taskState, audioLevel }}/>
+          onInteract={onInteract} signal={{ state, taskState, audioLevel }}/>
       )}
-      <button type="button" className="rodex-human-interact"
-        onClick={onInteract}
-        aria-label={compact ? 'Speak with RODEX floating companion' : 'Talk to RODEX'}
-        title={compact ? 'Talk to RODEX' : 'Talk to RODEX'}>
-        <span className="sr-only">Talk to RODEX</span>
-      </button>
+      {unavailable && (
+        <button type="button" className="rodex-human-interact"
+          onClick={onInteract} aria-label="Talk to RODEX" title="Talk to RODEX">
+          <span className="sr-only">Talk to RODEX</span>
+        </button>
+      )}
       {compact && onExpand && (
         <button type="button" className="rodex-human-expand"
           onClick={onExpand} aria-label="Expand RODEX companion to full view"
