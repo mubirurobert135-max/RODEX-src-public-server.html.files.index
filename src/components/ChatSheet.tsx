@@ -157,7 +157,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   }, [activeSession.id]);
 
   useEffect(() => {
-    if (isOpen && filterQuery) messagesScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+    if (isOpen && filterQuery) messagesScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [isOpen, filterQuery]);
 
   const handleSubmit = (e: React.FormEvent) => {
