@@ -5,7 +5,7 @@ import { RODEX_APPROVED_PORTRAIT } from './approvedAvatar';
 /**
  * Actual GPU-rendered, depth-tested articulated RODEX bust.
  * The approved portrait is UV-mapped onto a convex tessellated head and neck;
- * skull, eyelids, lips, jaw, and neck mechanism are separate 3D geometry.
+ * skull, lips, jaw and neck mechanism are separate 3D geometry; the eyelids are shader-deformed on the mapped face.
  * This is an authored procedural WebGL rig, not a still image with CSS tilt.
  * Precise phoneme visemes require a dedicated facial scan/rig and timed phonemes.
  */
@@ -149,7 +149,7 @@ const FRAGMENT = [
   'precision highp float;',
   'in vec2 vUV; in vec3 vNormal; out vec4 frag;',
   'uniform sampler2D uPortrait; uniform float uTextured;',
-  'uniform vec3 uColor; uniform vec2 uEyeGaze;',
+  'uniform vec3 uColor; uniform vec2 uEyeGaze; uniform float uBlink;',
   'void main() {',
   '  vec2 uv = vUV;',
   '  // Localized eye-texture displacement, feathered at each socket boundary.',
@@ -161,6 +161,15 @@ const FRAGMENT = [
   '    uv -= uEyeGaze * mask * vec2(.009, .006);',
   '  }',
   '  vec4 base = uTextured > .5 ? texture(uPortrait, uv) : vec4(uColor, 1.0);',
+  '  if(uTextured > .5 && uBlink > .0) {',
+  '    for(int i=0; i<2; i++) {',
+  '      vec2 eye = vec2(i==0 ? .347 : .653, .60);',
+  '      vec2 ellipse = (vUV - eye) / vec2(.068, .031);',
+  '      float lidMask = 1.0 - smoothstep(.52, 1.0, length(ellipse));',
+  '      vec4 eyelidSkin = texture(uPortrait, vec2(vUV.x, eye.y + .060));',
+  '      base.rgb = mix(base.rgb, eyelidSkin.rgb, clamp(uBlink * lidMask, 0.0, 1.0));',
+  '    }',
+  '  }',
   '  if(base.a < .09) discard;',
   '  float lit = .74 + .27 * max(dot(normalize(vNormal), normalize(vec3(-.55, 1.0, 1.9))), 0.0);',
   '  vec3 rgb = base.rgb * mix(lit, .94 + .06 * lit, uTextured);',
@@ -226,6 +235,7 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     textured: gl.getUniformLocation(p, 'uTextured'),
     portrait: gl.getUniformLocation(p, 'uPortrait'),
     gaze: gl.getUniformLocation(p, 'uEyeGaze'),
+    blink: gl.getUniformLocation(p, 'uBlink'),
   };
   const raw = { sphere: upload(gl, sphere()), ring: upload(gl, ring()),
     head: upload(gl, portraitShell(.235, 1)),
@@ -304,6 +314,7 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(positions.portrait, 0);
     gl.uniform2f(positions.gaze, c.gaze, c.pitch * 2.5);
+    gl.uniform1f(positions.blink, c.blink);
     const bodyY = Math.sin(c.breath) * .012;
     const yaw = c.yaw, pitch = c.pitch;
     // Sculpted shoulders, chest sockets and articulated metallic neck.
@@ -328,21 +339,9 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     draw(raw.sphere, SILVER, [.88, .75, -.075], [.07, .17, .055], c, true);
     // UV projected approved identity: the image is now attached to a true 3D shell.
     draw(raw.head, PEARL, [0, 0, .08], [1, 1, 1], c, true, true);
-    // Separate geometries for eyelids and jaw opening. The approved face
-    // remains recognizable when animation is paused or audio is unavailable.
-    const eyeY = .37 + pitch * .035;
-    // Blink geometry is hidden when the eye is open. No permanent white
-    // horizontal stripes across the original humanlike eye texture.
-    if (c.blink > .08) {
-      const lid = c.blink * .088;
-      for (const side of [-1, 1]) {
-        const x = side * .385 + c.gaze * .004;
-        draw(raw.sphere, IVORY, [x, eyeY + .057 - c.blink * .042, .761],
-          [.22, lid, .022], c, true);
-        draw(raw.sphere, IVORY, [x, eyeY - .054 + c.blink * .036, .762],
-          [.22, lid * .64, .020], c, true);
-      }
-    }
+    // Soft eyelid closure is applied inside the face texture shader, without
+    // the long bright bars that separate geometry produced across the eyes.
+    // Jaw geometry still articulates independently in front of the 3D skull.
     const mouth = CLAMP(c.mouth, 0, 1);
     // Jaw bone is articulated behind the approved facial surface.
     draw(raw.sphere, IVORY, [0, -.78 - mouth * .048, -.08],
