@@ -2,6 +2,7 @@ import assert from 'assert';
 import { checkWakeWordMatch, isHeyRodexCall, extractHeyRodexCommand } from '../src/utils/speech';
 import { IntentClassifier } from '../server/orchestrator/intentClassifier';
 import { globalOrchestrator } from '../server/orchestrator/orchestrator';
+import { LiveConversationService } from '../src/services/liveConversationService';
 
 async function runVoiceResponseReliabilityTests() {
   console.log('========================================================');
@@ -65,6 +66,27 @@ async function runVoiceResponseReliabilityTests() {
   assert(orchResult.openUrl?.includes('youtube.com'), 'Orchestrator handles open YouTube correctly');
   assert(orchResult.actionStatus === 'completed', 'Action status completed');
   console.log('  ✅ PASS: Orchestrator action pipeline successful');
+  passed++;
+
+  // 7. Real click-to-talk activation must open the service gate, not only UI.
+  console.log('7. Testing Robot Tap Opens the Actual Voice Conversation Gate...');
+  const tappedVoice = new LiveConversationService();
+  assert.strictEqual(tappedVoice.activateConversationFromGesture(), false,
+    'No conversation may activate before microphone permission and capture');
+  (tappedVoice as any).isMicLive = true;
+  (tappedVoice as any).mediaStream = {
+    getAudioTracks: () => [{ readyState: 'live' }],
+    getTracks: () => [],
+  };
+  assert.strictEqual(tappedVoice.activateConversationFromGesture(), true,
+    'First robot tap must activate listening');
+  assert.strictEqual(tappedVoice.getStatus(), 'listening', 'Engine must report listening');
+  assert.strictEqual((tappedVoice as any).isConversationActive, true,
+    'Audio response gate must be opened');
+  assert.strictEqual(tappedVoice.activateConversationFromGesture(), false,
+    'Repeated taps must not start duplicate greeting sessions');
+  tappedVoice.stop();
+  console.log('  ✅ PASS: Tap opens audio gate, respects permissions and prevents duplicate greetings');
   passed++;
 
   console.log('========================================================');

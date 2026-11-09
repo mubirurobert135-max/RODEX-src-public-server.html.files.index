@@ -1737,6 +1737,10 @@ export default function App() {
         } else if (newStatus === 'error') {
           setState('error');
           setDiagRunning('Error');
+        } else if (newStatus === 'disconnected') {
+          isLiveConversationRef.current = false;
+          setIsLiveConversation(false);
+          setDiagRunning('Voice disconnected');
         }
       },
       onAudioLevel: (inputLevel, outputLevel) => {
@@ -1819,6 +1823,10 @@ export default function App() {
       onError: (err) => {
         console.warn('[RODEX Live Voice Error]', err);
         setDiagLastError(String(err));
+        setLastResponse(`Live voice unavailable: ${String(err)}`);
+        setState('error');
+        isLiveConversationRef.current = false;
+        setIsLiveConversation(false);
       },
     });
 
@@ -1850,51 +1858,66 @@ export default function App() {
 
   // RODEX Character Interaction (Preserves the real-time live voice pipeline)
   const handleOrbClick = async () => {
-    console.info('[RODEX TRACE] ORB CLICKED');
-    console.info('[RODEX TRACE] ORB VOICE START REQUESTED');
-    // Must be called directly from the user's click: browsers may block automatic
-    // AudioContext resume while keeping the wake listener itself initialized.
+    console.info('[RODEX TRACE] ROBOT TAPPED: ACTIVATE LIVE CONVERSATION');
+    // The browser requires its audio contexts to be unlocked from a real user
+    // gesture. Do this before awaiting mic permission or WebSocket setup.
     void globalLiveConversationService.unlockVoiceAudio();
     rodexSynth.prime();
     triggerHaptic('tap');
 
-    // No visible microphone CTA: the character is the voice portal itself.
-    // Browsers still require permission; prompt from this genuine user gesture
-    // rather than claiming to capture audio without the user's consent.
     if (!navigator.mediaDevices?.getUserMedia) {
-      setLastResponse('Voice capture is unavailable in this browser or blocked by its permissions policy.');
+      setLastResponse('Microphone access requires a supported browser and HTTPS or localhost.');
+      setState('error');
       setIsSettingsOpen(true);
       return;
     }
 
-    // 1. Natural Barge-In: If speaking, immediately interrupt and listen
     if (state === 'speaking') {
       globalLiveConversationService.stopAllPlayback();
       rodexSynth.stop();
+      globalLiveConversationService.activateConversationFromGesture();
       playToneChime('bargein');
       setState('listening');
       return;
     }
 
-    // 2. If voice engine is not connected or mic is not active, start it
-    if (!globalLiveConversationService.isConnected() || !globalLiveConversationService.getIsMicLive()) {
-      await globalLiveConversationService.startNormalOrbVoice().catch((err) => {
-        console.warn('[RODEX Voice Start Error]', err);
-      });
-      if (globalLiveConversationService.getIsMicLive()) {
-        setMicPermissionGranted(true);
-        setDiagPermission('granted');
-        globalSpeechManager.setMicPermission(true);
-      } else {
-        setLastResponse('Voice could not start. Check browser microphone permission and connection.');
-        setIsSettingsOpen(true);
+    try {
+      if (!globalLiveConversationService.isConnected() || !globalLiveConversationService.getIsMicLive()) {
+        setState('connecting');
+        await globalLiveConversationService.startNormalOrbVoice();
       }
-      return;
-    }
 
-    // 3. If already running, activate immediate command listening
-    playToneChime('listen');
-    setState('listening');
+      if (!globalLiveConversationService.getIsMicLive()) {
+        setLastResponse('RODEX cannot access the microphone. Allow mic access in your browser and tap again.');
+        setState('error');
+        setIsSettingsOpen(true);
+        return;
+      }
+
+      setMicPermissionGranted(true);
+      setDiagPermission('granted');
+      globalSpeechManager.setMicPermission(true);
+
+      // Critical: updating React state to "listening" never opened the
+      // LiveConversationService wake gate. The service must open it itself
+      // before the first streamed response arrives.
+      const newlyActivated = globalLiveConversationService.activateConversationFromGesture();
+      isLiveConversationRef.current = true;
+      setIsLiveConversation(true);
+      setState('listening');
+
+      if (newlyActivated && !isMuted) {
+        // Give an immediate audible acknowledgement, then capture the command.
+        void globalLiveConversationService.playCatchPhraseGreeting();
+      } else {
+        playToneChime('listen');
+      }
+    } catch (err: any) {
+      const detail = err?.message || String(err);
+      console.warn('[RODEX ROBOT VOICE START FAILED]', detail);
+      setLastResponse(`Voice connection failed: ${detail}`);
+      setState('error');
+    }
   };
 
   // Start Voice Recognition (Fallback or Secondary Trigger)
@@ -2507,7 +2530,7 @@ export default function App() {
         />
 
         {/* Developer diagnostics are opt-in and never part of the natural character UI. */}
-        {typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname) && new URLSearchParams(window.location.search).has('diagnostics') && (
+        {typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('diagnostics') && (
           <VoiceDiagnosticPanel
           assistantState={state}
           lastTranscript={transcript}
