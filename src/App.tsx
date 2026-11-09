@@ -237,7 +237,10 @@ export default function App() {
   const lastHapticRef = useRef(0);
   // Throttle UI renders, not the audio capture/playback pipeline.
   const renderLiveAudio = useCallback((inputLevel: number, outputLevel: number) => {
-    const sample = outputLevel > 0 ? outputLevel : inputLevel;
+    // A user's microphone must never animate RODEX's own mouth.
+    // In SPEAKING the Gemini output analyser is authoritative; in LISTENING,
+    // input amplitude is free to drive attention without opening the jaw.
+    const sample = stateRef.current === 'speaking' ? outputLevel : inputLevel;
     const level = Math.max(0, Math.min(1, Number.isFinite(sample) ? sample : 0));
     const now = performance.now();
     if (now - lastAudioPaintRef.current >= 45 || level === 0) {
