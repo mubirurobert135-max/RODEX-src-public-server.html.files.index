@@ -438,8 +438,7 @@ export function RODEX3DScene({ signal, compact = false, onUnavailable }: {
     };
   }, [compact, onUnavailable]);
 
-  return <canvas ref={canvasRef} className="rodex3d-canvas"
-    aria-hidden="true" onPointerMove={(event) => {
+  return <div className="rodex3d-scene" onPointerMove={(event: React.PointerEvent<HTMLDivElement>) => {
       if (event.pointerType === 'touch') return;
       const bounds = event.currentTarget.getBoundingClientRect();
       pointerRef.current = {
@@ -449,5 +448,7 @@ export function RODEX3DScene({ signal, compact = false, onUnavailable }: {
       };
     }} onPointerLeave={() => {
       pointerRef.current = { x: 0, y: 0, hovering: false };
-    }}/>;
+    }}>
+      <canvas ref={canvasRef} className="rodex3d-canvas" aria-hidden="true"/>
+    </div>;
 }
