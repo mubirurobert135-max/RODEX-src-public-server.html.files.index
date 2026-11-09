@@ -81,6 +81,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   const [inputText, setInputText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedTranscript, setCopiedTranscript] = useState(false);
+  const [clipboardError, setClipboardError] = useState('');
   const [showSessionDrawer, setShowSessionDrawer] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
   const [expandedTraces, setExpandedTraces] = useState<Record<string, boolean>>({});
@@ -168,19 +169,28 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
     setInputText('');
   };
 
-  const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (value: string): Promise<boolean> => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(value);
+      setClipboardError('');
+      return true;
+    } catch {
+      setClipboardError('Copy is unavailable in this browser. Check HTTPS and clipboard permission.');
+      return false;
+    }
+  };
+
+  const handleCopy = async (id: string, text: string) => {
+    if (!(await copyToClipboard(text))) return;
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleCopyTranscript = () => {
+  const handleCopyTranscript = async () => {
     triggerHaptic('tap');
-    const transcript = formatSessionTranscript({
-      ...activeSession,
-      messages,
-    });
-    navigator.clipboard.writeText(transcript);
+    const transcript = formatSessionTranscript({ ...activeSession, messages });
+    if (!(await copyToClipboard(transcript))) return;
     setCopiedTranscript(true);
     setTimeout(() => setCopiedTranscript(false), 2500);
   };
@@ -303,6 +313,12 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
             </div>
           </header>
 
+          {clipboardError && (
+            <div role="status" className="shrink-0 border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-xs text-amber-100">
+              {clipboardError}
+              <button type="button" onClick={() => setClipboardError('')} className="ml-3 underline underline-offset-2">Dismiss</button>
+            </div>
+          )}
           {confirmClear && (
             <div role="alertdialog" aria-label="Confirm clearing chat" className="rodex-chat-confirm flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-rose-900/50 bg-rose-950/40 px-4 py-2">
               <span className="text-xs text-rose-100">Clear all messages in this conversation?</span>
@@ -442,11 +458,11 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                 <div className="w-12 h-12 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-center text-cyan-400">
                   <Bot className="w-6 h-6" />
                 </div>
-                <h3 className="text-sm font-semibold text-white">Live Session Connected</h3>
+                <h3 className="text-sm font-semibold text-white">{isLiveConversation ? 'Live conversation' : 'Start a conversation'}</h3>
                 <p className="text-xs max-w-xs text-neutral-400">
                   {filterQuery
                     ? `No messages matched "${filterQuery}".`
-                    : 'Speak freely with RODEX. Every exchange, verification source, and query is recorded in this live session.'}
+                    : 'Type a message below or start a voice call. Your conversation will appear here.'}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2 mt-4 max-w-xs">
                   {['Hey RODEX', 'What is on my schedule today?', 'Play music on my PC', 'Who are you?'].map(
