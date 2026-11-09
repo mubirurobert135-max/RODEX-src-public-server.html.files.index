@@ -158,6 +158,7 @@ export class LiveConversationService {
   private wakeRecognizer: any = null;
   private diagnosticTextTestActive = false;
   private diagnosticTextTestTimer: ReturnType<typeof setTimeout> | null = null;
+  private captureWatchdog: ReturnType<typeof setTimeout> | null = null;
   private sessionResumptionHandle: string | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
@@ -492,6 +493,41 @@ export class LiveConversationService {
     this.diag.voiceEngine = 'COMMAND_LISTENING';
     this.addTrace(newlyActive ? 'ROBOT TAP: CONVERSATION GATE OPEN' : 'ROBOT TAP: CONVERSATION ALREADY ACTIVE');
     this.setStatus('listening');
+    // A mic permission grant and an open socket are not enough: prove PCM
+    // frames really leave this browser after the user activates the robot.
+    if (this.captureWatchdog) clearTimeout(this.captureWatchdog);
+    const sentAtActivation = this.audioChunksSent;
+    if (this.inputAudioCtx && typeof window !== 'undefined') {
+      this.captureWatchdog = setTimeout(() => {
+        this.captureWatchdog = null;
+        if (!this.isConversationActive || !this.diag.upstreamConnected ||
+            this.audioChunksSent !== sentAtActivation) return;
+        const contextState = this.inputAudioCtx?.state || 'unavailable';
+        const micState = this.mediaStream?.getAudioTracks()[0]?.readyState || 'unavailable';
+        const detail = `Microphone capture stalled (audio context: ${contextState}, track: ${micState}). Tap RODEX again and check microphone access.`;
+        this.diag.voiceEngine = 'MIC_CAPTURE_STALLED';
+        this.diag.lastErrorMessage = detail;
+        this.addTrace(detail);
+        this.callbacks.onError?.(detail);
+      }, 3500);
+    }
+    return newlyActive;
+  }
+
+  /**
+   * Use for every click-to-talk entry point. A visible listening pose must
+   * never be mistaken for an active audio/response gate.
+   * Call synchronously from a user gesture (before the caller's first await).
+   */
+  public async startInteractiveConversation(): Promise<boolean> {
+    await this.startNormalOrbVoice();
+    if (!this.diag.upstreamConnected || !this.isConnected() || !this.getIsMicLive()) {
+      throw new Error('RODEX microphone or Gemini Live handshake is not ready.');
+    }
+    const newlyActive = this.activateConversationFromGesture();
+    if (!this.isConversationActive) {
+      throw new Error('RODEX could not activate microphone listening.');
+    }
     return newlyActive;
   }
 
@@ -726,10 +762,14 @@ export class LiveConversationService {
         },
       });
 
-      // Safety fallback timeout in case TTS takes longer than 2.5s
+      // Do not cut off a genuine spoken greeting after 2.5s on slower devices.
+      // Surface a browser TTS stall instead of silently pretending it spoke.
       setTimeout(() => {
-        if (!isDone) finishGreeting();
-      }, 2500);
+        if (!isDone) {
+          this.addTrace('LOCAL GREETING TIMED OUT; CONTINUING LIVE LISTENING');
+          finishGreeting();
+        }
+      }, 6500);
     });
   }
 
@@ -1047,6 +1087,7 @@ export class LiveConversationService {
         break;
 
       case 'connected':
+        this.lastError = null;
         this.diag.liveConnection = 'PASS';
         this.diag.upstreamConnected = true;
         this.diag.lastErrorMessage = null;
@@ -1706,6 +1747,7 @@ export class LiveConversationService {
    * Continuous animation loop to measure and report input/output audio volume
    */
   private startAudioLevelLoop() {
+    if (this.levelAnimFrame !== null) cancelAnimationFrame(this.levelAnimFrame);
     const updateLevels = () => {
       if (!this.outputAnalyser) return;
 
@@ -1952,6 +1994,10 @@ export class LiveConversationService {
       this.reconnectTimer = null;
     }
     this.stopWakeRecognizer();
+    if (this.captureWatchdog) {
+      clearTimeout(this.captureWatchdog);
+      this.captureWatchdog = null;
+    }
     this.diagnosticTextTestActive = false;
     if (this.diagnosticTextTestTimer) {
       clearTimeout(this.diagnosticTextTestTimer);
