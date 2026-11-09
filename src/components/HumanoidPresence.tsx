@@ -30,11 +30,38 @@ export const HumanoidPresence: React.FC<HumanoidPresenceProps> = ({
   const hasError = state === 'error' || state === 'warning' || taskState === 'FAILED';
   const level = Math.min(1, Math.max(0, Number.isFinite(audioLevel) ? audioLevel : 0));
   const motionStrength = speaking ? Math.min(1, level * 1.6) : 0;
+
+  // Respond subtly to the person's position without tracking them, activating
+  // the microphone, or re-rendering RODEX on every pointer movement.
+  const followAttention = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
+    const node = event.currentTarget;
+    const bounds = node.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const x = Math.max(-1, Math.min(1, (2 * (event.clientX - bounds.left) / bounds.width) - 1));
+    const y = Math.max(-1, Math.min(1, (2 * (event.clientY - bounds.top) / bounds.height) - 1));
+    node.style.setProperty('--rodex-look-x', `${(x * 2.5).toFixed(2)}px`);
+    node.style.setProperty('--rodex-look-y', `${(y * 1.7).toFixed(2)}px`);
+    node.style.setProperty('--rodex-look-tilt', `${(x * 1.2).toFixed(2)}deg`);
+  };
+
+  const releaseAttention = (event: React.PointerEvent<HTMLDivElement>) => {
+    const node = event.currentTarget;
+    node.style.setProperty('--rodex-look-x', '0px');
+    node.style.setProperty('--rodex-look-y', '0px');
+    node.style.setProperty('--rodex-look-tilt', '0deg');
+  };
+
   return (
     <div
       className={`rodex-human-presence ${compact ? 'rodex-human-presence--compact' : ''}`}
       data-expression={hasError ? 'concerned' : speaking ? 'speaking' : attentive ? 'attentive' : engaged ? 'engaged' : 'relaxed'}
-      style={{ '--rodex-speech-level': String(motionStrength) } as React.CSSProperties}
+      onPointerMove={followAttention}
+      onPointerLeave={releaseAttention}
+      style={{
+        '--rodex-speech-level': String(motionStrength),
+        '--rodex-speech-bob': `${(motionStrength * 2).toFixed(2)}px`,
+      } as React.CSSProperties}
     >
       <button
         type="button"

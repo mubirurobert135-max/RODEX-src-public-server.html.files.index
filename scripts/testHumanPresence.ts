@@ -70,6 +70,19 @@ const checks: [string, boolean][] = [
   ['Floating companion appears only for active tool surfaces',
     app.includes('<RODEXFloatingCompanion') && app.includes("activeMode !== 'home'") &&
     app.includes('!isChatOpen')],
+  ['Tools opened directly from Home retain floating RODEX',
+    app.includes('active={!isChatOpen && (') &&
+    app.includes("activeMode !== 'home'") &&
+    app.includes('isMoreMenuOpen') &&
+    !app.includes('active={isWorkspaceOpen && !isChatOpen')],
+  ['Natural movement responds to pointer without changing the approved face',
+    humanoid.includes('onPointerMove={followAttention}') &&
+    humanoid.includes('onPointerLeave={releaseAttention}') &&
+    humanoid.includes("event.pointerType === 'touch'") &&
+    humanoidCss.includes('--rodex-look-tilt') &&
+    humanoidCss.includes('var(--rodex-speech-bob)')],
+  ['User reduced-motion preference also disables head tracking',
+    humanoidCss.includes('transform: none !important;')],
   ['Mobile workspace and portrait are responsive',
     workspaceCss.includes('@media(max-width:620px)') &&
     humanoidCss.includes('@media (max-width: 900px)')],

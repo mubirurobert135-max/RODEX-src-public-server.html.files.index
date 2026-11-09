@@ -2342,8 +2342,10 @@ export default function App() {
         {/* Keep the approved humanoid present as a compact, controllable
             companion while existing tool/modal workspaces cover the page.
             Chat remains unobstructed and has its own close navigation. */}
+        {/* Tools can open directly from Home without opening Workspace first.
+            Keep the character available on tools, but never over Chat. */}
         <RODEXFloatingCompanion
-          active={isWorkspaceOpen && !isChatOpen && (
+          active={!isChatOpen && (
             activeMode !== 'home' || isMediaStudioOpen || isGmailOpen ||
             isScheduleOpen || isMemoryOpen || isDoctorOpen || isCapabilityOpen ||
             isWebVerifyOpen || isSpotifyOpen || isMediaHubOpen || isSecurityOpen ||

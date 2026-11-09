@@ -2,6 +2,12 @@
    Visual movement follows real state and audio amplitude; no fake waveform. */
 .rodex-human-presence {
   --rodex-speech-level: 0;
+  --rodex-speech-bob: 0px;
+  --rodex-look-x: 0px;
+  --rodex-look-y: 0px;
+  --rodex-look-tilt: 0deg;
+  --rodex-attention-y: 0px;
+  --rodex-attention-scale: 1;
   position: relative;
   display: flex;
   height: 100%;
@@ -43,18 +49,35 @@
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
-  transform-origin: 50% 70%;
+  transform-origin: 50% 44%;
 }
 .rodex-human-portrait {
   animation: rodex-natural-breathing 7s ease-in-out infinite;
   filter: drop-shadow(0 18px 28px rgba(0,0,0,.45));
-  transition: transform .35s ease, filter .35s ease;
+  transform:
+    translate3d(
+      var(--rodex-look-x),
+      calc(var(--rodex-look-y) + var(--rodex-attention-y) - var(--rodex-speech-bob)),
+      0
+    )
+    rotate(var(--rodex-look-tilt))
+    scale(var(--rodex-attention-scale));
+  transition: transform .38s cubic-bezier(.22,.74,.3,1), filter .35s ease;
 }
-.rodex-human-presence[data-expression="attentive"] .rodex-human-portrait {
-  transform: translateY(-3px) scale(1.008);
+.rodex-human-presence[data-expression="attentive"] {
+  --rodex-attention-y: -3px;
+  --rodex-attention-scale: 1.008;
 }
-.rodex-human-presence[data-expression="concerned"] .rodex-human-portrait {
-  transform: translateY(2px);
+.rodex-human-presence[data-expression="speaking"] {
+  --rodex-attention-y: -1px;
+  --rodex-attention-scale: 1.012;
+}
+.rodex-human-presence[data-expression="engaged"] {
+  --rodex-attention-y: -2px;
+  --rodex-attention-scale: 1.006;
+}
+.rodex-human-presence[data-expression="concerned"] {
+  --rodex-attention-y: 2px;
 }
 .rodex-human-mouth-motion {
   position: absolute;
@@ -99,5 +122,9 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rodex-human-portrait, .rodex-human-mouth-motion { animation: none !important; transition: none !important; }
+  .rodex-human-portrait, .rodex-human-mouth-motion {
+    animation: none !important;
+    transition: none !important;
+  }
+  .rodex-human-portrait { transform: none !important; }
 }
