@@ -1532,7 +1532,7 @@ export class LiveConversationService {
       } catch (err: any) {
         this.addTrace(`OUTPUT AUDIO UNLOCK FAILED: ${err?.message || err}`);
       }
-      if (ctx.state !== 'running') {
+      if ((ctx.state as AudioContextState) !== 'running') {
         this.diag.playbackStarted = 'FAIL';
         this.diag.lastErrorMessage = 'Audio playback is blocked. Tap RODEX to enable sound.';
         this.callbacks.onError?.(this.diag.lastErrorMessage);
