@@ -7,6 +7,7 @@ const workspace = readFileSync('src/components/RODEXWorkspace.tsx', 'utf8');
 const workspaceCss = readFileSync('src/components/RODEXWorkspace.css', 'utf8');
 const humanoid = readFileSync('src/components/HumanoidPresence.tsx', 'utf8');
 const humanoidCss = readFileSync('src/components/HumanoidPresence.css', 'utf8');
+const scene3D = readFileSync('src/components/RODEX3DScene.tsx', 'utf8');
 const immersiveCss = readFileSync('src/components/RodexImmersive.css', 'utf8');
 const live = readFileSync('server/services/liveGeminiService.ts', 'utf8');
 const speech = readFileSync('src/utils/speech.ts', 'utf8');
@@ -75,14 +76,45 @@ const checks: [string, boolean][] = [
     app.includes("activeMode !== 'home'") &&
     app.includes('isMoreMenuOpen') &&
     !app.includes('active={isWorkspaceOpen && !isChatOpen')],
-  ['Natural movement responds to pointer without changing the approved face',
-    humanoid.includes('onPointerMove={followAttention}') &&
-    humanoid.includes('onPointerLeave={releaseAttention}') &&
-    humanoid.includes("event.pointerType === 'touch'") &&
-    humanoidCss.includes('--rodex-look-tilt') &&
-    humanoidCss.includes('var(--rodex-speech-bob)')],
-  ['User reduced-motion preference also disables head tracking',
+  ['RODEX now renders a genuine vertex-based WebGL2 3D bust',
+    humanoid.includes('<RODEX3DScene') &&
+    scene3D.includes("getContext('webgl2'") &&
+    scene3D.includes('gl.drawElements(') &&
+    scene3D.includes('gl.DEPTH_TEST') &&
+    scene3D.includes('gl_Position') &&
+    scene3D.includes('portraitShell(')],
+  ['Approved RODEX identity is mapped to the real curved 3D face',
+    scene3D.includes('RODEX_APPROVED_PORTRAIT') &&
+    scene3D.includes('texImage2D(') &&
+    scene3D.includes('uTextured') &&
+    scene3D.includes('raw.head')],
+  ['Articulated lips, eyelids and head gaze respond to real events',
+    scene3D.includes('c.blink') &&
+    scene3D.includes('c.mouth') &&
+    scene3D.includes('c.yaw') &&
+    scene3D.includes("state === 'speaking'") &&
+    scene3D.includes('signalRef.current.audioLevel') &&
+    scene3D.includes('onPointerMove=')],
+  ['3D stage and camera fit wide, tall and compact layouts',
+    scene3D.includes('ResizeObserver(') &&
+    scene3D.includes('Math.max(vertical, horizontal)') &&
+    scene3D.includes('window.devicePixelRatio') &&
+    immersiveCss.includes('2026 adaptive 3D presence')],
+  ['3D failure gracefully restores the original approved face',
+    humanoid.includes('portrait-fallback') &&
+    humanoid.includes('onUnavailable') &&
+    humanoid.includes('rodex-human-portrait')],
+  ['Reduced motion, hidden tabs and GPU resources are respected',
+    scene3D.includes("prefers-reduced-motion: reduce") &&
+    scene3D.includes('document.hidden') &&
+    scene3D.includes('cancelAnimationFrame(raf)') &&
+    scene3D.includes('engine.dispose()') &&
     humanoidCss.includes('transform: none !important;')],
+  ['Browser speech animation follows real words rather than a fake sine',
+    speech.includes('onBoundary?:') &&
+    speech.includes('current.onboundary =') &&
+    app.includes('onBoundary: (_charIndex, charLength) =>') &&
+    !app.includes('Math.abs(Math.sin(elapsed * 6))')],
   ['Mobile workspace and portrait are responsive',
     workspaceCss.includes('@media(max-width:620px)') &&
     humanoidCss.includes('@media (max-width: 900px)')],
