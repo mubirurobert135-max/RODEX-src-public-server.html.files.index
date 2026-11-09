@@ -455,6 +455,32 @@ export class LiveConversationService {
     return this.isMicLive;
   }
 
+  /**
+   * A physical tap on RODEX is itself an intentional wake gesture. Previously the
+   * UI only changed to "listening", while this gate stayed false and discarded
+   * every model audio packet. Keep activation in the voice engine, not the UI.
+   * Returns true only for a newly activated conversation.
+   */
+  public activateConversationFromGesture(): boolean {
+    if (!this.isMicLive || !this.mediaStream?.getAudioTracks().some(track => track.readyState === 'live')) {
+      this.addTrace('ROBOT TAP: MICROPHONE NOT READY');
+      return false;
+    }
+    const newlyActive = !this.isConversationActive;
+    this.isConversationActive = true;
+    this.diag.isConversationActive = true;
+    this.stopWakeRecognizer();
+    if (this.followUpSilenceTimer) {
+      clearTimeout(this.followUpSilenceTimer);
+      this.followUpSilenceTimer = null;
+    }
+    this.diag.orbVoiceState = 'LISTENING';
+    this.diag.voiceEngine = 'COMMAND_LISTENING';
+    this.addTrace(newlyActive ? 'ROBOT TAP: CONVERSATION GATE OPEN' : 'ROBOT TAP: CONVERSATION ALREADY ACTIVE');
+    this.setStatus('listening');
+    return newlyActive;
+  }
+
   public async start(): Promise<void> {
     await this.startNormalOrbVoice();
   }
@@ -468,9 +494,11 @@ export class LiveConversationService {
    * Starts exclusive microphone stream and connects upstream Live session.
    */
   public async startNormalOrbVoice(): Promise<void> {
-    if (this.engineStarted || (this.isConnected() && this.isMicLive)) {
-      console.info('[RODEX ENGINE] SINGLETON_ACTIVE / DUPLICATE_START_BLOCKED');
-      this.addTrace('[RODEX ENGINE] DUPLICATE_START_BLOCKED');
+    if (this.engineStarted && this.isMicLive) {
+      // Reuse the capture stream but permit a direct user tap to repair a
+      // disconnected socket; do not silently return with a dead connection.
+      if (!this.isConnected()) await this.connectWebSocketOnly();
+      this.addTrace('[RODEX ENGINE] EXISTING MICROPHONE STREAM REUSED');
       return;
     }
     if (this.initializationInProgress) {
@@ -922,9 +950,11 @@ export class LiveConversationService {
 
     this.micSource.connect(this.audioProcessor);
     this.audioProcessor.connect(this.inputAudioCtx.destination);
-    this.diag.orbVoiceState = 'IDLE';
-    this.diag.voiceEngine = 'WAKE_LISTENER_ACTIVE';
-    this.setStatus('idle');
+    // A WebSocket handshake may finish AFTER a user taps the robot.
+    // Never reset a real active conversation back to idle on connection.
+    this.diag.orbVoiceState = this.isConversationActive ? 'LISTENING' : 'IDLE';
+    this.diag.voiceEngine = this.isConversationActive ? 'COMMAND_LISTENING' : 'WAKE_LISTENER_ACTIVE';
+    this.setStatus(this.isConversationActive ? 'listening' : 'idle');
   }
 
   /**
@@ -967,6 +997,12 @@ export class LiveConversationService {
         this.diag.upstreamConnected = false;
         this.diag.voiceEngine = 'LIVE_UPSTREAM_ERROR';
         this.lastError = errorMsg;
+        // Misconfiguration/quotas require an operator action, not infinite
+        // automatic reconnect loops that keep reopening a doomed WebSocket.
+        if (/api key.*(?:unconfigured|invalid)|quota|billing|permission denied|unauthenticated/i.test(errorMsg)) {
+          this.explicitShutdown = true;
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.close();
+        }
         this.addTrace(`LIVE VOICE ERROR: ${errorMsg}`);
         this.diag.lastErrorMessage = errorMsg;
         this.callbacks.onError?.(errorMsg);
@@ -1491,7 +1527,17 @@ export class LiveConversationService {
     }
 
     if (ctx.state !== 'running') {
-      await ctx.resume().catch(() => {});
+      try {
+        await ctx.resume();
+      } catch (err: any) {
+        this.addTrace(`OUTPUT AUDIO UNLOCK FAILED: ${err?.message || err}`);
+      }
+      if (ctx.state !== 'running') {
+        this.diag.playbackStarted = 'FAIL';
+        this.diag.lastErrorMessage = 'Audio playback is blocked. Tap RODEX to enable sound.';
+        this.callbacks.onError?.(this.diag.lastErrorMessage);
+        return;
+      }
     }
 
     const source = ctx.createBufferSource();
@@ -1520,7 +1566,8 @@ export class LiveConversationService {
       if (this.activeSources.length === 0) {
         this.isSpeaking = false;
         this.diag.playbackEnded = 'PASS';
-        this.diag.audibleOutputVerified = 'PASS';
+        // A completed Web Audio source is not proof the physical speaker was
+        // audible; leave verification to the user-facing speaker test.
         if (this.status === 'speaking') {
           this.diag.orbVoiceState = 'LISTENING';
           this.setStatus('listening');
