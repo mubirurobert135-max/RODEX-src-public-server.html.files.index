@@ -104,3 +104,203 @@
 @media (max-width: 760px) {
   .rodex-chat-composer { max-height: min(118px, 23dvh); resize: none; }
 }
+
+
+/* RODEX CHAT 2026 — dedicated conversation workspace.
+   A document-body portal prevents the host app's overflow/stacking contexts
+   from cropping these essential navigation controls. */
+.rodex-chat-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background:
+    radial-gradient(ellipse 75% 33% at 52% -6%, rgba(30, 128, 190, .13), transparent 82%),
+    linear-gradient(165deg, #061525 0%, #060e1a 54%, #040a15 100%);
+  color: #f1f9ff;
+  font-family: 'Manrope', system-ui, sans-serif;
+}
+.rodex-chat-header {
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+  border-color: rgba(107, 197, 239, .18);
+  background: rgba(7, 18, 33, .96);
+  box-shadow: 0 14px 38px rgba(0, 3, 12, .37);
+}
+.rodex-chat-primary {
+  min-height: 70px;
+  gap: clamp(8px, 1.4vw, 15px);
+  padding-top: max(9px, env(safe-area-inset-top));
+  padding-bottom: 9px;
+}
+.rodex-chat-back,
+.rodex-chat-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 46px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: .01em;
+  color: #eefaff;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.rodex-chat-back {
+  min-width: 89px;
+  padding-inline: 13px;
+  border: 1px solid rgba(104, 207, 245, .35);
+  background: linear-gradient(150deg, rgba(36, 108, 147, .34), rgba(9, 40, 70, .66));
+}
+.rodex-chat-close {
+  width: auto;
+  min-width: 98px;
+  height: 46px;
+  padding-inline: 14px;
+  border: 1px solid rgba(173, 214, 234, .35);
+  background: linear-gradient(155deg, rgba(67, 89, 116, .34), rgba(25, 38, 59, .84));
+  box-shadow: inset 0 1px rgba(255, 255, 255, .09), 0 5px 15px rgba(0, 0, 0, .2);
+}
+.rodex-chat-back:hover,
+.rodex-chat-close:hover {
+  background: rgba(37, 111, 154, .46);
+  border-color: #72d9ff;
+}
+.rodex-chat-close-label {
+  display: inline;
+  font: inherit;
+  white-space: nowrap;
+}
+.rodex-chat-actions {
+  padding-block: 8px 10px;
+  padding-inline: clamp(12px, 1.6vw, 25px);
+  gap: 8px;
+  scrollbar-width: none;
+  background: rgba(7, 18, 33, .7);
+}
+.rodex-chat-actions::-webkit-scrollbar { display: none; }
+.rodex-chat-action {
+  min-height: 41px;
+  border-radius: 12px;
+  font-weight: 650;
+}
+.rodex-chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  user-select: text;
+  -webkit-user-select: text;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  background:
+    radial-gradient(ellipse 50% 37% at 50% 100%, rgba(6, 81, 130, .11), transparent 90%);
+}
+.rodex-chat-bubble {
+  border: 1px solid rgba(157, 213, 241, .065);
+  box-shadow: 0 5px 17px rgba(0, 0, 0, .12);
+  text-wrap: pretty;
+}
+.rodex-chat-footer {
+  flex-shrink: 0;
+  padding-bottom: max(13px, env(safe-area-inset-bottom));
+  background: rgba(8, 20, 36, .97);
+  border-top: 1px solid rgba(71, 171, 225, .2);
+  box-shadow: 0 -12px 32px rgba(0, 5, 17, .4);
+}
+.rodex-chat-composer {
+  min-height: 48px;
+  border-radius: 14px;
+  background: rgba(2, 10, 23, .82);
+  border: 1px solid rgba(125, 177, 213, .36);
+}
+.rodex-chat-composer:focus-visible {
+  border-color: #63d6f8;
+  box-shadow: 0 0 0 2px rgba(76, 195, 231, .11);
+}
+.rodex-chat-footer #chat-send-button {
+  min-width: 48px;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+}
+.rodex-chat-jump-wrap {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  bottom: calc(83px + env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.rodex-chat-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(133, 224, 252, .45);
+  background: rgba(12, 42, 67, .96);
+  box-shadow: 0 8px 28px rgba(0, 4, 13, .52);
+  color: #e7faff;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+.rodex-chat-jump:hover { border-color: #a7edff; background: #164b6c; }
+.rodex-chat-layer :is(button, input, textarea):focus-visible {
+  outline: 2px solid #91eaff;
+  outline-offset: 2px;
+}
+@media (max-width: 420px) {
+  .rodex-chat-primary {
+    min-height: 62px;
+    gap: 7px;
+    padding-inline: 10px;
+  }
+  .rodex-chat-back {
+    min-width: 74px;
+    padding-inline: 9px;
+    gap: 5px;
+    font-size: 12px;
+  }
+  .rodex-chat-close {
+    min-width: 81px;
+    width: auto;
+    height: 44px;
+    padding-inline: 9px;
+    gap: 5px;
+    font-size: 12px;
+  }
+  .rodex-chat-primary h2 {
+    font-size: 12px;
+    letter-spacing: -.02em;
+  }
+  .rodex-chat-actions { padding-inline: 10px; gap: 7px; }
+  .rodex-chat-messages { scrollbar-gutter: auto; }
+  .rodex-chat-footer { padding-inline: 10px; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .rodex-chat-primary { min-height: 48px; padding-block: 3px; }
+  .rodex-chat-back, .rodex-chat-close { min-height: 40px; height: 40px; }
+  .rodex-chat-actions { padding-block: 4px; }
+  .rodex-chat-jump-wrap { bottom: calc(70px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-chat-layer,
+  .rodex-chat-layer * { scroll-behavior: auto !important; transition: none !important; }
+}
