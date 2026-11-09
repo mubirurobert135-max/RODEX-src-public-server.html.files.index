@@ -705,3 +705,62 @@
 @media(prefers-reduced-motion:reduce) {
   .rodex-header-workspace-btn,.rodex-command-btn {transition:none;}
 }
+
+
+/* 2026 adaptive 3D presence: the model grows with the usable viewport while
+   the GPU camera separately handles wide, tall, rotated and compact ratios. */
+.rodex-monochrome .rodex-scene {
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: stretch;
+  justify-content: center;
+  overflow: hidden;
+}
+.rodex-monochrome .rodex-character-stage {
+  width: min(100%, 1180px);
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  overflow: hidden;
+  filter: none;
+}
+.rodex-monochrome .rodex-human-intro {
+  bottom: clamp(10px, 2vh, 25px);
+  left: clamp(15px, 3vw, 44px);
+  font-size: clamp(10px, .9vw, 12px);
+  transform: none;
+  text-shadow: 0 1px 8px #000;
+}
+@media (max-width: 800px) {
+  .rodex-monochrome .rodex-character-stage {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    top: auto;
+    left: auto;
+    margin: 0 auto;
+  }
+  .rodex-monochrome .rodex-human-intro {
+    left: 50%;
+    right: auto;
+    bottom: 3px;
+    transform: translateX(-50%);
+    font-size: 9px;
+  }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .rodex-monochrome .rodex-home-header { padding-block: 5px; }
+  .rodex-monochrome .rodex-quiet-dock { padding-block: 5px; }
+  .rodex-monochrome .rodex-command-bar { height: 48px; }
+  .rodex-monochrome .rodex-human-intro { display: none; }
+}
+@media (max-width: 420px) {
+  .rodex-monochrome .rodex-home-header { padding-block: 9px; }
+  .rodex-monochrome .rodex-quiet-dock { padding-top: 7px; }
+}

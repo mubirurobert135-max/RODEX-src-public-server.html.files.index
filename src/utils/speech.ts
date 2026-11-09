@@ -91,6 +91,8 @@ export class SpeechSynthesizer {
       volume?: number;
       onStart?: () => void;
       onEnd?: () => void;
+      // Real word boundary events when supplied by the browser's speech engine.
+      onBoundary?: (charIndex: number, charLength: number) => void;
       onError?: (err: any) => void;
     } = {}
   ) {
@@ -226,6 +228,12 @@ export class SpeechSynthesizer {
           hasTriggeredStart = true;
           options.onStart?.();
         }
+      };
+
+      current.onboundary = (event) => {
+        if (!isCurrentPlayback()) return;
+        if (event.name && event.name !== 'word') return;
+        options.onBoundary?.(event.charIndex || 0, event.charLength || 0);
       };
 
       current.onend = () => {

@@ -1,0 +1,54 @@
+name: RODEX 3D browser rendering
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rodex-3d-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: Real 3D WebGL and viewport smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install app dependencies
+        run: bun install --frozen-lockfile
+      - name: Compile server and client
+        run: bun run build
+      - name: Install isolated pinned Playwright browser
+        run: |
+          mkdir -p /tmp/rodex-browser-tools
+          npm --prefix /tmp/rodex-browser-tools install --no-audit --no-fund --no-package-lock playwright@1.65.0
+          node /tmp/rodex-browser-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Start production app and verify health
+        run: |
+          NODE_ENV=production PORT=42687 node dist/server.mjs >/tmp/rodex-3d-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:42687/health > /tmp/rodex-3d-health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/rodex-3d-server.log
+          exit 1
+      - name: Assert actual 3D GPU pixels and responsive scenes
+        run: node scripts/testRODEX3DBrowser.mjs
+      - name: Keep visual evidence for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rodex-3d-render-${{ github.run_id }}
+          path: /tmp/rodex-3d-*.png
+          if-no-files-found: ignore
+          retention-days: 3
