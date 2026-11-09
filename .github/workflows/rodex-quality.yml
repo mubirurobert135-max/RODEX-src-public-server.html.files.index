@@ -74,6 +74,9 @@ jobs:
       - name: Voice response and wake reliability
         run: bun run test:voice
 
+      - name: Chat navigation and responsive UI regression
+        run: bun run test:chat-ui
+
       - name: Authentication access guards
         run: bun run test:auth
 
