@@ -144,6 +144,20 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
         aria-hidden="true"
       >
         <defs>
+          {/* Multi-coat ceramic shell and brushed titanium trim, illuminated by a studio softbox. */}
+          <linearGradient id={`${id}-ceramicLight`} x1="13%" y1="0%" x2="89%" y2="94%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity=".72"/>
+            <stop offset="27%" stopColor="#f5fcff" stopOpacity=".16"/>
+            <stop offset="58%" stopColor="#d4e7f7" stopOpacity=".03"/>
+            <stop offset="100%" stopColor="#122b4d" stopOpacity=".25"/>
+          </linearGradient>
+          <linearGradient id={`${id}-titanium`} x1="0%" y1="13%" x2="100%" y2="84%">
+            <stop offset="0%" stopColor="#ecf8ff"/>
+            <stop offset="22%" stopColor="#7496ad"/>
+            <stop offset="45%" stopColor="#dcecf6"/>
+            <stop offset="74%" stopColor="#466b89"/>
+            <stop offset="100%" stopColor="#d0e9f7"/>
+          </linearGradient>
           <linearGradient id={`${id}-helmet`} x1="12%" y1="3%" x2="85%" y2="98%">
             <stop offset="0%" stopColor="#ffffff"/>
             <stop offset="24%" stopColor="#f4fbff"/>
@@ -406,6 +420,10 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
               fill={paint('helmet')} stroke="#e5f7ff" strokeWidth="5.6"/>
             <path d="M222 199 C237 118 297 87 362 83 C451 78 503 130 525 204"
               fill="none" stroke="#ffffff" strokeOpacity=".34" strokeWidth="2.6" strokeLinecap="round"/>
+            <path d="M231 184 C245 133 290 106 350 94 C415 81 473 107 504 156 C457 125 410 120 365 124 C308 130 267 149 231 184Z"
+              fill={paint('ceramicLight')} opacity=".5"/>
+            <path d="M254 328 C315 368 440 373 497 321" fill="none" stroke={paint('titanium')}
+              strokeWidth="3" strokeLinecap="round" opacity=".48"/>
             <path d="M231 299 C249 340 302 358 371 363 C449 366 499 334 516 296"
               fill="none" stroke="#133a62" strokeOpacity=".32" strokeWidth="3"/>
             <path d="M238 141 C255 106 293 90 337 89" stroke="white" strokeOpacity=".83" strokeWidth="17" strokeLinecap="round" fill="none"/>
@@ -442,6 +460,11 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
                 fill={paint('visorSheen')}/>
               <path d="M263 217 C301 194 355 192 401 197" fill="none"
                 stroke="#eaffff" strokeOpacity=".085" strokeWidth="3" strokeLinecap="round"/>
+              {/* Curved glass reflection tracks the actual visor geometry, never a flat photo. */}
+              <path d="M280 203 C325 185 393 184 452 207 C429 199 369 206 329 217 Q299 222 280 236Z"
+                fill={paint('ceramicLight')} opacity=".17"/>
+              <path d="M276 298 Q377 324 476 294" stroke="#b7eaff" strokeWidth="1.3"
+                strokeOpacity=".15" fill="none"/>
               <path d="M470 286 L493 267" stroke="#def7ff" strokeOpacity=".1" strokeWidth="6" strokeLinecap="round"/>
               <path d="M265 308 C328 336 439 333 490 303" fill="none" stroke="#057dc4" strokeWidth="4" opacity=".19"/>
               <ellipse cx="321" cy="184" rx="92" ry="18" fill="#9bdfff" opacity=".09" filter={paint('soft')}/>
