@@ -702,24 +702,14 @@ export default function App() {
 
       setState('speaking');
 
-      // Synthesize pulse rhythm and harmonic pitch frequency for orb while speaking
+      // Browser speech synthesis does not expose a playable PCM stream.
+      // Drive mouth shapes from actual word boundaries instead of a fabricated
+      // sine-wave "audio meter". Gemini Live uses its real output analyser.
       if (speakIntervalRef.current) {
-        clearInterval(speakIntervalRef.current);
+        clearTimeout(speakIntervalRef.current);
         speakIntervalRef.current = null;
       }
-      const startTime = Date.now();
-      speakIntervalRef.current = setInterval(() => {
-        const elapsed = (Date.now() - startTime) / 1000;
-        const level = Math.abs(Math.sin(elapsed * 6)) * 0.45;
-        setAudioLevel(level);
-        // Modulate synthetic voice pitch frequency dynamically (135Hz - 175Hz)
-        setPitchHz(145 + Math.sin(elapsed * 4.5) * 28);
-
-        // Tactile voice-wave pulse matching atmospheric audio/light peak intensity
-        if (level > 0.35) {
-          triggerSubtlePulse(8);
-        }
-      }, 90);
+      setAudioLevel(0);
 
       if (bargeInAnimationFrameRef.current) {
         cancelAnimationFrame(bargeInAnimationFrameRef.current);
@@ -784,6 +774,17 @@ export default function App() {
         onStart: () => {
           setState('speaking');
           setTtsState('speaking');
+          setAudioLevel(.08);
+        },
+        onBoundary: (_charIndex, charLength) => {
+          // True word boundaries from the active speech engine; browsers that
+          // do not emit them simply retain a small speaking pose.
+          if (speakIntervalRef.current) clearTimeout(speakIntervalRef.current);
+          setAudioLevel(Math.min(.68, .28 + charLength * .045));
+          speakIntervalRef.current = setTimeout(() => {
+            setAudioLevel(.08);
+            speakIntervalRef.current = null;
+          }, 165);
         },
         onEnd: () => {
           setTtsState('idle');
