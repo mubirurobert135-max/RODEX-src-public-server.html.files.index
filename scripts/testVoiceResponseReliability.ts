@@ -104,6 +104,38 @@ async function runVoiceResponseReliabilityTests() {
   console.log('  ✅ PASS: WebSocket alone is insufficient; upstream readiness is required');
   passed++;
 
+  // 9. All interactive UI entry points must both initialize Live and open
+  // the audio response gate; a "listening" label by itself is insufficient.
+  console.log('9. Testing Unified Click-to-Talk Activation After Upstream Handshake...');
+  const interactiveVoice = new LiveConversationService();
+  (interactiveVoice as any).startNormalOrbVoice = async () => {};
+  (interactiveVoice as any).isConnected = () => true;
+  (interactiveVoice as any).isMicLive = true;
+  (interactiveVoice as any).diag.upstreamConnected = true;
+  (interactiveVoice as any).mediaStream = {
+    getAudioTracks: () => [{ readyState: 'live' }],
+    getTracks: () => [],
+  };
+  assert.strictEqual(await interactiveVoice.startInteractiveConversation(), true,
+    'First interactive call must open the voice gate');
+  assert.strictEqual((interactiveVoice as any).isConversationActive, true,
+    'Live model audio must be allowed after tapping the robot');
+  assert.strictEqual(await interactiveVoice.startInteractiveConversation(), false,
+    'Repeat activations must preserve one ongoing conversation');
+  interactiveVoice.stop();
+  console.log('  ✅ PASS: interactive call activates the real PCM gate without duplicate sessions');
+  passed++;
+
+  // 10. Corrupt/unaligned audio must not crash the WebSocket callback.
+  console.log('10. Testing Malformed Live PCM Chunk Rejection...');
+  const pcmVoice = new LiveConversationService();
+  await (pcmVoice as any).processAndScheduleStreamingChunk(new Uint8Array([0x12]), 'audio/pcm;rate=24000');
+  assert.strictEqual((pcmVoice as any).diag.audioDataValid, 'FAIL',
+    'Malformed PCM cannot be interpreted as valid speaker data');
+  pcmVoice.stop();
+  console.log('  ✅ PASS: invalid PCM is rejected safely and appears in diagnostics');
+  passed++;
+
   console.log('========================================================');
   console.log(` SUMMARY: ${passed} PASS | 0 FAIL`);
   console.log(' STATUS: ALL VOICE RESPONSE RELIABILITY TESTS PASSED');

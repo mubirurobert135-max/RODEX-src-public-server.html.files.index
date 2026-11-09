@@ -252,3 +252,72 @@
   .rodex-aurora-character::before,
   .rodex-aurora-svg { transition: none; }
 }
+
+
+/* AURORA IV — physical materials: studio-lighted ceramic, machined alloy,
+   low-bloom glass. Keep actual SVG joints, gestures and audio-state animation. */
+.rodex-aurora-character {
+  --rodex-shell-shadow: rgba(1, 8, 22, .68);
+  border-radius: clamp(18px, 3.2vw, 38px);
+  transform-style: preserve-3d;
+}
+.rodex-aurora-character::before {
+  background:
+    radial-gradient(ellipse 38% 31% at 40% 27%, rgba(215, 247, 255, .12), transparent 93%),
+    radial-gradient(ellipse 44% 49% at 51% 57%, rgba(9, 113, 191, .16), transparent 88%);
+  filter: blur(31px);
+}
+.rodex-aurora-character::after {
+  content: "";
+  position: absolute;
+  inset: 13% 11% 16%;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 52% 50%, rgba(0, 138, 220, .11), transparent 69%);
+}
+.rodex-aurora-svg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 34px 26px var(--rodex-shell-shadow))
+    drop-shadow(0 11px 11px rgba(1, 30, 58, .37))
+    drop-shadow(0 0 6px rgba(142, 224, 248, .13));
+  transition: filter .35s ease;
+}
+.rodex-dimensional-atmosphere {
+  inset: 13% 4% 18%;
+  background:
+    radial-gradient(ellipse 48% 46% at 52% 39%, rgba(172, 225, 245, .14), transparent 95%),
+    radial-gradient(ellipse 42% 35% at 50% 76%, rgba(0, 143, 223, .14), transparent 96%);
+  opacity: .7;
+  filter: blur(35px);
+}
+.rodex-character-aura {
+  bottom: 7%;
+  height: 7%;
+  filter: blur(19px);
+}
+.rodex-aurora-character[data-expression="listening"] .rodex-aurora-svg,
+.rodex-aurora-character[data-expression="wake"] .rodex-aurora-svg {
+  filter: drop-shadow(0 34px 27px rgba(1, 8, 22, .68))
+          drop-shadow(0 0 15px rgba(56, 195, 248, .3));
+}
+.rodex-aurora-character[data-expression="speaking"] .rodex-aurora-svg {
+  filter: drop-shadow(0 33px 28px rgba(1, 8, 22, .68))
+          drop-shadow(0 0 20px rgba(58, 201, 247, .32));
+}
+.rodex-aurora-character[data-expression="concerned"] .rodex-dimensional-atmosphere {
+  opacity: .34;
+  filter: blur(39px) saturate(.7);
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  .rodex-aurora-character { padding: min(1.4vw, 6px); }
+  .rodex-aurora-svg { width: 100%; height: 100%; }
+  .rodex-aurora-character::after { inset: 18% 7% 20%; }
+  .rodex-dimensional-atmosphere { inset: 12% 2% 17%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-aurora-svg { transition: none; }
+}

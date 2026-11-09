@@ -127,8 +127,9 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
     <button
       type="button"
       className="rodex-robot-button rodex-aurora-character"
-      aria-label="Talk to RODEX"
+      aria-label={listening ? 'RODEX is listening. Tap to focus the conversation.' : speaking ? 'RODEX is speaking. Tap to interrupt.' : 'Tap RODEX to start talking'}
       aria-pressed={listening}
+      style={{ '--rodex-energy': energy } as React.CSSProperties}
       onClick={onClick}
       onPointerMove={moveEyes}
       onPointerLeave={resetEyes}
@@ -138,7 +139,7 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
       <span className="rodex-dimensional-atmosphere" aria-hidden="true" />
       <motion.svg
         className="rodex-aurora-svg"
-        viewBox="65 42 680 717"
+        viewBox="0 17 790 760"
         preserveAspectRatio="xMidYMid meet"
         role="presentation"
         aria-hidden="true"
@@ -160,11 +161,12 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           </linearGradient>
           <linearGradient id={`${id}-helmet`} x1="12%" y1="3%" x2="85%" y2="98%">
             <stop offset="0%" stopColor="#ffffff"/>
-            <stop offset="24%" stopColor="#f4fbff"/>
-            <stop offset="48%" stopColor="#d5e8fa"/>
-            <stop offset="72%" stopColor="#93c4e7"/>
-            <stop offset="88%" stopColor="#3f79ae"/>
-            <stop offset="100%" stopColor="#10345e"/>
+            <stop offset="17%" stopColor="#f8fcff"/>
+            <stop offset="38%" stopColor="#e1f0fc"/>
+            <stop offset="56%" stopColor="#b7d5ec"/>
+            <stop offset="72%" stopColor="#8ebad9"/>
+            <stop offset="87%" stopColor="#466d94"/>
+            <stop offset="100%" stopColor="#102c4f"/>
           </linearGradient>
           <radialGradient id={`${id}-pearl`} cx="26%" cy="18%" r="97%">
             <stop offset="0%" stopColor="#ffffff"/>
@@ -188,10 +190,11 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
           </linearGradient>
           {/* Sapphire-tinted optical coating with controlled studio reflections. */}
           <linearGradient id={`${id}-visorSheen`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#d8f6ff" stopOpacity=".28"/>
-            <stop offset="38%" stopColor="#8abfe8" stopOpacity=".075"/>
-            <stop offset="55%" stopColor="#bfeaff" stopOpacity=".015"/>
-            <stop offset="100%" stopColor="#40a6db" stopOpacity=".12"/>
+            <stop offset="0%" stopColor="#ecfcff" stopOpacity=".42"/>
+            <stop offset="23%" stopColor="#a7e1fa" stopOpacity=".18"/>
+            <stop offset="49%" stopColor="#bfeaff" stopOpacity=".018"/>
+            <stop offset="74%" stopColor="#417aa9" stopOpacity=".04"/>
+            <stop offset="100%" stopColor="#80dbf5" stopOpacity=".14"/>
           </linearGradient>
           <linearGradient id={`${id}-machinedRim`} x1="10%" y1="0%" x2="95%" y2="100%">
             <stop offset="0%" stopColor="#ffffff"/>
@@ -422,7 +425,15 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
               fill="none" stroke="#ffffff" strokeOpacity=".34" strokeWidth="2.6" strokeLinecap="round"/>
             <path d="M231 184 C245 133 290 106 350 94 C415 81 473 107 504 156 C457 125 410 120 365 124 C308 130 267 149 231 184Z"
               fill={paint('ceramicLight')} opacity=".5"/>
-            <path d="M254 328 C315 368 440 373 497 321" fill="none" stroke={paint('titanium')}
+            {/* CNC-machined helmet joints and a recessed shadow groove give the
+              pearl shell real thickness instead of a flat cartoon outline. */}
+          <path d="M230 187 C247 123 297 93 366 89 C452 82 504 125 523 184"
+            fill="none" stroke="#193958" strokeOpacity=".27" strokeWidth="5.5" strokeLinecap="round"/>
+          <path d="M220 233 C218 286 247 332 302 353" fill="none"
+            stroke="#f0fdff" strokeOpacity=".55" strokeWidth="3" strokeLinecap="round"/>
+          <path d="M506 300 C521 281 526 256 527 236" fill="none"
+            stroke="#071b36" strokeOpacity=".52" strokeWidth="4" strokeLinecap="round"/>
+          <path d="M254 328 C315 368 440 373 497 321" fill="none" stroke={paint('titanium')}
               strokeWidth="3" strokeLinecap="round" opacity=".48"/>
             <path d="M231 299 C249 340 302 358 371 363 C449 366 499 334 516 296"
               fill="none" stroke="#133a62" strokeOpacity=".32" strokeWidth="3"/>
@@ -467,6 +478,11 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
                 strokeOpacity=".15" fill="none"/>
               <path d="M470 286 L493 267" stroke="#def7ff" strokeOpacity=".1" strokeWidth="6" strokeLinecap="round"/>
               <path d="M265 308 C328 336 439 333 490 303" fill="none" stroke="#057dc4" strokeWidth="4" opacity=".19"/>
+              {/* Asymmetric studio strip-light, visor edge reflections and coated-glass optics. */}
+              <path d="M273 207 C312 181 365 173 419 180 C368 183 323 198 287 220Z"
+                fill="#ecfbff" opacity=".11"/>
+              <path d="M472 211 C498 237 503 260 492 284"
+                fill="none" stroke="#d5f7ff" strokeWidth="4.5" strokeLinecap="round" opacity=".12"/>
               <ellipse cx="321" cy="184" rx="92" ry="18" fill="#9bdfff" opacity=".09" filter={paint('soft')}/>
               <ellipse cx="488" cy="259" rx="16" ry="57" fill="#9bdfff" opacity=".08" filter={paint('soft')}/>
             </g>
@@ -488,6 +504,11 @@ export const RobotCharacter: React.FC<RobotCharacterProps> = ({
                 transition={{ repeat: Infinity, duration: active ? 1 : 3.8 }}/>
             </g>
 
+            {/* Internal soft optical bloom beneath the expressive OLED eye traces. */}
+            <g opacity={listening ? .47 : speaking ? .4 : .19} filter={paint('soft')}>
+              <ellipse cx="324" cy="257" rx="38" ry="25" fill="#009fdc"/>
+              <ellipse cx="438" cy="257" rx="38" ry="25" fill="#009fdc"/>
+            </g>
             <motion.g className="rodex-aurora-eyes" style={{ transformOrigin: '378px 259px' }}
               animate={reducedMotion ? undefined : { scaleY: blink ? .06 : 1, x: gaze.x * 5, y: gaze.y * 3, opacity: thinking ? [.65,1,.65] : 1 }}
               transition={{ scaleY: { duration: .105 }, x: { duration: .18 }, y: { duration: .18 }, opacity: { duration: 1.3, repeat: thinking ? Infinity : 0 } }}>

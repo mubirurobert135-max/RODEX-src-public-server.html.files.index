@@ -848,10 +848,15 @@ export default function App() {
 
   // Direct Live Real-Time Call Controller (Powered by Gemini 3.8 Live API + Google Maps)
   const startLiveCall = async () => {
-    if (!micPermissionGranted) {
-      const granted = await requestMicPermission();
-      if (!granted) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setLastResponse('Live voice requires HTTPS or localhost and browser microphone support.');
+      setState('error');
+      return;
     }
+    // Unlock audio during the actual click, before any awaited permission
+    // prompt. Delaying this call can leave mobile output permanently silent.
+    void globalLiveConversationService.unlockVoiceAudio();
+    rodexSynth.prime();
 
     // Stop standard Web Speech recognition & synth to avoid conflict with bidirectional Live API audio stream
     rodexSynth.stop();
@@ -868,16 +873,6 @@ export default function App() {
     playToneChime('wake');
     setState('connecting' as any);
     setLastResponse('Connecting to Gemini 3.8 Live neural stream...');
-
-    const liveStartMsg: ChatMessage = {
-      id: createId('live-start'),
-      sender: 'assistant',
-      text: 'Live voice stream connected (Gemini 3.8 Live • 16kHz in / 24kHz out • Google Maps tool active). Speak naturally in real-time.',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      speakerVerified: true,
-      webGrounded: true,
-    };
-    setMessages((prev) => [...prev, liveStartMsg]);
 
     try {
       globalLiveConversationService.setCallbacks({
@@ -951,7 +946,18 @@ export default function App() {
       });
 
       globalVoiceManager.setLiveVoiceMode(true);
-      await globalLiveConversationService.start();
+      // Starting the engine is NOT sufficient: it must open the same reply
+      // gate used by clicking the robot, otherwise model PCM is discarded.
+      await globalLiveConversationService.startInteractiveConversation();
+      setMicPermissionGranted(true);
+      isLiveConversationRef.current = true;
+      setIsLiveConversation(true);
+      setMessages((prev) => [...prev, {
+        id: createId('live-start'),
+        sender: 'assistant',
+        text: 'Gemini Live connected and microphone permission granted. Speak naturally.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }]);
       setState('listening');
       playToneChime('listen');
     } catch (err: any) {
@@ -959,6 +965,9 @@ export default function App() {
       setState('error');
       const errorSpeech = `LIVE VOICE ERROR: ${err?.message || err}`;
       setLastResponse(errorSpeech);
+      isLiveConversationRef.current = false;
+      setIsLiveConversation(false);
+      globalVoiceManager.setLiveVoiceMode(false);
     }
   };
 
@@ -968,6 +977,7 @@ export default function App() {
     consecutiveSilenceCountRef.current = 0;
 
     globalLiveConversationService.stop();
+    globalVoiceManager.setLiveVoiceMode(false);
 
     if (speakIntervalRef.current) {
       clearInterval(speakIntervalRef.current);
@@ -1882,10 +1892,10 @@ export default function App() {
     }
 
     try {
-      if (!globalLiveConversationService.isConnected() || !globalLiveConversationService.getIsMicLive()) {
-        setState('connecting');
-        await globalLiveConversationService.startNormalOrbVoice();
-      }
+      setState('connecting');
+      // One shared entry point verifies the upstream handshake AND opens the
+      // actual audio-response gate. No simulated listening state.
+      const newlyActivated = await globalLiveConversationService.startInteractiveConversation();
 
       if (!globalLiveConversationService.getIsMicLive()) {
         setLastResponse('RODEX cannot access the microphone. Allow mic access in your browser and tap again.');
@@ -1898,10 +1908,6 @@ export default function App() {
       setDiagPermission('granted');
       globalSpeechManager.setMicPermission(true);
 
-      // Critical: updating React state to "listening" never opened the
-      // LiveConversationService wake gate. The service must open it itself
-      // before the first streamed response arrives.
-      const newlyActivated = globalLiveConversationService.activateConversationFromGesture();
       isLiveConversationRef.current = true;
       setIsLiveConversation(true);
       setState('listening');
