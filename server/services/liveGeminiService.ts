@@ -534,17 +534,17 @@ LIVE ACTION EXECUTION CONTRACT:
             console.log("[Gemini Live Server] Upstream Live API session closed");
             if (!isClosed && clientWs.readyState === WebSocket.OPEN) {
               clientWs.send(JSON.stringify({ type: "session_closed" }));
+              clientWs.close(1012, "Gemini upstream ended");
             }
           },
           onerror: (err: any) => {
             console.error("[Gemini Live Server] Upstream session error:", err?.message || err);
             if (!isClosed && clientWs.readyState === WebSocket.OPEN) {
-              clientWs.send(
-                JSON.stringify({
-                  type: "error",
-                  error: err?.message || "Live API upstream connection error",
-                })
-              );
+              clientWs.send(JSON.stringify({
+                type: "error",
+                error: err?.message || "Live API upstream connection error",
+              }));
+              clientWs.close(1011, "Gemini upstream error");
             }
           },
         },
