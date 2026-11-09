@@ -113,11 +113,11 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
         return;
       }
       if (event.key !== 'Tab' || !chatDialogRef.current) return;
-      const focusable = Array.from(
-        chatDialogRef.current.querySelectorAll<HTMLElement>(
+      const focusable = (
+        Array.from(chatDialogRef.current.querySelectorAll(
           'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter(element => element.getClientRects().length > 0);
+        )) as HTMLElement[]
+      ).filter((element: HTMLElement) => element.getClientRects().length > 0);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
