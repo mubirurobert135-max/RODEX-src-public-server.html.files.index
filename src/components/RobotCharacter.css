@@ -191,3 +191,64 @@
 @media (prefers-reduced-motion: reduce) {
   .rodex-aurora-svg { transform: none; }
 }
+
+
+/* AURORA III — architectural studio lighting, not an overexposed neon sticker.
+   Keep the figure fully vector / articulated and the entire silhouette clickable. */
+.rodex-aurora-character {
+  contain: layout style;
+  -webkit-font-smoothing: antialiased;
+}
+.rodex-aurora-character::before {
+  content: "";
+  position: absolute;
+  inset: 5% 8% 9%;
+  z-index: -1;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 38% 43% at 42% 29%, rgba(210, 237, 255, .105), transparent 92%),
+    radial-gradient(ellipse 43% 58% at 52% 59%, rgba(25, 95, 166, .13), transparent 96%);
+  filter: blur(22px);
+}
+.rodex-aurora-svg {
+  max-width: 100%;
+  max-height: 100%;
+  filter:
+    drop-shadow(0 29px 30px rgba(0, 5, 16, .66))
+    drop-shadow(0 3px 10px rgba(3, 21, 43, .35))
+    drop-shadow(0 0 7px rgba(125, 198, 239, .13));
+}
+.rodex-dimensional-atmosphere {
+  opacity: .64;
+  filter: blur(38px);
+}
+.rodex-character-aura {
+  bottom: 6%;
+  height: 8%;
+  background: radial-gradient(ellipse, rgba(91, 208, 249, .16), rgba(20, 93, 167, .065) 58%, transparent 83%);
+  filter: blur(20px);
+}
+.rodex-aurora-character[data-expression="listening"] .rodex-dimensional-atmosphere {
+  filter: blur(29px);
+  opacity: .92;
+}
+.rodex-aurora-character[data-expression="speaking"] .rodex-aurora-svg {
+  filter:
+    drop-shadow(0 29px 31px rgba(0, 5, 16, .64))
+    drop-shadow(0 0 12px rgba(74, 197, 246, .23));
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  .rodex-aurora-svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    overflow: visible;
+  }
+  .rodex-aurora-character::before { inset: 7% 1% 11%; }
+  .rodex-character-aura { bottom: 8%; width: 70%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-aurora-character::before,
+  .rodex-aurora-svg { transition: none; }
+}
