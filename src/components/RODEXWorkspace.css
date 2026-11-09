@@ -92,3 +92,16 @@
   .rodex-workspace-feature {transition:none;}
   .rodex-workspace-feature:hover {transform:none;}
 }
+
+
+/* The compact 3D companion is a deliberate card, not a 100vh black void. */
+@media(min-width:621px) {
+  .rodex-workspace-companion {
+    align-self: start;
+    height: min(61vh, 550px);
+    max-height: 100%;
+  }
+  .rodex-workspace-companion-visual {
+    align-items: center;
+  }
+}
