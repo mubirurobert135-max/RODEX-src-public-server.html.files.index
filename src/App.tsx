@@ -36,9 +36,12 @@ import {
   UserRound,
   Plus,
   Keyboard,
+  ArrowUp,
+  PanelsTopLeft,
+  Grid2X2,
 } from 'lucide-react';
-import { RobotCharacter } from './components/RobotCharacter';
-import { RodexCockpit } from './components/RodexCockpit';
+import { HumanoidPresence } from './components/HumanoidPresence';
+import { RODEXWorkspace } from './components/RODEXWorkspace';
 import { RodexSpeechWave } from './components/RodexSpeechWave';
 import './components/RodexImmersive.css';
 import { ActionBar } from './components/ActionBar';
@@ -122,6 +125,8 @@ export default function App() {
   const [state, setState] = useState<AssistantState>('idle');
   const [activeMode, setActiveMode] = useState<AppMode>('home');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const [quickPrompt, setQuickPrompt] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isVoiceProfileOpen, setIsVoiceProfileOpen] = useState(false);
   const [isWebVerifyOpen, setIsWebVerifyOpen] = useState(false);
@@ -280,7 +285,7 @@ export default function App() {
   // Settings
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
     voiceURI: '',
-    rate: 1.0,
+    rate: 1.08,
     pitch: 1.0,
     volume: 1.0,
     autoSpeak: true,
@@ -1952,7 +1957,8 @@ export default function App() {
     <AndroidFrame>
       <main
         id="rodex-main-screen"
-        className="rodex-home w-full h-full flex flex-col justify-between items-center text-white select-none m-0 p-0"
+        className="rodex-home rodex-monochrome w-full h-full flex flex-col justify-between items-center text-white select-none m-0 p-0"
+        data-workspace={isWorkspaceOpen ? 'true' : 'false'}
       >
         {/* Live CSS atmospheric background: no static screenshot or visible frame. */}
 
@@ -2052,6 +2058,18 @@ export default function App() {
             <span className="rodex-brand-word">RODEX <span>AI</span></span>
           </div>
           <div className="rodex-top-actions">
+            <button type="button" id="rodex-header-workspace-btn"
+              className="rodex-header-workspace-btn" aria-label={isWorkspaceOpen ? 'Return to companion' : 'Open workspace'}
+              onClick={() => { triggerHaptic('tap'); setIsWorkspaceOpen(value => !value); }}>
+              <PanelsTopLeft size={17} aria-hidden="true"/>
+              <span>{isWorkspaceOpen ? 'Companion' : 'Workspace'}</span>
+            </button>
+            <button type="button" id="rodex-header-tools-btn"
+              className="rodex-header-workspace-btn" aria-label="Open all RODEX tools"
+              onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
+              <Grid2X2 size={17} aria-hidden="true"/>
+              <span>Tools</span>
+            </button>
             <button type="button" id="header-notifications-btn"
               aria-label="System updates" title="System updates"
               className="rodex-glass-icon rodex-notification-icon"
@@ -2103,40 +2121,41 @@ export default function App() {
               damping: 24,
             }}
           >
-            <RobotCharacter
+            <HumanoidPresence
               state={state}
               audioLevel={audioLevel}
               taskState={activeTask?.state}
-              lastResponse={lastResponse}
-              onClick={handleOrbClick}
+              onInteract={handleOrbClick}
             />
           </motion.div>
 
-          <RodexCockpit
-            onHome={() => {
-              triggerHaptic('tap');
-              setIsChatOpen(false);
-              setActiveMode('home');
-            }}
-            onChat={() => { triggerHaptic('tap'); setIsChatOpen(true); }}
-            onApps={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}
-            onLayers={() => { triggerHaptic('tap'); setIsCapabilityOpen(true); }}
-            onSettings={() => { triggerHaptic('tap'); setIsSettingsOpen(true); }}
-            onCreate={() => {
-              triggerHaptic('tap');
-              setMediaStudioTab('video');
-              setIsMediaStudioOpen(true);
-            }}
-            onWrite={() => { triggerHaptic('tap'); setIsChatOpen(true); }}
-            onGenerate={() => {
-              triggerHaptic('tap');
-              setMediaStudioTab('image');
-              setIsMediaStudioOpen(true);
-            }}
-            onAnalyze={() => { triggerHaptic('tap'); setActiveMode('web'); }}
-            onBuild={() => { triggerHaptic('tap'); setActiveMode('code'); }}
-            onExplore={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}
-          />
+          {/* Primary navigation lives in the header and the contextual workspace.
+              Keep the humanlike character unobstructed by feature-card clutter. */}
+          <div className="rodex-human-intro" aria-hidden="true">
+            <span>YOUR INTELLIGENT COMPANION</span>
+          </div>
+
+          {isWorkspaceOpen && (
+            <RODEXWorkspace
+              onClose={() => { triggerHaptic('tap'); setIsWorkspaceOpen(false); setActiveMode('home'); }}
+              onChat={() => { triggerHaptic('tap'); setIsChatOpen(true); }}
+              onResearch={() => { triggerHaptic('tap'); setActiveMode('web'); }}
+              onCode={() => { triggerHaptic('tap'); setActiveMode('code'); }}
+              onDocument={() => { triggerHaptic('tap'); setActiveMode('file'); }}
+              onCreate={() => { triggerHaptic('tap'); setMediaStudioTab('image'); setIsMediaStudioOpen(true); }}
+              onEmail={() => { triggerHaptic('tap'); setIsGmailOpen(true); }}
+              onCalendar={() => { triggerHaptic('tap'); setIsScheduleOpen(true); }}
+              onMemory={() => { triggerHaptic('tap'); setIsMemoryOpen(true); }}
+              onDiagnostics={() => { triggerHaptic('tap'); setIsDoctorOpen(true); }}
+              onSettings={() => { triggerHaptic('tap'); setIsSettingsOpen(true); }}
+              onTools={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}
+              onAsk={(text) => { handleSendMessage(text); setIsChatOpen(true); }}
+              onRobotClick={handleOrbClick}
+              state={state}
+              taskState={activeTask?.state}
+              audioLevel={audioLevel}
+            />
+          )}
 
           {/* Active Task Card (Lightweight Proactive & Multi-Step Agent Agenda Card) */}
           {activeTask && (
@@ -2277,27 +2296,46 @@ export default function App() {
           {/* Clean Subtitle & Status Text - Overlayed below Orb without disturbing exact vertical centering */}
         </div>
 
-        {/* No microphone icon, feature pills, verbose labels or default permission
-            prompt. Existing wake-word and robot-tap voice paths remain intact. */}
+        {/* Direct, minimalist conversation control. All advanced tools are
+            integrated in the header or adaptive Workspace, not six busy tabs. */}
         <footer className="rodex-quiet-dock">
           {isLiveConversation && (
-            <button type="button" id="hangup-call-btn" className="rodex-live-stop" onClick={endLiveCall}>
-              <PhoneOff className="w-4 h-4" /> End call
-            </button>
+            <button type="button" id="hangup-call-btn" className="rodex-live-stop"
+              onClick={endLiveCall}><PhoneOff size={16}/> End call</button>
           )}
-          <div className="rodex-quiet-dock-inner">
-            <button type="button" aria-label="More actions" title="More actions"
-              className="rodex-quiet-dock-icon"
+          <form className="rodex-command-bar" onSubmit={(event) => {
+            event.preventDefault();
+            const command = quickPrompt.trim();
+            if (!command) return;
+            handleSendMessage(command);
+            setIsChatOpen(true);
+            setQuickPrompt('');
+          }}>
+            <button type="button" className="rodex-command-btn" aria-label="Open RODEX tools"
               onClick={() => { triggerHaptic('tap'); setIsMoreMenuOpen(true); }}>
-              <Plus className="w-[45%] h-[45%]" />
+              <Plus size={21} aria-hidden="true"/>
             </button>
-            <RodexSpeechWave state={state} audioLevel={audioLevel} />
-            <button type="button" aria-label="Open keyboard chat" title="Text chat"
-              className="rodex-quiet-dock-icon"
-              onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}>
-              <Keyboard className="w-[45%] h-[45%]" />
+            <input type="text" autoComplete="off"
+              value={quickPrompt} onChange={event => setQuickPrompt(event.target.value)}
+              placeholder="Talk or type to RODEX..." aria-label="Ask RODEX"/>
+            {quickPrompt.trim() ? (
+              <button type="submit" className="rodex-command-btn" aria-label="Send message">
+                <ArrowUp size={20} aria-hidden="true"/>
+              </button>
+            ) : (
+              <button type="button" className="rodex-command-btn" id="rodex-direct-voice-btn"
+                aria-label={isLiveConversation ? 'End voice conversation' : 'Start voice conversation'}
+                title={isLiveConversation ? 'End call' : 'Talk to RODEX'}
+                onClick={() => { triggerHaptic('tap'); if (isLiveConversation) endLiveCall(); else startLiveCall(); }}>
+                {isLiveConversation ? <PhoneOff size={20}/> : <Mic size={20}/>}
+              </button>
+            )}
+            <button type="button" className="rodex-command-btn rodex-command-chat-btn"
+              aria-label="Open conversation history" onClick={() => { triggerHaptic('tap'); setIsChatOpen(true); }}>
+              <MessageSquare size={20} aria-hidden="true"/>
             </button>
-          </div>
+          </form>
+          <RodexSpeechWave state={state} audioLevel={audioLevel}/>
         </footer>
 
         {/* Slide-up Chat History Sheet */}
