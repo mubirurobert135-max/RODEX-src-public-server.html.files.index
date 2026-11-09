@@ -89,6 +89,21 @@ async function runVoiceResponseReliabilityTests() {
   console.log('  ✅ PASS: Tap opens audio gate, respects permissions and prevents duplicate greetings');
   passed++;
 
+  // 8. Browser socket OPEN alone must never be interpreted as Gemini READY.
+  console.log('8. Testing Upstream Handshake Must Finish Before Listening...');
+  const readinessVoice = new LiveConversationService();
+  (readinessVoice as any).isConnected = () => true;
+  await assert.rejects(
+    () => (readinessVoice as any).waitForUpstreamReady(35),
+    /handshake timed out/i,
+    'A socket without Gemini upstream readiness must not be accepted'
+  );
+  (readinessVoice as any).diag.upstreamConnected = true;
+  await (readinessVoice as any).waitForUpstreamReady(35);
+  readinessVoice.stop();
+  console.log('  ✅ PASS: WebSocket alone is insufficient; upstream readiness is required');
+  passed++;
+
   console.log('========================================================');
   console.log(` SUMMARY: ${passed} PASS | 0 FAIL`);
   console.log(' STATUS: ALL VOICE RESPONSE RELIABILITY TESTS PASSED');
