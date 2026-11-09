@@ -207,6 +207,8 @@ export class LiveConversationService {
   // Accumulated Response Chunks for complete single-buffer playback
   private turnPcmChunks: Uint8Array[] = [];
   private lastCompleteResponseBuffer: AudioBuffer | null = null;
+  private pendingSpokenTranscript = '';
+  private pendingTurnCompletionAfterPlayback = false;
 
   // Diagnostics State
   private diag: DetailedAudioDiagnostics = {
@@ -1049,6 +1051,14 @@ export class LiveConversationService {
           return;
         }
         if (data.text) {
+          // Live audio transcription often arrives in fragments. Retain a
+          // readable fallback only if Gemini fails to deliver PCM this turn.
+          const fragment = String(data.text);
+          this.pendingSpokenTranscript = fragment.startsWith(this.pendingSpokenTranscript)
+            ? fragment
+            : this.pendingSpokenTranscript.endsWith(fragment)
+              ? this.pendingSpokenTranscript
+              : this.pendingSpokenTranscript + fragment;
           this.addTrace(`MODEL RESPONSE: "${data.text.substring(0, 60)}"`);
           this.diag.orbVoiceState = 'SPEAKING';
           this.diag.voiceEngine = 'SPEAKING';
@@ -1117,7 +1127,45 @@ export class LiveConversationService {
           this.addTrace('DIAGNOSTIC TEXT TEST COMPLETE; WAKE GATE REMAINS CLOSED');
           break;
         }
-        // When model finishes, enter active follow-up listening
+        // The primary path is true streaming PCM; only use local TTS if a
+        // completed model turn supplied speech text but literally zero audio.
+        // This avoids a silent robot without speaking twice over real audio.
+        const receivedPcm = this.turnPcmChunks.length > 0;
+        const speechFallbackText = this.pendingSpokenTranscript.trim();
+        this.turnPcmChunks = [];
+        this.pendingSpokenTranscript = '';
+        if (!receivedPcm && speechFallbackText) {
+          this.addTrace('NO LIVE PCM RECEIVED: USING BROWSER SPEECH FALLBACK');
+          this.isSpeaking = true;
+          this.diag.orbVoiceState = 'SPEAKING';
+          this.setStatus('speaking');
+          const finishFallback = () => {
+            this.isSpeaking = false;
+            this.diag.orbVoiceState = 'LISTENING';
+            this.setStatus('listening');
+            this.startFollowUpSilenceTimer();
+            this.callbacks.onTurnComplete?.();
+          };
+          rodexSynth.speak(speechFallbackText, {
+            rate: 1.05,
+            pitch: 1,
+            volume: 1,
+            onEnd: finishFallback,
+            onError: (err) => {
+              this.addTrace(`BROWSER SPEECH FALLBACK ERROR: ${String(err)}`);
+              finishFallback();
+            },
+          });
+          break;
+        }
+
+        // Wait until queued PCM is actually played before considering the
+        // utterance finished; model turn completion is not speaker completion.
+        if (this.activeSources.length > 0) {
+          this.pendingTurnCompletionAfterPlayback = true;
+          this.addTrace('MODEL FINISHED; DRAINING AUDIO PLAYBACK');
+          break;
+        }
         this.diag.orbVoiceState = 'LISTENING';
         this.setStatus('listening');
         this.startFollowUpSilenceTimer();
@@ -1572,6 +1620,11 @@ export class LiveConversationService {
           this.diag.orbVoiceState = 'LISTENING';
           this.setStatus('listening');
         }
+        if (this.pendingTurnCompletionAfterPlayback) {
+          this.pendingTurnCompletionAfterPlayback = false;
+          this.startFollowUpSilenceTimer();
+          this.callbacks.onTurnComplete?.();
+        }
       }
     };
   }
@@ -1613,6 +1666,9 @@ export class LiveConversationService {
     }
     this.activeSources = [];
     this.nextPlaybackTime = 0;
+    this.pendingTurnCompletionAfterPlayback = false;
+    this.pendingSpokenTranscript = '';
+    this.turnPcmChunks = [];
     this.isSpeaking = false;
     this.currentOutputLevel = 0;
   }
