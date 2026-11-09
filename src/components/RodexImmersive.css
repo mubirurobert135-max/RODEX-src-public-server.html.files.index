@@ -699,7 +699,7 @@
   .rodex-monochrome .rodex-quiet-dock {padding-inline:12px;gap:3px;}
   .rodex-command-bar {gap:5px;padding:6px;}
   .rodex-command-btn {width:40px;height:40px;flex-basis:40px;}
-  .rodex-command-chat-btn {display:none;}
+  .rodex-command-chat-btn {display:grid;}
   .rodex-monochrome .rodex-quiet-dock > .rodex-quiet-wave {display:none;}
 }
 @media(prefers-reduced-motion:reduce) {
