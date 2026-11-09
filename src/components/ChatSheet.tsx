@@ -86,6 +86,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   const [expandedTraces, setExpandedTraces] = useState<Record<string, boolean>>({});
   const [approvingActionId, setApprovingActionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const chatDialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeCallbackRef = useRef(onClose);
@@ -143,11 +144,21 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !filterQuery) {
       console.info('[RODEX TRACE] CHAT UI RENDERED');
       scrollToBottom();
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, filterQuery]);
+
+  useEffect(() => {
+    setFilterQuery('');
+    setShowSessionDrawer(false);
+    setConfirmClear(false);
+  }, [activeSession.id]);
+
+  useEffect(() => {
+    if (isOpen && filterQuery) messagesScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [isOpen, filterQuery]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,14 +347,16 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                     allSessions.map((session) => {
                       const isCurrent = session.id === activeSession.id;
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={session.id}
                           onClick={() => {
                             triggerHaptic('tap');
                             onSelectSession(session);
                             setShowSessionDrawer(false);
                           }}
-                          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-all border ${
+                          aria-current={isCurrent ? 'true' : undefined}
+                          className={`flex w-full items-center justify-between px-3 py-2 rounded-xl text-left text-xs cursor-pointer transition-all border ${
                             isCurrent
                               ? 'bg-cyan-950/60 border-cyan-700/80 text-cyan-200'
                               : 'bg-neutral-900/80 hover:bg-neutral-800/90 border-neutral-800 text-neutral-300'
@@ -373,7 +386,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                               Active
                             </span>
                           )}
-                        </div>
+                        </button>
                       );
                     })
                   )}
@@ -423,7 +436,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           )}
 
           {/* Conversation Body */}
-          <div className="rodex-chat-messages min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-4 sm:px-6" role="log" aria-live="polite" aria-relevant="additions text">
+          <div ref={messagesScrollRef} className="rodex-chat-messages min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-4 sm:px-6" role="log" aria-live="polite" aria-relevant="additions text">
             {filteredMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-neutral-500 space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-center text-cyan-400">
@@ -1018,18 +1031,25 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           {/* Bottom Chat Input Bar */}
           <footer className="rodex-chat-footer shrink-0 border-t border-cyan-900/40 bg-[#081322]/95 px-3 pt-3 sm:px-5">
             <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
-              <input
+              <textarea
                 id="chat-text-input"
-                type="text"
+                rows={1}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing &&
+                      !window.matchMedia('(pointer: coarse)').matches) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 placeholder={
                   isLiveConversation
                     ? 'Live call active... type or speak to RODEX'
                     : 'Message RODEX in this session...'
                 }
                 aria-label="Message RODEX"
-                className="min-w-0 flex-1 rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder-slate-500 transition-colors focus:border-cyan-400/80 focus:outline-none"
+                className="rodex-chat-composer min-w-0 flex-1 rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder-slate-500 transition-colors focus:border-cyan-400/80 focus:outline-none"
               />
 
               <button
