@@ -2,6 +2,7 @@ import React from 'react';
 import { Maximize2 } from 'lucide-react';
 import type { AssistantState, TaskState } from '../types';
 import './HumanoidPresence.css';
+import { RODEX_APPROVED_PORTRAIT } from './approvedAvatar';
 
 /**
  * RODEX Human Presence — reference-preserving 2.5D character renderer.
@@ -44,7 +45,7 @@ export const HumanoidPresence: React.FC<HumanoidPresenceProps> = ({
       >
         <img
           className="rodex-human-portrait"
-          src="/assets/rodex-humanoid.webp"
+          src={RODEX_APPROVED_PORTRAIT}
           alt=""
           draggable={false}
           decoding="async"
@@ -55,7 +56,7 @@ export const HumanoidPresence: React.FC<HumanoidPresenceProps> = ({
         {speaking && (
           <img
             className="rodex-human-mouth-motion"
-            src="/assets/rodex-humanoid.webp"
+            src={RODEX_APPROVED_PORTRAIT}
             alt=""
             draggable={false}
             aria-hidden="true"
