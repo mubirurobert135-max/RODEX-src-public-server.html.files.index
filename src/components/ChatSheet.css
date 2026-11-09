@@ -1,0 +1,106 @@
+/* RODEX Chat | Dedicated high-priority navigation layer
+   The home header is z-index 50; the chat must sit above that header,
+   voice dock, stage and any non-chat controls. */
+.rodex-chat-layer {
+  z-index: 120;
+  height: 100%;
+  height: 100dvh;
+  min-height: 0;
+  width: 100%;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 66% 24% at 46% 0%, rgba(11, 93, 158, .17), transparent 92%),
+    #050c17;
+}
+.rodex-chat-header {
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .24);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+.rodex-chat-primary {
+  min-height: 62px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  padding-bottom: 7px;
+}
+.rodex-chat-close,
+.rodex-chat-back {
+  min-height: 44px;
+}
+.rodex-chat-close {
+  width: 46px;
+  height: 46px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+.rodex-chat-actions {
+  padding-top: 3px;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 176, 220, .28) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.rodex-chat-action {
+  min-height: 38px;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+.rodex-chat-messages {
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+  overflow-wrap: anywhere;
+  background: radial-gradient(circle at 50% 100%, rgba(7, 52, 95, .13), transparent 58%);
+}
+.rodex-chat-messages :is(a, button) { touch-action: manipulation; }
+.rodex-chat-bubble {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.rodex-chat-footer {
+  position: relative;
+  z-index: 1;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 32px rgba(0, 0, 0, .28);
+}
+.rodex-chat-confirm { position: relative; z-index: 2; }
+.rodex-chat-layer button:focus-visible,
+.rodex-chat-layer input:focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
+}
+@media (max-width: 420px) {
+  .rodex-chat-primary { min-height: 58px; gap: 8px; }
+  .rodex-chat-back { padding-inline: 12px; }
+  .rodex-chat-close { width: 44px; height: 44px; }
+  .rodex-chat-actions { gap: 6px; }
+  .rodex-chat-messages { scrollbar-gutter: auto; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .rodex-chat-primary { min-height: 49px; padding-block: 3px; }
+  .rodex-chat-close, .rodex-chat-back { min-height: 40px; }
+  .rodex-chat-close { height: 40px; width: 42px; }
+  .rodex-chat-action { min-height: 34px; }
+  .rodex-chat-footer { padding-top: 8px; padding-bottom: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-chat-layer, .rodex-chat-layer * { scroll-behavior: auto !important; }
+  .rodex-chat-layer button { transition: none; }
+}
+
+
+/* Multiline chat composer: comfortable long prompts without expanding the
+   screen or hiding the Send control on a small phone. */
+.rodex-chat-composer {
+  display: block;
+  min-height: 48px;
+  max-height: min(150px, 28dvh);
+  resize: vertical;
+  overflow-y: auto;
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+@media (max-width: 760px) {
+  .rodex-chat-composer { max-height: min(118px, 23dvh); resize: none; }
+}

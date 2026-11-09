@@ -23,6 +23,7 @@
     "lint": "tsc --noEmit",
     "test:grounding": "tsx scripts/testGrounding.ts",
     "test:voice": "tsx scripts/testVoiceResponseReliability.ts",
+    "test:chat-ui": "tsx scripts/testChatNavigation.ts",
     "test:auth": "tsx scripts/testAuthGuards.ts",
     "test:booking": "tsx scripts/testBookingIntegrity.ts"
   },
