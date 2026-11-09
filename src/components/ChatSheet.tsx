@@ -104,6 +104,8 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
     if (!isOpen) {
       setShowSessionDrawer(false);
       setConfirmClear(false);
+      setShowJumpToLatest(false);
+      shouldFollowLatestRef.current = true;
       return;
     }
     const previousFocus = document.activeElement instanceof HTMLElement
@@ -306,6 +308,23 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                 {isLiveConversation ? 'End call' : 'Voice call'}
               </button>
               <button
+                id="new-chat-session-btn"
+                type="button"
+                onClick={() => {
+                  triggerHaptic('tap');
+                  onNewSession();
+                  setShowSessionDrawer(false);
+                  setConfirmClear(false);
+                  shouldFollowLatestRef.current = true;
+                }}
+                aria-label="Start a new chat conversation"
+                title="New conversation"
+                className="rodex-chat-action flex shrink-0 items-center gap-1.5 rounded-xl border border-cyan-400/25 bg-cyan-950/45 px-3 text-xs text-cyan-100 hover:border-cyan-300/65 hover:bg-cyan-900/60"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                New chat
+              </button>
+              <button
                 id="toggle-session-history-btn"
                 type="button"
                 onClick={() => { triggerHaptic('tap'); setShowSessionDrawer(value => !value); }}
@@ -467,7 +486,8 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                 type="text"
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                placeholder="Search within this live session..."
+                placeholder="Search this conversation..."
+                aria-label="Search conversation messages"
                 className="w-full bg-transparent text-xs text-neutral-300 placeholder-neutral-600 focus:outline-none"
               />
               {filterQuery && (
