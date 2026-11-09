@@ -90,8 +90,20 @@ function portraitShell(vStart: number, vEnd: number, rows = 54, cols = 42): RawM
       const lateral = u * 2 - 1;
       const width = MIX(.92, 1.12, face);
       const x = lateral * width * 1.13;
-      const z = .18 + .51 * Math.sqrt(Math.max(0, 1 - lateral * lateral)) *
+      const relief = (cx: number, cy: number, width: number, height: number) =>
+        Math.exp(-Math.pow((lateral - cx) / width, 2) -
+          Math.pow((v - cy) / height, 2));
+      const profile = .18 + .51 * Math.sqrt(Math.max(0, 1 - lateral * lateral)) *
         (face > 0 ? (.74 + .26 * Math.sin(face * Math.PI)) : .45);
+      // Geometry for nose bridge, cheeks, brow and inset eye sockets gives
+      // visible facial volume in profile, without replacing identity texture.
+      const faceRelief = .19 * relief(0, .48, .19, .12) +
+        .09 * relief(-.40, .49, .27, .14) +
+        .09 * relief(.40, .49, .27, .14) -
+        .050 * relief(-.35, .60, .22, .055) -
+        .050 * relief(.35, .60, .22, .055) +
+        .07 * relief(0, .29, .30, .085);
+      const z = profile + faceRelief * face;
       const slope = lateral / Math.sqrt(Math.max(.04, 1 - lateral * lateral));
       const normal = 1 / Math.sqrt(1 + slope * slope * .35);
       vertices.push(x, y, z, -slope * .6 * normal, 0, normal, u, v);
@@ -137,9 +149,18 @@ const FRAGMENT = [
   'precision highp float;',
   'in vec2 vUV; in vec3 vNormal; out vec4 frag;',
   'uniform sampler2D uPortrait; uniform float uTextured;',
-  'uniform vec3 uColor;',
+  'uniform vec3 uColor; uniform vec2 uEyeGaze;',
   'void main() {',
-  '  vec4 base = uTextured > .5 ? texture(uPortrait, vUV) : vec4(uColor, 1.0);',
+  '  vec2 uv = vUV;',
+  '  // Localized eye-texture displacement, feathered at each socket boundary.',
+  '  // The rest of the approved face remains unchanged.',
+  '  for(int i=0; i<2; i++) {',
+  '    vec2 eye = vec2(i==0 ? .347 : .653, .60);',
+  '    vec2 diff = (vUV - eye) / vec2(.070, .032);',
+  '    float mask = 1.0 - smoothstep(.35, 1.0, length(diff));',
+  '    uv -= uEyeGaze * mask * vec2(.009, .006);',
+  '  }',
+  '  vec4 base = uTextured > .5 ? texture(uPortrait, uv) : vec4(uColor, 1.0);',
   '  if(base.a < .09) discard;',
   '  float lit = .74 + .27 * max(dot(normalize(vNormal), normalize(vec3(-.55, 1.0, 1.9))), 0.0);',
   '  vec3 rgb = base.rgb * mix(lit, .94 + .06 * lit, uTextured);',
@@ -204,6 +225,7 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     color: gl.getUniformLocation(p, 'uColor'),
     textured: gl.getUniformLocation(p, 'uTextured'),
     portrait: gl.getUniformLocation(p, 'uPortrait'),
+    gaze: gl.getUniformLocation(p, 'uEyeGaze'),
   };
   const raw = { sphere: upload(gl, sphere()), ring: upload(gl, ring()),
     head: upload(gl, portraitShell(.235, 1)),
@@ -281,6 +303,7 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(positions.portrait, 0);
+    gl.uniform2f(positions.gaze, c.gaze, c.pitch * 2.5);
     const bodyY = Math.sin(c.breath) * .012;
     const yaw = c.yaw, pitch = c.pitch;
     // Sculpted shoulders, chest sockets and articulated metallic neck.
