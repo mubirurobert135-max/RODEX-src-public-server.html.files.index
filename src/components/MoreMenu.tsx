@@ -203,15 +203,16 @@ export const MoreMenu: React.FC<MoreMenuProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-start justify-start p-4 sm:p-6 animate-fade-in overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-start justify-start p-3 sm:p-6 animate-fade-in overflow-hidden">
       <div
         ref={menuRef}
-        className="w-full max-w-sm bg-neutral-950/95 border border-neutral-800/90 rounded-3xl p-5 shadow-2xl flex flex-col gap-4 text-white animate-scale-up mt-2 sm:mt-4 ml-0 sm:ml-2 my-auto"
+        className="w-full max-w-sm max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain bg-neutral-950/95 border border-neutral-800/90 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col gap-4 text-white animate-scale-up sm:ml-2"
         role="dialog"
+        aria-modal="true"
         aria-label="RODEX Navigation & Capabilities Menu"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-900">
+        <div className="sticky top-0 z-10 -mx-1 -mt-1 flex items-center justify-between rounded-t-2xl border-b border-neutral-800 bg-neutral-950/95 px-1 pt-1 pb-3 backdrop-blur-lg">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-cyan-950/80 border border-cyan-800/80 flex items-center justify-center text-cyan-400 font-bold text-xs shadow-[0_0_12px_rgba(6,182,212,0.3)]">
               R
@@ -227,7 +228,7 @@ export const MoreMenu: React.FC<MoreMenuProps> = ({
               triggerHaptic('tap');
               onClose();
             }}
-            className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-900 transition-all cursor-pointer"
+            className="min-h-11 min-w-11 flex items-center justify-center rounded-xl border border-neutral-700/70 bg-neutral-900/85 text-neutral-200 hover:text-white hover:border-cyan-400/60 transition-colors cursor-pointer"
             aria-label="Close menu"
           >
             <X className="w-4 h-4" />
@@ -334,7 +335,7 @@ export const MoreMenu: React.FC<MoreMenuProps> = ({
         {/* Footer info */}
         <div className="pt-2 border-t border-neutral-900/80 flex items-center justify-between text-[10px] text-neutral-500 px-1">
           <span>RODEX AI Core v4.2</span>
-          <span className="text-cyan-400/80 font-mono">Firebase Active</span>
+          <span className="text-cyan-400/80">Your assistant workspace</span>
         </div>
       </div>
     </div>

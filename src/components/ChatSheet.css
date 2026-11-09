@@ -304,3 +304,57 @@
   .rodex-chat-layer,
   .rodex-chat-layer * { scroll-behavior: auto !important; transition: none !important; }
 }
+
+
+/* RODEX CHAT — permanent, accessible return route below the composer.
+   A short screen or mobile browser chrome must never trap navigation. */
+.rodex-chat-footer-nav {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(131, 190, 218, .16);
+  min-height: 43px;
+}
+.rodex-chat-footer-home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 7px 13px;
+  border: 1px solid rgba(115, 206, 245, .43);
+  border-radius: 11px;
+  background: rgba(17, 61, 92, .53);
+  color: #e1f8ff;
+  font: 700 12px 'Manrope', system-ui, sans-serif;
+  letter-spacing: .005em;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+.rodex-chat-footer-home:hover {
+  background: rgba(30, 99, 142, .76);
+  border-color: #8ceaff;
+}
+.rodex-chat-footer-home:active { transform: scale(.985); }
+.rodex-chat-shortcut-note {
+  color: #97a9be;
+  font-size: 11px;
+  font-weight: 500;
+}
+@media (max-width: 520px) {
+  .rodex-chat-footer-nav { margin-top: 8px; padding-top: 7px; }
+  .rodex-chat-footer-home {
+    width: 100%;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .rodex-chat-shortcut-note { display: none; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .rodex-chat-footer-nav { margin-top: 4px; padding-top: 4px; min-height: 35px; }
+  .rodex-chat-footer-home { min-height: 35px; padding-block: 4px; }
+  .rodex-chat-footer { padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rodex-chat-footer-home { transition: none; }
+}
