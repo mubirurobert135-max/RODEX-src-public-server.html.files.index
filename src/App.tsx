@@ -2343,7 +2343,9 @@ export default function App() {
             companion while existing tool/modal workspaces cover the page.
             Chat remains unobstructed and has its own close navigation. */}
         <RODEXFloatingCompanion
-          active={isWorkspaceOpen && !isChatOpen && (
+          // Tools can open directly from Home, without opening Workspace first.
+          // Keep the character present on all tool surfaces, but not over Chat.
+          active={!isChatOpen && (
             activeMode !== 'home' || isMediaStudioOpen || isGmailOpen ||
             isScheduleOpen || isMemoryOpen || isDoctorOpen || isCapabilityOpen ||
             isWebVerifyOpen || isSpotifyOpen || isMediaHubOpen || isSecurityOpen ||
