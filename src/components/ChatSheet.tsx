@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { createPortal } from 'react-dom';
 import {
   X,
   ArrowLeft,
@@ -93,6 +94,9 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   const closeCallbackRef = useRef(onClose);
   closeCallbackRef.current = onClose;
   const [confirmClear, setConfirmClear] = useState(false);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const shouldFollowLatestRef = useRef(true);
+  const reduceMotion = useReducedMotion();
 
   // Full-screen chat acts as a real dialog: Escape closes it, Tab remains
   // inside the chat and focus returns to the control that opened it.
@@ -100,10 +104,16 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
     if (!isOpen) {
       setShowSessionDrawer(false);
       setConfirmClear(false);
+      setShowJumpToLatest(false);
+      shouldFollowLatestRef.current = true;
       return;
     }
     const previousFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement : null;
+    // Chat lives in a body-level portal, outside the clipped/scaled app shell.
+    // Prevent background page scrolling without trapping the user's chat scroll.
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     closeButtonRef.current?.focus({ preventScroll: true });
     const handleDialogKeyboard = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -132,6 +142,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
     document.addEventListener('keydown', handleDialogKeyboard, true);
     return () => {
       document.removeEventListener('keydown', handleDialogKeyboard, true);
+      document.body.style.overflow = previousBodyOverflow;
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, [isOpen]);
@@ -140,13 +151,26 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
     setExpandedTraces((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Keep the user's position when they scroll back through a long chat.
+  // Do not call scrollIntoView: that can also scroll the surrounding app.
+  const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
+    const list = messagesScrollRef.current;
+    if (!list) return;
+    shouldFollowLatestRef.current = true;
+    list.scrollTo({ top: list.scrollHeight, behavior });
+    setShowJumpToLatest(false);
+  };
+
+  const onMessagesScroll = () => {
+    const list = messagesScrollRef.current;
+    if (!list || !isOpen) return;
+    const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 100;
+    shouldFollowLatestRef.current = nearBottom;
+    setShowJumpToLatest(!nearBottom);
   };
 
   useEffect(() => {
-    if (isOpen && !filterQuery) {
-      console.info('[RODEX TRACE] CHAT UI RENDERED');
+    if (isOpen && !filterQuery && shouldFollowLatestRef.current) {
       scrollToBottom();
     }
   }, [messages, isOpen, filterQuery]);
@@ -155,6 +179,12 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
     setFilterQuery('');
     setShowSessionDrawer(false);
     setConfirmClear(false);
+    shouldFollowLatestRef.current = true;
+    setShowJumpToLatest(false);
+    const frame = window.requestAnimationFrame(() => {
+      if (isOpen) scrollToBottom();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [activeSession.id]);
 
   useEffect(() => {
@@ -203,7 +233,9 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
       )
     : messages;
 
-  return (
+  // A portal is required here: AndroidFrame and .rodex-home clip overflow
+  // and create stacking contexts that can hide full-screen chat controls.
+  return typeof document === 'undefined' ? null : createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -212,10 +244,10 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="rodex-chat-title"
-          initial={{ opacity: 0, y: '3%' }}
+          initial={reduceMotion ? false : { opacity: 0, y: '2%' }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: '3%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: '2%' }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: 'easeOut' }}
           className="rodex-chat-layer fixed inset-0 flex min-h-0 min-w-0 flex-col bg-[#050c17]/98 text-white"
         >
           {/* Primary navigation always stays visible, even at 320px width. */}
@@ -226,11 +258,11 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                 type="button"
                 onClick={() => { triggerHaptic('tap'); onClose(); }}
                 className="rodex-chat-back flex shrink-0 items-center gap-1.5 rounded-xl border border-cyan-500/35 bg-cyan-950/60 px-3 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-900/70"
-                title="Return to RODEX home"
+                title="Back to RODEX home"
                 aria-label="Back to RODEX home"
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden min-[370px]:inline">Back</span>
+                <span>Home</span>
               </button>
 
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -256,7 +288,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                 className="rodex-chat-close flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white shadow-sm transition-colors hover:border-cyan-300/60 hover:bg-white/20"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
-                <span className="sr-only">Close chat</span>
+                <span className="rodex-chat-close-label">Close</span>
               </button>
             </div>
 
@@ -274,6 +306,23 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
               >
                 {isLiveConversation ? <PhoneOff className="h-4 w-4" /> : <PhoneCall className="h-4 w-4" />}
                 {isLiveConversation ? 'End call' : 'Voice call'}
+              </button>
+              <button
+                id="new-chat-session-btn"
+                type="button"
+                onClick={() => {
+                  triggerHaptic('tap');
+                  onNewSession();
+                  setShowSessionDrawer(false);
+                  setConfirmClear(false);
+                  shouldFollowLatestRef.current = true;
+                }}
+                aria-label="Start a new chat conversation"
+                title="New conversation"
+                className="rodex-chat-action flex shrink-0 items-center gap-1.5 rounded-xl border border-cyan-400/25 bg-cyan-950/45 px-3 text-xs text-cyan-100 hover:border-cyan-300/65 hover:bg-cyan-900/60"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                New chat
               </button>
               <button
                 id="toggle-session-history-btn"
@@ -437,7 +486,8 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                 type="text"
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                placeholder="Search within this live session..."
+                placeholder="Search this conversation..."
+                aria-label="Search conversation messages"
                 className="w-full bg-transparent text-xs text-neutral-300 placeholder-neutral-600 focus:outline-none"
               />
               {filterQuery && (
@@ -452,7 +502,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           )}
 
           {/* Conversation Body */}
-          <div ref={messagesScrollRef} className="rodex-chat-messages min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-4 sm:px-6" role="log" aria-live="polite" aria-relevant="additions text">
+          <div ref={messagesScrollRef} onScroll={onMessagesScroll} className="rodex-chat-messages min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-4 sm:px-6" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation messages">
             {filteredMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-neutral-500 space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-center text-cyan-400">
@@ -1044,6 +1094,16 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
+          {/* An unobtrusive way back to new replies after reading older messages. */}
+          {showJumpToLatest && !filterQuery && (
+            <div className="rodex-chat-jump-wrap">
+              <button type="button" className="rodex-chat-jump" onClick={() => scrollToBottom('smooth')}>
+                <ChevronDown aria-hidden="true" className="h-4 w-4" />
+                Latest messages
+              </button>
+            </div>
+          )}
+
           {/* Bottom Chat Input Bar */}
           <footer className="rodex-chat-footer shrink-0 border-t border-cyan-900/40 bg-[#081322]/95 px-3 pt-3 sm:px-5">
             <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
@@ -1081,6 +1141,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           </footer>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
