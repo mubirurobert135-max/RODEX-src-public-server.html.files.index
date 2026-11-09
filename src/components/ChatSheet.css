@@ -88,3 +88,19 @@
   .rodex-chat-layer, .rodex-chat-layer * { scroll-behavior: auto !important; }
   .rodex-chat-layer button { transition: none; }
 }
+
+
+/* Multiline chat composer: comfortable long prompts without expanding the
+   screen or hiding the Send control on a small phone. */
+.rodex-chat-composer {
+  display: block;
+  min-height: 48px;
+  max-height: min(150px, 28dvh);
+  resize: vertical;
+  overflow-y: auto;
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+@media (max-width: 760px) {
+  .rodex-chat-composer { max-height: min(118px, 23dvh); resize: none; }
+}
