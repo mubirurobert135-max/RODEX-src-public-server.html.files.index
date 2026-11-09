@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-  ArrowRight, BookOpenText, CalendarDays, Code2, FileText, Folder,
-  Globe2, Mail, Maximize2, PanelRightClose, Search, Settings2, ShieldCheck,
+  ArrowRight, CalendarDays, Code2, FileText,
+  Globe2, Mail, Maximize2, PanelRightClose, Settings2,
   Sparkles, Wrench, MessageSquare, Brain, Stethoscope,
 } from 'lucide-react';
 import type { AssistantState, TaskState } from '../types';
