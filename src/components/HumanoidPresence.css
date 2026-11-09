@@ -59,8 +59,8 @@
 .rodex-human-mouth-motion {
   position: absolute;
   inset: 0;
-  clip-path: ellipse(9% 1.9% at 51% 50%);
-  transform-origin: 51% 50%;
+  clip-path: ellipse(12% 2.4% at 51% 64%);
+  transform-origin: 51% 64%;
   transform: scaleY(calc(1 + (var(--rodex-speech-level) * .11)));
   transition: transform 100ms linear;
 }
