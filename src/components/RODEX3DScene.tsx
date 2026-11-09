@@ -342,8 +342,9 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
   };
 }
 
-export function RODEX3DScene({ signal, compact = false, onUnavailable }: {
+export function RODEX3DScene({ signal, compact = false, onUnavailable, onInteract }: {
   signal: PresenceSignal; compact?: boolean; onUnavailable: () => void;
+  onInteract: () => void | Promise<void>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const signalRef = useRef(signal);
@@ -450,5 +451,8 @@ export function RODEX3DScene({ signal, compact = false, onUnavailable }: {
       pointerRef.current = { x: 0, y: 0, hovering: false };
     }}>
       <canvas ref={canvasRef} className="rodex3d-canvas" aria-hidden="true"/>
+      <button type="button" className="rodex-human-interact" onClick={onInteract}
+        aria-label={compact ? "Speak with RODEX floating companion" : "Talk to RODEX"}
+        title="Talk to RODEX"><span className="sr-only">Talk to RODEX</span></button>
     </div>;
 }
