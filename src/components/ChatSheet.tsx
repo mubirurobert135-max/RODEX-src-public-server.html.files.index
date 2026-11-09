@@ -147,6 +147,38 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
     };
   }, [isOpen]);
 
+  // Hardware/browser Back should leave chat and restore the existing RODEX
+  // screen, instead of navigating out of the application. The marker prevents
+  // a normal UI close from stepping back through an unrelated history entry.
+  useEffect(() => {
+    if (!isOpen) return;
+    const token = `rodex-chat-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const existingState = window.history.state;
+    let closedByBrowserBack = false;
+    try {
+      window.history.pushState(
+        { ...(existingState && typeof existingState === 'object' ? existingState : {}), rodexChatOverlay: token },
+        '',
+        window.location.href
+      );
+    } catch {
+      // History can be disabled in a constrained embedded browser; the Home,
+      // Close and Escape controls remain fully functional.
+      return;
+    }
+    const handleDeviceBack = () => {
+      closedByBrowserBack = true;
+      closeCallbackRef.current();
+    };
+    window.addEventListener('popstate', handleDeviceBack);
+    return () => {
+      window.removeEventListener('popstate', handleDeviceBack);
+      if (!closedByBrowserBack && window.history.state?.rodexChatOverlay === token) {
+        window.history.back();
+      }
+    };
+  }, [isOpen]);
+
   const toggleTrace = (id: string) => {
     setExpandedTraces((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -1138,6 +1170,21 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                 <Send className="w-5 h-5" />
               </button>
             </form>
+            {/* Persistent escape route: stays usable even if the title bar is
+                covered by a virtual keyboard, mobile browser chrome or zoom. */}
+            <div className="rodex-chat-footer-nav mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
+              <button
+                id="chat-footer-return-home-btn"
+                type="button"
+                onClick={() => { triggerHaptic('tap'); onClose(); }}
+                aria-label="Exit chat and return to RODEX home"
+                className="rodex-chat-footer-home"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                <span>Back to RODEX home</span>
+              </button>
+              <span className="rodex-chat-shortcut-note" aria-hidden="true">Esc to close chat</span>
+            </div>
           </footer>
         </motion.div>
       )}
