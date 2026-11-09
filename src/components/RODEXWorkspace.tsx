@@ -125,7 +125,7 @@ export const RODEXWorkspace: React.FC<RODEXWorkspaceProps> = ({
           </header>
           <div className="rodex-workspace-companion-visual">
             <HumanoidPresence compact state={state} taskState={taskState} audioLevel={audioLevel}
-              onInteract={onRobotClick} onExpand={onClose}/>
+              onInteract={onRobotClick}/>
           </div>
           <div className="rodex-workspace-companion-bottom">
             <button type="button" onClick={onChat}>
