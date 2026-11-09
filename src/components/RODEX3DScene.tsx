@@ -284,9 +284,10 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     const bodyY = Math.sin(c.breath) * .012;
     const yaw = c.yaw, pitch = c.pitch;
     // Sculpted shoulders, chest sockets and articulated metallic neck.
-    draw(raw.sphere, GRAPHITE, [0, -1.81 + bodyY, -.20], [1.26, .35, .52], c);
-    draw(raw.sphere, SILVER, [-.85, -1.55 + bodyY, -.13], [.51, .29, .42], c);
-    draw(raw.sphere, SILVER, [.85, -1.55 + bodyY, -.13], [.51, .29, .42], c);
+    draw(raw.sphere, GRAPHITE, [0, -1.82 + bodyY, -.40], [.95, .23, .32], c);
+    // Shoulder pivots are deliberately recessed behind the original bust.
+    draw(raw.sphere, GRAPHITE, [-.67, -1.69 + bodyY, -.35], [.34, .18, .23], c);
+    draw(raw.sphere, GRAPHITE, [.67, -1.69 + bodyY, -.35], [.34, .18, .23], c);
     draw(raw.sphere, GRAPHITE, [0, -1.12 + bodyY, -.14], [.34, .75, .34], c);
     draw(raw.sphere, SILVER, [-.30, -1.24 + bodyY, .12], [.070, .55, .10], c);
     draw(raw.sphere, SILVER, [.30, -1.24 + bodyY, .12], [.070, .55, .10], c);
@@ -296,31 +297,34 @@ function createRenderer(canvas: HTMLCanvasElement, onLost: () => void) {
     }
     draw(raw.neck, PEARL, [0, bodyY, .07], [1, 1, 1], c, false, true);
     // Convex sculpt beneath facial texture gives real parallax when head turns.
-    draw(raw.sphere, GRAPHITE, [0, .37, -.13], [1.01, 1.44, .56], c, true);
-    draw(raw.sphere, IVORY, [0, .35, -.04], [.96, 1.35, .52], c, true);
-    draw(raw.sphere, SILVER, [-.94, .73, -.02], [.21, .37, .24], c, true);
-    draw(raw.sphere, SILVER, [.94, .73, -.02], [.21, .37, .24], c, true);
-    draw(raw.ring, GRAPHITE, [-1.02, .83, .14], [.25, .34, .08], c, true);
-    draw(raw.ring, GRAPHITE, [1.02, .83, .14], [.25, .34, .08], c, true);
+    draw(raw.sphere, GRAPHITE, [0, .37, -.19], [.89, 1.35, .49], c, true);
+    draw(raw.sphere, IVORY, [0, .35, -.11], [.88, 1.30, .47], c, true);
+    // Low-profile titanium articulation, not external cartoon ear handles.
+    draw(raw.sphere, GRAPHITE, [-.88, .70, -.18], [.13, .23, .16], c, true);
+    draw(raw.sphere, GRAPHITE, [.88, .70, -.18], [.13, .23, .16], c, true);
+    draw(raw.sphere, SILVER, [-.88, .75, -.075], [.07, .17, .055], c, true);
+    draw(raw.sphere, SILVER, [.88, .75, -.075], [.07, .17, .055], c, true);
     // UV projected approved identity: the image is now attached to a true 3D shell.
     draw(raw.head, PEARL, [0, 0, .08], [1, 1, 1], c, true, true);
     // Separate geometries for eyelids and jaw opening. The approved face
     // remains recognizable when animation is paused or audio is unavailable.
     const eyeY = .37 + pitch * .035;
-    const lid = .002 + c.blink * .096;
-    for (const side of [-1, 1]) {
-      const x = side * .385;
-      draw(raw.sphere, IVORY, [x, eyeY + .062 - c.blink * .043, .761],
-        [.24, lid, .021], c, true);
-      draw(raw.sphere, IVORY, [x, eyeY - .055 + c.blink * .033, .762],
-        [.24, lid * .63, .020], c, true);
-      // Eye reflections are restrained, not cartoon pupils.
-      if (c.blink < .65) {
-        draw(raw.sphere, PEARL, [x - .013 + c.gaze * .018, eyeY + .055, .775],
-          [.022, .008, .009], c, true);
+    // Blink geometry is hidden when the eye is open. No permanent white
+    // horizontal stripes across the original humanlike eye texture.
+    if (c.blink > .08) {
+      const lid = c.blink * .088;
+      for (const side of [-1, 1]) {
+        const x = side * .385 + c.gaze * .004;
+        draw(raw.sphere, IVORY, [x, eyeY + .057 - c.blink * .042, .761],
+          [.22, lid, .022], c, true);
+        draw(raw.sphere, IVORY, [x, eyeY - .054 + c.blink * .036, .762],
+          [.22, lid * .64, .020], c, true);
       }
     }
     const mouth = CLAMP(c.mouth, 0, 1);
+    // Jaw bone is articulated behind the approved facial surface.
+    draw(raw.sphere, IVORY, [0, -.78 - mouth * .048, -.08],
+      [.40, .22, .33], c, true);
     if (mouth > .025) {
       draw(raw.sphere, DARK, [0, -.51 - mouth * .025, .761],
         [.166 + mouth * .016, .008 + mouth * .095, .018], c, true);
