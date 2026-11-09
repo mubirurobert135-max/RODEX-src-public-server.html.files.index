@@ -77,6 +77,9 @@ jobs:
       - name: Chat navigation and responsive UI regression
         run: bun run test:chat-ui
 
+      - name: Human Presence and minimalist workspace integration
+        run: bun run test:human-presence
+
       - name: Authentication access guards
         run: bun run test:auth
 
