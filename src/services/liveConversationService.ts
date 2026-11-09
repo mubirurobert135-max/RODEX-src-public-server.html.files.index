@@ -882,7 +882,12 @@ export class LiveConversationService {
           if (this.ws !== ws || this.explicitShutdown) return;
           try {
             const data = JSON.parse(event.data);
-            this.handleServerMessage(data);
+            void this.handleServerMessage(data).catch((err) => {
+              const detail = err?.message || String(err);
+              this.diag.lastErrorMessage = `Live packet processing failed: ${detail}`;
+              this.addTrace(this.diag.lastErrorMessage);
+              this.callbacks.onError?.(this.diag.lastErrorMessage);
+            });
           } catch (err) {
             console.error('[RODEX Live] Failed parsing server message', err);
           }
@@ -1115,7 +1120,7 @@ export class LiveConversationService {
         this.lastError = errorMsg;
         // Misconfiguration/quotas require an operator action, not infinite
         // automatic reconnect loops that keep reopening a doomed WebSocket.
-        if (/api key.*(?:unconfigured|invalid)|quota|billing|permission denied|unauthenticated/i.test(errorMsg)) {
+        if (/api key.*(?:unconfigured|invalid)|quota|billing|permission denied|unauthenticated|resource.exhausted|\b(?:401|403|429)\b/i.test(errorMsg)) {
           this.explicitShutdown = true;
           if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.close();
         }
@@ -1253,7 +1258,10 @@ export class LiveConversationService {
           this.isSpeaking = true;
           this.diag.orbVoiceState = 'SPEAKING';
           this.setStatus('speaking');
+          let fallbackFinished = false;
           const finishFallback = () => {
+            if (fallbackFinished) return;
+            fallbackFinished = true;
             this.isSpeaking = false;
             this.diag.orbVoiceState = 'LISTENING';
             this.setStatus('listening');
@@ -1309,8 +1317,13 @@ export class LiveConversationService {
         break;
 
       case 'session_closed':
-        this.addTrace('LIVE SESSION CLOSED');
-        this.stop();
+        this.diag.upstreamConnected = false;
+        this.addTrace('GEMINI UPSTREAM CLOSED; RECONNECTING');
+        // Do not tear down microphone permission for a recoverable upstream
+        // disconnect. The WebSocket close handler owns backoff/reconnection.
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.close(1012, 'Gemini session ended');
+        }
         break;
     }
   }
@@ -1661,9 +1674,16 @@ export class LiveConversationService {
   private async processAndScheduleStreamingChunk(chunkBytes: Uint8Array, mimeType?: string) {
     const rawMime = mimeType || 'audio/pcm;rate=24000';
     const rateMatch = rawMime.match(/rate=(\d+)/);
-    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+    const proposedRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+    const sampleRate = Number.isFinite(proposedRate) && proposedRate >= 8000 && proposedRate <= 96000
+      ? proposedRate : 24000;
+    if (chunkBytes.byteLength < 2 || chunkBytes.byteLength % 2 !== 0) {
+      this.diag.audioDataValid = 'FAIL';
+      this.addTrace('INVALID LIVE PCM CHUNK: expected aligned signed 16-bit audio');
+      return;
+    }
 
-    const int16 = new Int16Array(chunkBytes.buffer);
+    const int16 = new Int16Array(chunkBytes.buffer, chunkBytes.byteOffset, chunkBytes.byteLength / 2);
     const sampleCount = int16.length;
     this.diag.sampleCount += sampleCount;
 
