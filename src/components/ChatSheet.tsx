@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
+  ArrowLeft,
   Send,
   Volume2,
   Copy,
@@ -40,6 +41,7 @@ import {
 import { ChatMessage, AssistantState, ChatSession } from '../types';
 import { triggerHaptic } from '../utils/haptics';
 import { formatSessionTranscript } from '../utils/sessionStorage';
+import './ChatSheet.css';
 
 interface ChatSheetProps {
   isOpen: boolean;
@@ -84,6 +86,53 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
   const [expandedTraces, setExpandedTraces] = useState<Record<string, boolean>>({});
   const [approvingActionId, setApprovingActionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatDialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeCallbackRef = useRef(onClose);
+  closeCallbackRef.current = onClose;
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  // Full-screen chat acts as a real dialog: Escape closes it, Tab remains
+  // inside the chat and focus returns to the control that opened it.
+  useEffect(() => {
+    if (!isOpen) {
+      setShowSessionDrawer(false);
+      setConfirmClear(false);
+      return;
+    }
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement : null;
+    closeButtonRef.current?.focus({ preventScroll: true });
+    const handleDialogKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeCallbackRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || !chatDialogRef.current) return;
+      const focusable = Array.from(
+        chatDialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(element => element.getClientRects().length > 0);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !chatDialogRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !chatDialogRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleDialogKeyboard, true);
+    return () => {
+      document.removeEventListener('keydown', handleDialogKeyboard, true);
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [isOpen]);
 
   const toggleTrace = (id: string) => {
     setExpandedTraces((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -138,127 +187,120 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
       {isOpen && (
         <motion.div
           id="rodex-chat-sheet"
-          initial={{ opacity: 0, y: '100%' }}
+          ref={chatDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rodex-chat-title"
+          initial={{ opacity: 0, y: '3%' }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-          className="fixed inset-0 z-40 bg-black/95 backdrop-blur-2xl flex flex-col justify-between"
+          exit={{ opacity: 0, y: '3%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="rodex-chat-layer fixed inset-0 flex min-h-0 min-w-0 flex-col bg-[#050c17]/98 text-white"
         >
-          {/* Top Session Header */}
-          <header className="px-4 py-3 border-b border-neutral-900 flex items-center justify-between bg-black/90 shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span
-                className={`w-2.5 h-2.5 rounded-full ${
-                  isLiveConversation
-                    ? 'bg-rose-500 shadow-[0_0_12px_#f43f5e] animate-ping'
-                    : 'bg-cyan-400 shadow-[0_0_10px_#22d3ee] animate-pulse'
-                }`}
-              />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-white tracking-wider truncate">
-                    {isLiveConversation ? 'LIVE RODEX CALL' : 'RODEX CHAT SESSION'}
-                  </h2>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800/80 font-mono shrink-0">
-                    {messages.length} msgs
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-neutral-400 truncate">
-                  <span className="truncate">{activeSession.title || 'Live Session'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              {/* Return to Voice Orb Button */}
+          {/* Primary navigation always stays visible, even at 320px width. */}
+          <header className="rodex-chat-header shrink-0 border-b border-cyan-900/35 bg-[#081322]/95">
+            <div className="rodex-chat-primary flex min-w-0 items-center gap-2 px-3 sm:px-5">
               <button
                 id="close-chat-to-orb-btn"
-                onClick={() => {
-                  triggerHaptic('tap');
-                  onClose();
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-950/90 hover:bg-cyan-900 border border-cyan-700/80 text-cyan-300 text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-sm"
-                title="Return to RODEX"
+                type="button"
+                onClick={() => { triggerHaptic('tap'); onClose(); }}
+                className="rodex-chat-back flex shrink-0 items-center gap-1.5 rounded-xl border border-cyan-500/35 bg-cyan-950/60 px-3 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-900/70"
+                title="Return to RODEX home"
+                aria-label="Back to RODEX home"
               >
-                <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                <span className="hidden sm:inline">RODEX</span>
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden min-[370px]:inline">Back</span>
               </button>
 
-              {/* Live Audio Call Connect / End Button */}
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${isLiveConversation ? 'bg-rose-400' : 'bg-cyan-400'}`} aria-hidden="true" />
+                <div className="min-w-0">
+                  <h2 id="rodex-chat-title" className="truncate text-sm font-bold tracking-wide text-white sm:text-base">
+                    RODEX Chat
+                  </h2>
+                  <p className="truncate text-[11px] text-slate-400">
+                    {isLiveConversation ? 'Live voice conversation' : (activeSession.title || 'Conversation')}
+                    <span className="ml-2 text-slate-500">· {messages.length} messages</span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                id="close-chat-btn"
+                type="button"
+                ref={closeButtonRef}
+                onClick={() => { triggerHaptic('tap'); onClose(); }}
+                aria-label="Close chat and return to RODEX"
+                title="Close chat"
+                className="rodex-chat-close flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white shadow-sm transition-colors hover:border-cyan-300/60 hover:bg-white/20"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+                <span className="sr-only">Close chat</span>
+              </button>
+            </div>
+
+            {/* Secondary controls may scroll horizontally; primary navigation does not. */}
+            <div className="rodex-chat-actions flex min-w-0 items-center gap-2 overflow-x-auto px-3 pb-2 sm:px-5">
               <button
                 id="sheet-live-call-toggle-btn"
-                onClick={() => {
-                  triggerHaptic('tap');
-                  onToggleLiveCall();
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-md active:scale-95 cursor-pointer ${
-                  isLiveConversation
-                    ? 'bg-rose-600/90 hover:bg-rose-500 text-white shadow-rose-950 border border-rose-400'
-                    : 'bg-emerald-600/90 hover:bg-emerald-500 text-white shadow-emerald-950 border border-emerald-400'
-                }`}
-                title={isLiveConversation ? 'End Live Two-Way Call' : 'Connect Live with RODEX'}
+                type="button"
+                onClick={() => { triggerHaptic('tap'); onToggleLiveCall(); }}
+                className={`rodex-chat-action flex shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors ${isLiveConversation
+                  ? 'border-rose-400/50 bg-rose-600/80 text-white hover:bg-rose-500'
+                  : 'border-cyan-400/35 bg-cyan-950/65 text-cyan-100 hover:bg-cyan-900'}`}
+                aria-label={isLiveConversation ? 'End live voice call' : 'Start live voice call'}
+                title={isLiveConversation ? 'End live two-way call' : 'Start live voice call'}
               >
-                {isLiveConversation ? (
-                  <>
-                    <PhoneOff className="w-3.5 h-3.5 animate-pulse" />
-                    <span className="hidden xs:inline">END CALL</span>
-                  </>
-                ) : (
-                  <>
-                    <PhoneCall className="w-3.5 h-3.5 text-emerald-100" />
-                    <span className="hidden xs:inline">CONNECT LIVE</span>
-                  </>
-                )}
+                {isLiveConversation ? <PhoneOff className="h-4 w-4" /> : <PhoneCall className="h-4 w-4" />}
+                {isLiveConversation ? 'End call' : 'Voice call'}
               </button>
-
-              {/* Sessions Drawer Toggle */}
               <button
                 id="toggle-session-history-btn"
-                onClick={() => {
-                  triggerHaptic('tap');
-                  setShowSessionDrawer(!showSessionDrawer);
-                }}
-                title="View & Retrieve Stored Sessions"
-                className={`p-2 rounded-xl border transition-colors ${
-                  showSessionDrawer
-                    ? 'bg-cyan-950/80 text-cyan-300 border-cyan-700'
-                    : 'bg-neutral-900/90 text-neutral-400 border-neutral-800 hover:text-white hover:bg-neutral-800'
-                }`}
+                type="button"
+                onClick={() => { triggerHaptic('tap'); setShowSessionDrawer(value => !value); }}
+                aria-label="Conversation history"
+                aria-expanded={showSessionDrawer}
+                className={`rodex-chat-action flex shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs transition-colors ${showSessionDrawer
+                  ? 'border-cyan-500/50 bg-cyan-950 text-cyan-200'
+                  : 'border-slate-700/70 bg-slate-900/70 text-slate-200 hover:bg-slate-800'}`}
               >
-                <History className="w-4 h-4" />
+                <History className="h-4 w-4" /> History
               </button>
-
-              {/* Copy Full Transcript */}
               <button
                 id="copy-session-transcript-btn"
+                type="button"
                 onClick={handleCopyTranscript}
-                title="Copy Full Session Transcript"
-                className="p-2 text-neutral-400 hover:text-cyan-400 rounded-xl hover:bg-neutral-900 border border-neutral-800 transition-colors"
+                aria-label="Copy conversation transcript"
+                title="Copy transcript"
+                className="rodex-chat-action flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-700/70 bg-slate-900/70 px-3 text-xs text-slate-200 hover:bg-slate-800"
               >
-                {copiedTranscript ? <Check className="w-4 h-4 text-emerald-400" /> : <Download className="w-4 h-4" />}
+                {copiedTranscript ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                {copiedTranscript ? 'Copied' : 'Copy'}
               </button>
-
               {messages.length > 0 && (
                 <button
                   id="clear-chat-btn"
-                  onClick={onClearHistory}
-                  title="Clear current session messages"
-                  className="p-2 text-neutral-500 hover:text-red-400 rounded-xl hover:bg-neutral-900 border border-neutral-800 transition-colors"
+                  type="button"
+                  onClick={() => setConfirmClear(value => !value)}
+                  aria-label="Clear conversation messages"
+                  aria-expanded={confirmClear}
+                  className="rodex-chat-action flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-700/70 bg-slate-900/70 px-3 text-xs text-slate-200 hover:border-rose-500/40 hover:text-rose-300"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="h-4 w-4" /> Clear
                 </button>
               )}
-
-              {/* Close Sheet */}
-              <button
-                id="close-chat-btn"
-                onClick={onClose}
-                className="p-2 text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-900 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
           </header>
+
+          {confirmClear && (
+            <div role="alertdialog" aria-label="Confirm clearing chat" className="rodex-chat-confirm flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-rose-900/50 bg-rose-950/40 px-4 py-2">
+              <span className="text-xs text-rose-100">Clear all messages in this conversation?</span>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setConfirmClear(false)} className="rounded-lg border border-slate-600 px-3 py-2 text-xs text-white">Cancel</button>
+                <button type="button" onClick={() => { onClearHistory(); setConfirmClear(false); }} className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500">Clear messages</button>
+              </div>
+            </div>
+          )}
 
           {/* Session Switcher / Retrieval Drawer */}
           <AnimatePresence>
@@ -381,7 +423,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           )}
 
           {/* Conversation Body */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          <div className="rodex-chat-messages min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-4 sm:px-6" role="log" aria-live="polite" aria-relevant="additions text">
             {filteredMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-neutral-500 space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-center text-cyan-400">
@@ -434,7 +476,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                   </div>
 
                   <div
-                    className={`relative max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    className={`rodex-chat-bubble relative max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[80%] ${
                       msg.sender === 'user'
                         ? 'bg-gradient-to-br from-cyan-600/90 to-teal-700/90 text-white rounded-tr-sm shadow-[0_4px_16px_rgba(6,182,212,0.15)]'
                         : 'bg-neutral-950 border border-neutral-800/90 text-neutral-200 rounded-tl-sm shadow-[0_4px_20px_rgba(0,0,0,0.5)]'
@@ -974,8 +1016,8 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           </div>
 
           {/* Bottom Chat Input Bar */}
-          <footer className="p-3 border-t border-neutral-900 bg-black/95 shrink-0 flex justify-center">
-            <form onSubmit={handleSubmit} className="flex items-center gap-2 w-full max-w-3xl">
+          <footer className="rodex-chat-footer shrink-0 border-t border-cyan-900/40 bg-[#081322]/95 px-3 pt-3 sm:px-5">
+            <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
               <input
                 id="chat-text-input"
                 type="text"
@@ -986,14 +1028,16 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
                     ? 'Live call active... type or speak to RODEX'
                     : 'Message RODEX in this session...'
                 }
-                className="flex-1 bg-neutral-950 text-white placeholder-neutral-500 text-sm px-4 py-3 rounded-xl border border-neutral-800 focus:outline-none focus:border-cyan-500/80 transition-colors"
+                aria-label="Message RODEX"
+                className="min-w-0 flex-1 rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3 text-sm text-white placeholder-slate-500 transition-colors focus:border-cyan-400/80 focus:outline-none"
               />
 
               <button
                 type="submit"
                 id="chat-send-button"
                 disabled={!inputText.trim() || assistantState === 'thinking'}
-                className="p-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold disabled:opacity-30 disabled:hover:bg-cyan-500 transition-all active:scale-95"
+                aria-label="Send message"
+                className="shrink-0 rounded-xl bg-cyan-400 p-3 font-semibold text-slate-950 transition-all hover:bg-cyan-300 disabled:opacity-30 disabled:hover:bg-cyan-400 active:scale-95"
               >
                 <Send className="w-5 h-5" />
               </button>
