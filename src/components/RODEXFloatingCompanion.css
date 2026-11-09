@@ -1,0 +1,40 @@
+/* Floating RODEX over tool dialogs, never over the body-level chat. */
+.rodex-floating-companion {
+  position:fixed;z-index:9500;
+  bottom:max(24px,env(safe-area-inset-bottom));
+  right:max(24px,env(safe-area-inset-right));
+  width:190px;height:270px;
+  display:flex;flex-direction:column;
+  border:1px solid #666;border-radius:18px;background:#080808;color:#fff;
+  box-shadow:0 12px 45px rgba(0,0,0,.7);
+  overflow:hidden;isolation:isolate;
+}
+.rodex-floating-header {
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:7px 9px 7px 12px;background:#141414;border-bottom:1px solid #393939;
+  gap:5px;font:650 10px 'Manrope',system-ui,sans-serif;letter-spacing:.08em;
+}
+.rodex-floating-actions {display:flex;align-items:center;gap:3px;}
+.rodex-floating-actions button {
+  width:28px;height:28px;display:grid;place-items:center;border:1px solid transparent;
+  border-radius:8px;background:transparent;color:#fff;cursor:pointer;
+}
+.rodex-floating-actions button:hover {border-color:#777;background:#313131;}
+.rodex-floating-image {flex:1 1 auto;min-height:0;overflow:hidden;background:#000;}
+.rodex-floating-companion--min {width:174px;height:45px;}
+.rodex-floating-companion--min .rodex-floating-header {height:100%;border:0;}
+.rodex-floating-companion button:focus-visible {outline:2px solid #fff;outline-offset:2px;}
+@media(max-width:620px) {
+  .rodex-floating-companion {
+    width:122px;height:180px;
+    bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px));
+    right:10px;border-radius:13px;
+  }
+  .rodex-floating-header {padding:4px 5px;font-size:9px;}
+  .rodex-floating-actions {gap:0;}
+  .rodex-floating-actions button {height:25px;width:25px;}
+  .rodex-floating-companion--min {width:145px;height:35px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .rodex-floating-companion,.rodex-floating-companion * {animation:none!important;transition:none!important;}
+}

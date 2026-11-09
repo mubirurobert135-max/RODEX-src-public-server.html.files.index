@@ -164,8 +164,12 @@ export class SpeechSynthesizer {
       const quality = (v: SpeechSynthesisVoice): number => {
         const name = v.name.toLowerCase();
         let score = 0;
-        if (/neural|natural|enhanced|premium/.test(name)) score += 9;
-        if (/aria|jenny|samantha|sonia|ava|zira|olivia|victoria/.test(name)) score += 6;
+        if (/neural|natural|enhanced|premium/.test(name)) score += 12;
+        // Where OS voice names make it possible, prefer a modern,
+        // humanlike feminine timbre for the approved RODEX personality.
+        // Do not override the user's explicitly selected voice.
+        if (/aria|jenny|samantha|sonia|ava|zira|olivia|victoria|female|hazel|serena|susan|allison|siri/.test(name)) score += 17;
+        if (/david|daniel|george|guy|mark|thomas|male/.test(name)) score -= 8;
         if (/google|microsoft|apple/.test(name)) score += 4;
         if (!v.localService) score += 2;
         if (/^en[-_](us|gb)/i.test(v.lang)) score += 1;

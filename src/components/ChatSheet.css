@@ -358,3 +358,56 @@
 @media (prefers-reduced-motion: reduce) {
   .rodex-chat-footer-home { transition: none; }
 }
+
+
+/* RODEX HUMAN PRESENCE / CHAT
+   Matches the official pure monochrome workspace. Chat is portaled to body,
+   so these rules cannot depend on the parent .rodex-monochrome class. */
+.rodex-chat-layer {background:#000!important;color:#fff!important;}
+.rodex-chat-header,.rodex-chat-primary,.rodex-chat-actions {
+  background:#080808!important;
+  border-color:#292929!important;
+  box-shadow:none!important;
+}
+.rodex-chat-back,.rodex-chat-close {
+  background:#171717!important;border:1px solid #555!important;
+  color:#fff!important;box-shadow:none!important;
+}
+.rodex-chat-back:hover,.rodex-chat-close:hover {
+  background:#303030!important;border-color:#fff!important;
+}
+.rodex-chat-action,.rodex-chat-jump,.rodex-chat-footer-home {
+  background:#171717!important;border-color:#555!important;color:#fff!important;
+  box-shadow:none!important;
+}
+.rodex-chat-action:hover,.rodex-chat-jump:hover,.rodex-chat-footer-home:hover {
+  background:#303030!important;border-color:#fff!important;
+}
+.rodex-chat-footer,.rodex-chat-confirm {
+  background:#090909!important;border-color:#323232!important;
+  box-shadow:none!important;
+}
+.rodex-chat-messages {background:#000!important;}
+.rodex-chat-composer {
+  background:#181818!important;color:#fff!important;
+  border:1px solid #595959!important;
+}
+.rodex-chat-layer #chat-send-button {
+  background:#fff!important;color:#000!important;border:1px solid #fff!important;
+}
+.rodex-chat-layer #chat-send-button:disabled {opacity:.32;}
+.rodex-chat-layer :where([class*="text-cyan-"],[class*="text-rose-"],
+  [class*="text-purple-"],[class*="text-emerald-"],[class*="text-amber-"]) {
+  color:#fff!important;
+}
+.rodex-chat-layer :where([class*="bg-cyan-"],[class*="bg-rose-"],
+  [class*="bg-purple-"],[class*="bg-emerald-"],[class*="bg-amber-"]) {
+  background-color:#1c1c1c!important;
+}
+.rodex-chat-layer :where([class*="border-cyan-"],[class*="border-rose-"],
+  [class*="border-purple-"],[class*="border-emerald-"]) {
+  border-color:#555!important;
+}
+.rodex-chat-layer :is(button,input,textarea):focus-visible {
+  outline:2px solid #fff!important;outline-offset:2px!important;
+}
