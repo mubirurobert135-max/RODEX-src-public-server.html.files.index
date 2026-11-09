@@ -12,6 +12,8 @@ const live = readFileSync('server/services/liveGeminiService.ts', 'utf8');
 const speech = readFileSync('src/utils/speech.ts', 'utf8');
 const server = readFileSync('server.ts', 'utf8');
 const chatCss = readFileSync('src/components/ChatSheet.css', 'utf8');
+const floating = readFileSync('src/components/RODEXFloatingCompanion.tsx', 'utf8');
+const floatingCss = readFileSync('src/components/RODEXFloatingCompanion.css', 'utf8');
 
 const imageBytes = Buffer.from(RODEX_APPROVED_PORTRAIT.split(',')[1] || '', 'base64');
 const checks: [string, boolean][] = [
@@ -59,6 +61,15 @@ const checks: [string, boolean][] = [
   ['Provider failure no longer presents fake success',
     !server.includes('My voice subsystems and live link remain verified and active') &&
     server.includes("I couldn't reach my AI service just now")],
+  ['Floating companion portaled above tool dialogs but not chat',
+    floating.includes('createPortal(') && floating.includes('document.body') &&
+    floatingCss.includes('z-index:9500') && chatCss.includes('z-index: 9999')],
+  ['Floating companion can expand, minimize and hide',
+    floating.includes('Minimize RODEX companion') && floating.includes('Hide floating RODEX companion') &&
+    floating.includes('onClick={onExpand}')],
+  ['Floating companion appears only for active tool surfaces',
+    app.includes('<RODEXFloatingCompanion') && app.includes("activeMode !== 'home'") &&
+    app.includes('!isChatOpen')],
   ['Mobile workspace and portrait are responsive',
     workspaceCss.includes('@media(max-width:620px)') &&
     humanoidCss.includes('@media (max-width: 900px)')],
