@@ -78,6 +78,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [isOpen]);
 
+  // Settings are a full-screen dialog. Keyboard users should be able to
+  // escape without hunting for a small icon in a scrolled panel.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || document.getElementById('rodex-chat-sheet')) return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   // Deduplicate and provide guaranteed unique React keys for voice options
   const sanitizedVoices = useMemo(() => {
     const seen = new Set<string>();
@@ -128,25 +141,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       {isOpen && (
         <motion.div
           id="rodex-settings-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rodex-settings-title"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col justify-between overflow-hidden"
         >
           {/* Header */}
-          <header className="px-5 py-4 border-b border-neutral-900 flex items-center justify-between bg-black/80">
+          <header className="shrink-0 px-4 sm:px-5 py-3 sm:py-4 border-b border-neutral-900 flex items-center justify-between gap-3 bg-black/90"
+            style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-400" />
-              <h2 className="text-base font-semibold text-white tracking-wider">
-                RODEX PREFERENCES
+              <h2 id="rodex-settings-title" className="text-sm sm:text-base font-semibold text-white tracking-wide">
+                RODEX Settings
               </h2>
             </div>
             <button
               id="close-settings-btn"
+              type="button"
               onClick={onClose}
-              className="p-2 text-neutral-400 hover:text-white rounded-xl hover:bg-neutral-900 transition-colors"
+              aria-label="Close settings and return to RODEX"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-neutral-700/80 bg-neutral-900/90 px-3 text-white hover:border-cyan-400/70 hover:bg-neutral-800 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5" aria-hidden="true" />
+              <span className="hidden sm:inline text-xs font-semibold">Close</span>
             </button>
           </header>
 
