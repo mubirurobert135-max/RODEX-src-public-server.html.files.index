@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 const chat = readFileSync('src/components/ChatSheet.tsx', 'utf8');
 const css = readFileSync('src/components/ChatSheet.css', 'utf8');
 const app = readFileSync('src/App.tsx', 'utf8');
+const menu = readFileSync('src/components/MoreMenu.tsx', 'utf8');
+const settings = readFileSync('src/components/SettingsModal.tsx', 'utf8');
 
 const tests: Array<[string, boolean]> = [
   ['Chat has a dedicated Return button', chat.includes('id="close-chat-to-orb-btn"') && chat.includes('Back to RODEX home')],
@@ -33,6 +35,14 @@ const tests: Array<[string, boolean]> = [
   ['Clearing conversation requires confirmation', chat.includes('confirmClear &&') && chat.includes('Clear messages')],
   ['Chat is connected to RODEX App close state', app.includes('onClose={() => setIsChatOpen(false)}')],
   ['Voice call action preserved in chat', chat.includes('onToggleLiveCall();')],
+  ['Persistent footer Back to RODEX action is present', chat.includes('id="chat-footer-return-home-btn"') && chat.includes('>Back to RODEX home</span>')],
+  ['Footer escape route remains visible on phones', css.includes('.rodex-chat-footer-nav') && css.includes('.rodex-chat-footer-home')],
+  ['Hardware browser Back closes chat rather than leaving the app', chat.includes('window.history.pushState(') && chat.includes("window.addEventListener('popstate', handleDeviceBack)") && chat.includes('closeCallbackRef.current();')],
+  ['Normal chat close restores browser history', chat.includes('window.history.back()') && chat.includes('closedByBrowserBack')],
+  ['More menu close stays available when items scroll', menu.includes('sticky top-0') && menu.includes('overflow-y-auto overscroll-contain')],
+  ['More menu declares modal semantics', menu.includes('aria-modal="true"') && menu.includes('aria-label="Close menu"')],
+  ['Settings has accessible Close and Escape handling', settings.includes('aria-label="Close settings and return to RODEX"') && settings.includes("event.key !== 'Escape'")],
+  ['Settings dialog has an accessible title', settings.includes('aria-labelledby="rodex-settings-title"') && settings.includes('id="rodex-settings-title"')],
 ];
 let passed = 0;
 for (const [name, ok] of tests) {
